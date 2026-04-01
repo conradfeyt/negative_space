@@ -1,0 +1,350 @@
+// commands.rs — Data structures and utility functions for Negative _.
+//
+// RUST CONCEPT: This file is a "module". We declare it in lib.rs with `mod commands;`
+// so the compiler includes it as part of our crate. Everything marked `pub` here
+// is accessible from lib.rs via `commands::SomeType`.
+
+// RUST CONCEPT: `use` brings items from other crates/modules into scope so we
+// don't have to type the full path every time.
+use serde::{Deserialize, Serialize};
+
+// ---------------------------------------------------------------------------
+// Data structures
+// ---------------------------------------------------------------------------
+// RUST CONCEPT: `#[derive(...)]` auto-generates trait implementations.
+//   - Serialize / Deserialize: lets serde convert these to/from JSON.
+//     Tauri uses this to send data to the Vue frontend.
+//   - Clone: lets us duplicate values with `.clone()`.
+//   - Debug: lets us print the struct with `{:?}` in format strings (handy for logging).
+
+/// Disk usage statistics for the root volume.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DiskUsage {
+    /// Total disk space in bytes
+    pub total: u64,
+    /// Used disk space in bytes
+    pub used: u64,
+    /// Free disk space in bytes
+    pub free: u64,
+    /// Usage as a percentage (0.0 – 100.0)
+    pub percentage: f64,
+}
+
+/// Information about a single file found during a large-file scan.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FileInfo {
+    /// Absolute path to the file
+    pub path: String,
+    /// File name (last component of the path)
+    pub name: String,
+    /// Apparent (logical) size in bytes — what `ls -l` shows
+    pub apparent_size: u64,
+    /// Actual (physical) size on disk — blocks * 512
+    pub actual_size: u64,
+    /// Last-modified time as a human-readable string
+    pub modified: String,
+    /// True if the file is sparse (actual_size < 80% of apparent_size)
+    pub is_sparse: bool,
+}
+
+/// One cache directory found under ~/Library/Caches or similar locations.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CacheEntry {
+    /// Absolute path to the cache directory
+    pub path: String,
+    /// Directory name
+    pub name: String,
+    /// Total size in bytes (sum of all files inside)
+    pub size: u64,
+    /// Number of files inside the directory
+    pub item_count: u64,
+}
+
+/// A single .log file found during a log scan.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LogEntry {
+    /// Absolute path
+    pub path: String,
+    /// File name
+    pub name: String,
+    /// Size in bytes
+    pub size: u64,
+    /// Last-modified time as a human-readable string
+    pub modified: String,
+}
+
+/// Docker installation info — images, disk usage, reclaimable space.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DockerInfo {
+    /// Whether `docker` is installed (found on disk)
+    pub installed: bool,
+    /// Whether the Docker daemon is running (can execute commands)
+    pub running: bool,
+    /// List of Docker images / build-cache items
+    pub images: Vec<DockerItem>,
+    /// Human-readable total reclaimable space (from `docker system df`)
+    pub total_reclaimable: String,
+    /// Raw output of `docker system df`
+    pub disk_usage_raw: String,
+}
+
+/// One Docker image or cache item.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DockerItem {
+    pub name: String,
+    pub size: String,
+    pub id: String,
+    /// e.g. "image", "container", "build-cache"
+    pub item_type: String,
+}
+
+/// Information about an installed application.
+///
+/// `size` = the .app bundle itself.
+/// `leftover_size` = sum of all detected Library leftovers.
+/// `footprint` = size + leftover_size = total disk impact of this app.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AppInfo {
+    /// Display name (e.g. "Safari")
+    pub name: String,
+    /// Path to the .app bundle
+    pub path: String,
+    /// Size of the .app bundle in bytes
+    pub size: u64,
+    /// CFBundleIdentifier from Info.plist (empty string if unavailable)
+    pub bundle_id: String,
+    /// Leftover paths found in ~/Library/...
+    pub leftover_paths: Vec<String>,
+    /// Sum of leftover sizes in bytes
+    pub leftover_size: u64,
+    /// Total disk footprint: size + leftover_size
+    pub footprint: u64,
+    /// Base64-encoded PNG of the app's launcher icon (data:image/png;base64,...).
+    /// Empty string if extraction failed.
+    pub icon_base64: String,
+    /// How the app was installed: "homebrew", "app-store", or "manual"
+    pub install_source: String,
+}
+
+/// Summary of the Trash folder.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TrashInfo {
+    /// Total size of all items in Trash, in bytes
+    pub size: u64,
+    /// Number of items (files + directories at the top level)
+    pub item_count: u64,
+}
+
+/// Result returned by any "clean" / "delete" operation.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CleanResult {
+    /// Whether the overall operation succeeded (may still have partial errors)
+    pub success: bool,
+    /// Total bytes freed
+    pub freed_bytes: u64,
+    /// Number of items deleted
+    pub deleted_count: u64,
+    /// Human-readable error messages for any items that failed
+    pub errors: Vec<String>,
+}
+
+/// Result of a large file scan — includes both found files and skipped directories.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LargeFileScanResult {
+    /// Files found matching the size criteria
+    pub files: Vec<FileInfo>,
+    /// Directories that were skipped due to permission errors
+    pub skipped_paths: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Streaming large-file scan event payloads
+// ---------------------------------------------------------------------------
+// RUST CONCEPT: These structs are the event payloads that the streaming scan
+// emits to the frontend via Tauri's `app.emit()`. Each event name maps to one
+// of these types, and the frontend listens with `listen("event-name", cb)`.
+
+/// Emitted each time a large file is discovered during a streaming scan.
+/// The frontend appends it to the reactive list immediately so the user
+/// sees files appear in real time.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LargeFileFound {
+    pub file: FileInfo,
+}
+
+/// Emitted periodically to show which directory the scanner is currently
+/// walking. Throttled to avoid flooding the event bus — we emit at most
+/// once per directory entry at the top two levels, plus any time a file
+/// is found.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LargeFileScanProgress {
+    /// Human-readable path being scanned (with ~ substituted for home)
+    pub current_dir: String,
+    /// Number of files found so far
+    pub files_found: usize,
+}
+
+/// Emitted once when the scan finishes (successfully or not).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LargeFileScanDone {
+    /// Total number of files found
+    pub total_files: usize,
+    /// Directories that were skipped (e.g. TCC-protected without FDA)
+    pub skipped_paths: Vec<String>,
+}
+
+/// Result of checking access to a specific path.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PathAccess {
+    /// The original path as provided (e.g. "~/Desktop")
+    pub path: String,
+    /// The resolved absolute path (e.g. "/Users/conradfe/Desktop")
+    pub resolved_path: String,
+    /// Whether the path exists on disk
+    pub exists: bool,
+    /// Whether the app can read the directory contents
+    pub readable: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Disk map cache metadata
+// ---------------------------------------------------------------------------
+
+/// Metadata about a cached disk map scan result.
+/// Returned by `list_disk_map_caches` so the frontend can show a dropdown of
+/// past scans without loading the full JSON payload.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CacheMetadata {
+    /// Unique ID — the filename stem, e.g. "spacemap-2025-03-10T14:30:00"
+    pub id: String,
+    /// ISO 8601 timestamp string of when the scan was saved
+    pub timestamp: String,
+    /// How many seconds ago this cache was saved (computed at list time)
+    pub age_seconds: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
+
+/// Convert a byte count into a human-readable string (B, KB, MB, GB, TB).
+///
+/// RUST CONCEPT: This is a plain function. `pub` makes it visible outside this
+/// module. The return type `String` is a heap-allocated, growable UTF-8 string.
+///
+/// # Examples
+/// ```ignore
+/// assert_eq!(format_size(0), "0 B");
+/// assert_eq!(format_size(1024), "1.00 KB");
+/// ```
+#[allow(dead_code)] // Utility exposed for future use by other modules.
+pub fn format_size(bytes: u64) -> String {
+    // RUST CONCEPT: `as f64` casts the integer to a 64-bit float so we can
+    // do floating-point math.
+    let bytes_f = bytes as f64;
+
+    // We define the unit thresholds as constants.
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    const TB: f64 = GB * 1024.0;
+
+    // RUST CONCEPT: `if / else if` is an expression in Rust — it returns a value.
+    if bytes_f >= TB {
+        format!("{:.2} TB", bytes_f / TB)
+    } else if bytes_f >= GB {
+        format!("{:.2} GB", bytes_f / GB)
+    } else if bytes_f >= MB {
+        format!("{:.2} MB", bytes_f / MB)
+    } else if bytes_f >= KB {
+        format!("{:.2} KB", bytes_f / KB)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Get the current user's home directory as a `String`.
+///
+/// RUST CONCEPT: `Option<String>` means the function may return `Some(path)` or
+/// `None`. We use `std::env::var` which returns a `Result`; `.ok()` converts
+/// that to an `Option`, discarding the error variant.
+pub fn home_dir() -> Option<String> {
+    std::env::var("HOME").ok()
+}
+
+/// Calculate the total size (in bytes) of a directory by recursively walking it.
+/// Permission errors are silently skipped.
+///
+/// Returns `(total_bytes, file_count)`.
+pub fn dir_size(path: &str) -> (u64, u64) {
+    // RUST CONCEPT: `walkdir::WalkDir` is an iterator that lazily yields
+    // directory entries. We chain `.into_iter()` so we can call `.filter_map()`.
+    let mut total: u64 = 0;
+    let mut count: u64 = 0;
+
+    for entry in walkdir::WalkDir::new(path)
+        .into_iter()
+        // `filter_map(|e| e.ok())` silently skips entries that produced errors
+        // (e.g. permission denied).
+        .filter_map(|e| e.ok())
+    {
+        // RUST CONCEPT: `.metadata()` returns a `Result`. The `if let Ok(m)`
+        // pattern only enters the block when metadata was successfully read.
+        if let Ok(m) = entry.metadata() {
+            if m.is_file() {
+                total += m.len();
+                count += 1;
+            }
+        }
+    }
+
+    (total, count)
+}
+
+/// Try to format a `SystemTime` as a human-readable "YYYY-MM-DD HH:MM:SS" string.
+/// Falls back to "unknown" on error.
+///
+/// RUST CONCEPT: `std::time::SystemTime` doesn't have built-in formatting, so we
+/// convert through `UNIX_EPOCH` to get a timestamp and do basic math. This avoids
+/// pulling in the `chrono` crate.
+pub fn format_system_time(time: std::time::SystemTime) -> String {
+    match time.duration_since(std::time::UNIX_EPOCH) {
+        Ok(dur) => {
+            let secs = dur.as_secs();
+            // We shell out to `date` for reliable local-time formatting.
+            // RUST CONCEPT: `std::process::Command` spawns a child process.
+            let output = std::process::Command::new("date")
+                .args(["-r", &secs.to_string(), "+%Y-%m-%d %H:%M:%S"])
+                .output();
+            match output {
+                Ok(o) if o.status.success() => {
+                    String::from_utf8_lossy(&o.stdout).trim().to_string()
+                }
+                _ => {
+                    // Fallback: just show the Unix timestamp
+                    format!("{}", secs)
+                }
+            }
+        }
+        Err(_) => "unknown".to_string(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests (optional but good practice)
+// ---------------------------------------------------------------------------
+// RUST CONCEPT: `#[cfg(test)]` means this module is only compiled when running
+// `cargo test`, not in production builds.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(512), "512 B");
+        assert_eq!(format_size(1024), "1.00 KB");
+        assert_eq!(format_size(1_048_576), "1.00 MB");
+        assert_eq!(format_size(1_073_741_824), "1.00 GB");
+    }
+}

@@ -1,0 +1,54 @@
+# Claude Code — local session data, transcripts, worktrees
+.claude/
+
+# Private internal docs (roadmap, handover notes, scratch files)
+_private/
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.local
+
+# Backup files
+*.bak
+*~lock~
+
+# Design source files (Affinity Photo — large binaries, not code)
+deisgns/
+
+# Reference images / screenshots (local dev only, not source)
+references/
+screenshots/
+
+# Legacy assets (replaced by canvas-rendered gradient)
+background.jpg
+public/background.jpg
+transparent.png
+
+# Root-level design PNGs (keep icons in src-tauri/icons/)
+app_icon_dark.png
+app_icon_light.png
+appicon.png

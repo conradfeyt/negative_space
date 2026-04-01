@@ -1,0 +1,38 @@
+[package]
+name = "negative-space"
+version = "0.1.0"
+description = "A lightweight macOS system cleaner"
+authors = ["conradfe"]
+edition = "2021"
+
+[lib]
+name = "negative_space_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+blake3 = "1.8.3"
+base64 = "0.22"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSData", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSWindow", "NSView", "NSImageView", "NSImage", "NSBitmapImageRep",
+  "NSImageRep", "NSGraphics", "NSColor", "NSEvent", "NSScreen"
+] }
+block2 = "0.6"
+smc = "0.2"
+four-char-code = "0.0.5"
+zstd = "0.13"
+tar = "0.4"
+uuid = { version = "1", features = ["v4"] }
+tauri-plugin-dialog = "2.6.0"
+
+[dev-dependencies]
+tempfile = "3"

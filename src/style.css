@@ -1,0 +1,785 @@
+/* ==========================================================================
+   Negative _ Design System — "Clarity" v2 (Glassmorphism + Fog + Aqua)
+   ==========================================================================
+   Premium glass-layered aesthetic. Translucent cards over a warm tinted
+   background. Depth through blur and luminosity, not hard borders.
+   References: Apple HIG, Linear, Craft, Raycast, Things 3, Flighty.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* --- Background: fully transparent to let native vibrancy show --- */
+  --app-bg: transparent;
+  --app-bg-gradient: transparent;
+
+  /* --- Glass surfaces (more opaque cards on native vibrancy) --- */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.80);
+  --glass-hover: rgba(255, 255, 255, 0.82);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 32px;
+
+  /* --- Surfaces --- */
+  --surface: rgba(255, 255, 255, 0.75);
+  --surface-alt: rgba(248, 250, 252, 0.60);
+  --surface-hover: rgba(255, 255, 255, 0.85);
+
+  /* --- Borders (slightly stronger for definition on translucent bg) --- */
+  --border: rgba(255, 255, 255, 0.50);
+  --border-subtle: rgba(255, 255, 255, 0.30);
+  --border-divider: rgba(0, 0, 0, 0.08);
+
+  /* --- Text hierarchy --- */
+  --text: #1A1D2E;
+  --text-secondary: #5C6070;
+  --muted: #8E92A4;
+
+  /* --- Sidebar (transparent — dark text on native vibrancy) --- */
+  --sidebar-bg: transparent;
+  --sidebar-bg-flat: transparent;
+  --sidebar-active: rgba(255, 255, 255, 0.30);
+  --sidebar-text: rgba(255, 255, 255, 0.95);
+  --sidebar-text-muted: rgba(255, 255, 255, 0.55);
+  --sidebar-hover: rgba(255, 255, 255, 0.12);
+  --sidebar-divider: rgba(255, 255, 255, 0.12);
+
+  /* --- Brand accent (Aqua) --- */
+  --accent: #3BC7E8;
+  --accent-hover: #2AAFCD;
+  --accent-deep: #1697A6;
+  --accent-fresh: #62E0C1;
+  --accent-light: rgba(59, 199, 232, 0.10);
+  --accent-glow: rgba(59, 199, 232, 0.18);
+
+  /* --- State colors (opaque enough for vibrancy context) --- */
+  --info-tint: rgba(232, 248, 252, 0.85);
+  --info-text: #148AA0;
+  --success-tint: rgba(234, 248, 241, 0.85);
+  --success-text: #1E8E5A;
+  --success: #34C759;
+  --warning-tint: rgba(255, 252, 240, 0.85);
+  --warning-text: #B06E0E;
+  --warning: #E5A30F;
+  --danger-tint: rgba(253, 238, 238, 0.85);
+  --danger-text: #C94444;
+  --danger: #D94B4B;
+  --danger-hover: #C03A3A;
+
+  /* --- Shadows (layered, diffused, more depth) --- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(59, 199, 232, 0.08);
+
+  /* --- Radii (generous, organic) --- */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 100px;
+
+  /* --- Spacing (8pt grid) --- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* --- Typography --- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Fira Code", "Cascadia Code", monospace;
+
+  /* Legacy aliases */
+  --content-bg: var(--app-bg);
+  --card-bg: var(--surface);
+}
+
+/* --------------------------------------------------------------------------
+   2. Reset & base
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  /* Keep all root elements in the same GPU compositing layer to prevent
+     white flash from WebKit layer transitions on transparent windows. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+html {
+  background: transparent;
+  /* Force GPU compositing layer on the root element.
+     Without this, WebKit can flip between CPU and GPU rendering modes
+     during internal recomposition (GC, layout recalc, timer callbacks),
+     which on transparent Tauri windows briefly flashes white as the
+     layer transitions. Keeping the root in GPU mode prevents this. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--text);
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Background image + frosted glass overlay for readability */
+#app {
+  position: relative;
+}
+
+/* #app::before no longer used — sidebar gradient is now a real DOM element
+   (.sidebar-bg-layer) for direct inline transform updates without CSS variable
+   recalc overhead. See App.vue for the element and polling code. */
+
+/* --------------------------------------------------------------------------
+   3. Buttons — refined, glassy, premium feel
+   -------------------------------------------------------------------------- */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, color 0.2s ease;
+  letter-spacing: -0.1px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(59, 199, 232, 0.25), 0 2px 8px rgba(59, 199, 232, 0.15);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 6px rgba(59, 199, 232, 0.3), 0 4px 12px rgba(59, 199, 232, 0.2);
+  transform: translateY(-0.5px);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 2px rgba(59, 199, 232, 0.2);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Danger: calm tint, escalates to red on hover */
+.btn-danger {
+  background: var(--danger-tint);
+  color: var(--danger-text);
+  border: 1px solid rgba(217, 75, 75, 0.12);
+}
+
+.btn-danger:hover {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(217, 75, 75, 0.25);
+}
+
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary: glass button */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Ghost / text button */
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  padding: 7px 14px;
+}
+
+.btn-ghost:hover {
+  background: var(--accent-light);
+}
+
+/* Small button variant */
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 10px;
+}
+
+/* Scan button — used across many views */
+.scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 22px;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   4. Inputs — glassy
+   -------------------------------------------------------------------------- */
+input {
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+}
+
+input:focus {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+select {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+select:focus {
+  border-color: var(--accent);
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* --------------------------------------------------------------------------
+   5. Cards / surfaces — GLASSMORPHISM
+   -------------------------------------------------------------------------- */
+.card {
+  background: var(--glass);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-6);
+  transition: box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  background: var(--glass-hover);
+}
+
+/* Card with no padding (for internal table/list sections) */
+.card-flush {
+  background: var(--glass);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  padding: 0;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   6. Tables — open, breathable, minimal lines
+   -------------------------------------------------------------------------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-divider);
+  white-space: nowrap;
+  background: transparent;
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  color: var(--text);
+}
+
+tr:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+/* Common column widths */
+.col-check { width: 40px; text-align: center; }
+.col-size { width: 100px; white-space: nowrap; text-align: right; }
+.col-date { width: 120px; white-space: nowrap; }
+
+/* --------------------------------------------------------------------------
+   7. Badges — softer, glassy tints
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  line-height: 1.4;
+  letter-spacing: 0.1px;
+}
+
+.badge-accent {
+  background: var(--accent-light);
+  color: var(--accent-deep);
+}
+
+.badge-warning {
+  background: var(--warning-tint);
+  color: var(--warning-text);
+}
+
+.badge-success {
+  background: var(--success-tint);
+  color: var(--success-text);
+}
+
+.badge-danger {
+  background: var(--danger-tint);
+  color: var(--danger-text);
+}
+
+.badge-info {
+  background: var(--info-tint);
+  color: var(--info-text);
+}
+
+.badge-neutral {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-secondary);
+}
+
+/* Small pill badge */
+.badge-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   8. Spinner
+   -------------------------------------------------------------------------- */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.06);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-xs {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(59, 199, 232, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --------------------------------------------------------------------------
+   9. View layout shared classes
+   -------------------------------------------------------------------------- */
+
+/* Standard view header — larger type scale, more breathing room */
+.view-header {
+  margin-bottom: var(--sp-8);
+}
+
+.view-header h2,
+.view-header .view-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1A1D2E;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.view-header p,
+.view-header .view-subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #4A4E63;
+  font-weight: 400;
+}
+
+.view-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+/* Loading / empty / error states */
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--sp-6) 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--sp-12);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.success-message {
+  background: var(--success-tint);
+  border: 1px solid rgba(30, 142, 90, 0.12);
+  color: var(--success-text);
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: var(--sp-4);
+  animation: fadeIn 0.3s ease;
+}
+
+.error-message {
+  background: var(--danger-tint);
+  border: 1px solid rgba(217, 75, 75, 0.12);
+  color: var(--danger-text);
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: var(--sp-4);
+  animation: fadeIn 0.3s ease;
+}
+
+/* Results header bar */
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.results-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selected-info {
+  font-size: 13px;
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Summary bar (above lists) */
+.summary-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-4);
+  padding: 0 var(--sp-1);
+}
+
+/* --------------------------------------------------------------------------
+   10. Expand / collapse chevron (unified)
+   -------------------------------------------------------------------------- */
+.expand-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.expand-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.expand-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   11. Animations
+   -------------------------------------------------------------------------- */
+/* view-enter-active is defined in App.vue scoped styles */
+
+@keyframes fadeIn {
+  from {
+    transform: translateY(4px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 600px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   12. Scrollbar — subtle, translucent
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   13. Utility
+   -------------------------------------------------------------------------- */
+.text-muted { color: var(--muted); }
+.text-secondary { color: var(--text-secondary); }
+.text-accent { color: var(--accent); }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   14. FDA warning banner (shared across scan views) — glassy
+   -------------------------------------------------------------------------- */
+.fda-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: var(--sp-5) var(--sp-5);
+  border-radius: var(--radius-md);
+  background: rgba(255, 252, 240, 0.85);
+  border: 1px solid rgba(229, 163, 15, 0.15);
+  margin-bottom: var(--sp-6);
+  animation: fadeIn 0.3s ease;
+}
+
+.fda-warning-banner .fda-warning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.fda-warning-banner .fda-warning-body {
+  flex: 1;
+}
+
+.fda-warning-banner .fda-warning-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: var(--sp-1);
+}
+
+.fda-warning-banner .fda-warning-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.fda-warning-banner .fda-warning-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fda-warning-banner .btn-fda {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.fda-warning-banner .btn-fda-primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+
+.fda-warning-banner .btn-fda-primary:hover {
+  background: var(--accent-hover);
+}
+
+.fda-warning-banner .btn-fda-secondary {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--accent);
+  border: 1px solid rgba(59, 199, 232, 0.25);
+}
+
+.fda-warning-banner .btn-fda-secondary:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* --------------------------------------------------------------------------
+   15. Modal — frosted glass overlay
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-content {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-8);
+  max-width: 440px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: var(--sp-3);
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--sp-6);
+}
