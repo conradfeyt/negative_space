@@ -1,5 +1,9 @@
 # Negativ_
 
+![Status](https://img.shields.io/badge/status-early%20alpha-orange)
+
+> ⚠️ **Early alpha** — expect rough edges and missing features. Not recommended for critical use.
+
 A lightweight macOS system cleaner and monitor built with Tauri v2.
 
 ## Features
