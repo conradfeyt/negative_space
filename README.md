@@ -17,6 +17,35 @@ A lightweight macOS system cleaner and monitor built with Tauri v2.
 - **Security auditing** — launch agent inspection, app code signing verification
 - **Maintenance tasks** — flush DNS, rebuild Spotlight, purge purgeable space
 
+## Installation
+
+### Homebrew (recommended)
+
+```bash
+brew tap conradfeyt/negativespace
+brew install --cask negativ_
+```
+
+> **First launch:** macOS will block the app as it's unsigned. Right-click `Negativ_.app` in `/Applications` and select **Open** to bypass Gatekeeper.
+
+### Uninstall
+
+```bash
+brew uninstall --cask negativ_
+```
+
+To also remove all app data and your vault:
+
+```bash
+brew uninstall --cask --zap negativ_
+```
+
+### Direct download
+
+Download the latest `.dmg` from [Releases](https://github.com/conradfeyt/negative_space/releases).
+
+---
+
 ## Stack
 
 - **Frontend:** Vue 3 + TypeScript + Vite + D3.js
