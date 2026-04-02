@@ -227,7 +227,7 @@ function statusLabel(status: string): string {
 
 <style scoped>
 .maintenance-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* Info banner */

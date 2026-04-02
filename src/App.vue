@@ -106,6 +106,31 @@ function getDomainStatus(navId: string): DomainStatus | undefined {
   return domainStatus.value[key]?.status;
 }
 
+// Domains where item count is more meaningful than total size
+const countBasedDomains = new Set(["largeFiles", "duplicates"]);
+
+// Format a scan-result badge for a completed domain
+function getDomainBadge(navId: string): string | null {
+  const key = navToDomain[navId];
+  if (!key) return null;
+  const info = domainStatus.value[key];
+  if (!info || info.status !== "done") return null;
+  if (countBasedDomains.has(key)) {
+    return info.itemCount > 0 ? String(info.itemCount) : null;
+  }
+  return info.totalSize > 0 ? formatBadgeSize(info.totalSize) : null;
+}
+
+// Compact size format for badges: "4.2G", "800M", "12K"
+function formatBadgeSize(bytes: number): string {
+  if (bytes === 0) return "0";
+  const units = ["B", "K", "M", "G", "T"];
+  const k = 1024;
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
+  const val = bytes / Math.pow(k, i);
+  return (i === 0 ? val.toFixed(0) : val.toFixed(val < 10 ? 1 : 0)) + units[i];
+}
+
 // FDA gate state
 const fdaChecked = ref(false);
 const fdaDismissed = ref(false);
@@ -172,22 +197,22 @@ interface Geometry {
 // Shared blob geometry config — tuned in bg-test.html
 const BLOB_SEED = 372057;
 const BLOB_COUNT = 108;
-const BLOB_SCALE = 0.85;
-const BLOB_RMIN = 380 * BLOB_SCALE;   // 323px
-const BLOB_RMAX = 680 * BLOB_SCALE;   // 578px
+const BLOB_SCALE = 1.0;
+const BLOB_RMIN = 380 * BLOB_SCALE;
+const BLOB_RMAX = 680 * BLOB_SCALE;
 const BLOB_JITTER = 0.85;
-const BLOB_HOLD = 0.75;               // gradient color-hold stop
+const BLOB_HOLD = 0.35;              // slight hold so colours survive 70% white overlay
 
-// Main gradient palette — vibrant warm tones
+// Main gradient palette
 const mainPalette: PaletteEntry[] = [
-  { color: [230, 80, 140],  a: 0.60, w: 3 },  // hot pink
-  { color: [50, 190, 180],  a: 1.00, w: 2 },  // teal
-  { color: [140, 80, 200],  a: 1.00, w: 2 },  // purple
-  { color: [240, 160, 80],  a: 1.00, w: 2 },  // orange
-  { color: [100, 200, 140], a: 0.65, w: 0 },  // green
-  { color: [235, 120, 160], a: 0.85, w: 1 },  // rose
-  { color: [80, 140, 220],  a: 1.00, w: 1 },  // blue
-  { color: [200, 100, 180], a: 0.75, w: 0 },  // magenta
+  { color: [230, 80, 140],  a: 0.75, w: 3 },  // hot pink
+  { color: [50, 190, 180],  a: 0.85, w: 2 },  // teal
+  { color: [140, 80, 200],  a: 0.85, w: 2 },  // purple
+  { color: [240, 160, 80],  a: 0.65, w: 2 },  // orange — slightly lower to avoid dominance
+  { color: [100, 200, 140], a: 0.70, w: 1 },  // green
+  { color: [235, 120, 160], a: 0.75, w: 1 },  // rose
+  { color: [80, 140, 220],  a: 0.85, w: 1 },  // blue
+  { color: [200, 100, 180], a: 0.70, w: 1 },  // magenta
 ];
 
 // Sidebar gradient palette — cool-toned frosted glass
@@ -232,44 +257,46 @@ function generateBlobGeometry(w: number, h: number): Geometry {
 
 /**
  * Phase 2: Paint blobs onto a canvas using a specific palette + filter.
- * Uses shared geometry so both main and sidebar have identical blob shapes.
+ * Renders at low resolution (RENDER_SCALE) then upscales to full size —
+ * bilinear interpolation + pre-blur eliminates blob edges completely.
  */
+const RENDER_SCALE = 0.20;
+
 function paintBitmap(
   w: number, h: number,
   geometry: Geometry,
   pal: PaletteEntry[],
   baseFill: string,
-  blur: number,
+  _blur: number,
   saturate: number,
   brightness: number,
 ): string {
+  const rw = Math.max(1, Math.round(w * RENDER_SCALE));
+  const rh = Math.max(1, Math.round(h * RENDER_SCALE));
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = rw;
+  canvas.height = rh;
   const ctx = canvas.getContext('2d')!;
 
-  // Base fill
   ctx.fillStyle = baseFill;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, rw, rh);
 
-  // Blob painter — radial gradient ellipse
   function drawBlob(cx: number, cy: number, rx: number, ry: number, color: string, alpha: number) {
+    const scx = cx * RENDER_SCALE, scy = cy * RENDER_SCALE;
+    const srx = rx * RENDER_SCALE, sry = ry * RENDER_SCALE;
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(1, ry / rx);
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    ctx.translate(scx, scy);
+    ctx.scale(1, sry / srx);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, srx);
     grad.addColorStop(0, color);
-    grad.addColorStop(BLOB_HOLD, color);
+    if (BLOB_HOLD > 0) grad.addColorStop(BLOB_HOLD, color);
     grad.addColorStop(1, 'transparent');
     ctx.globalAlpha = alpha;
     ctx.fillStyle = grad;
-    ctx.fillRect(-rx, -rx, rx * 2, rx * 2);
+    ctx.fillRect(-srx, -srx, srx * 2, srx * 2);
     ctx.restore();
   }
 
-  // Build weighted + shuffled color list from palette.
-  // Seeded from geometry's final PRNG state so shuffle is deterministic
-  // and the Nth blob always gets the Nth color from each palette.
   let s = geometry.prngState;
   function rand() { s = (s * 16807) % 2147483647; return s / 2147483647; }
 
@@ -284,23 +311,27 @@ function paintBitmap(
     [colorList[i], colorList[j]] = [colorList[j], colorList[i]];
   }
 
-  // Paint each blob at its geometry position with the palette color
   for (let i = 0; i < geometry.blobs.length; i++) {
     const b = geometry.blobs[i];
     const p = colorList[i % colorList.length];
-    const color = `rgb(${p.color[0]}, ${p.color[1]}, ${p.color[2]})`;
-    drawBlob(b.cx, b.cy, b.rx, b.ry, color, p.a * b.alphaScale);
+    drawBlob(b.cx, b.cy, b.rx, b.ry, `rgb(${p.color[0]},${p.color[1]},${p.color[2]})`, p.a * b.alphaScale);
   }
 
-  // Blur + filter pass on a second canvas
-  const blurred = document.createElement('canvas');
-  blurred.width = w;
-  blurred.height = h;
-  const bCtx = blurred.getContext('2d')!;
-  bCtx.filter = `blur(${blur}px) saturate(${saturate}) brightness(${brightness})`;
-  bCtx.drawImage(canvas, 0, 0);
+  // Pre-blur at low-res before upscaling — 8px here ≈ 65px at full scale
+  const preBlur = document.createElement('canvas');
+  preBlur.width = rw; preBlur.height = rh;
+  const pbCtx = preBlur.getContext('2d')!;
+  pbCtx.filter = 'blur(8px)';
+  pbCtx.drawImage(canvas, 0, 0);
 
-  return blurred.toDataURL('image/jpeg', 0.92);
+  // Upscale — bilinear interpolation makes everything perfectly smooth
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const oCtx = out.getContext('2d')!;
+  oCtx.filter = `saturate(${saturate}) brightness(${brightness})`;
+  oCtx.drawImage(preBlur, 0, 0, w, h);
+
+  return out.toDataURL('image/jpeg', 0.92);
 }
 
 /**
@@ -539,7 +570,7 @@ async function initScreenAnchor() {
 
   // Phase 2a: Main gradient (warm palette) — stays in CSS (needs border-radius clipping)
   const mainUrl = paintBitmap(vsW, vsH, geometry, mainPalette,
-    '#d8c8c0', 120, 3.7, 1.18);
+    '#b8a8cc', 120, 6.0, 1.10);
 
   // Phase 2b: Sidebar gradient (cool palette) — sent to Rust for native layer
   const sidebarUrl = paintBitmap(vsW, vsH, geometry, sidebarPalette,
@@ -728,6 +759,9 @@ onUnmounted(() => {
             <!-- Domain scan status badge -->
             <span v-if="getDomainStatus(item.id) === 'scanning'" class="nav-badge nav-badge-scanning">
               <span class="spinner-xs"></span>
+            </span>
+            <span v-else-if="getDomainBadge(item.id)" class="nav-badge nav-badge-result">
+              {{ getDomainBadge(item.id) }}
             </span>
             <span v-else-if="getDomainStatus(item.id) === 'done'" class="nav-badge nav-badge-done">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -1063,6 +1097,22 @@ onUnmounted(() => {
 .nav-item.active .nav-badge-scanning :deep(.spinner-xs) {
   border-color: rgba(255, 255, 255, 0.2);
   border-top-color: #ffffff;
+}
+
+.nav-badge-result {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+}
+
+.nav-item.active .nav-badge-result {
+  background: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .nav-badge-done {

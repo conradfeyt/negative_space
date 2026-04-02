@@ -305,7 +305,7 @@ function sourceLabel(source: string): string {
 
 <style scoped>
 .apps-view {
-  max-width: 800px;
+  max-width: 1440px;
 }
 
 /* Summary stats row */

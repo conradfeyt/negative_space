@@ -991,7 +991,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .spacemap-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* ---- Expanded mode (shared across all viz types) ----
@@ -1000,7 +1000,7 @@ onBeforeUnmount(() => {
    Non-essential UI (disk bar, FDA warning, etc.) hidden. */
 .spacemap-view.viz-expanded {
   position: relative;
-  max-width: none;
+  max-width: 1440px;
 }
 
 .spacemap-view.viz-expanded .view-header {

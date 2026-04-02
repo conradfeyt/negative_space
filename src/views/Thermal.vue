@@ -350,7 +350,7 @@ const orderedSummaries = computed(() => {
 
 <style scoped>
 .thermal-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* Header */

@@ -534,7 +534,7 @@ export interface ThermalScanResult {
 
 export interface FileClassification {
   path: string;
-  safety: "safe" | "probably_safe" | "risky";
+  safety: "safe" | "safe_stale" | "safe_rebuild" | "probably_safe" | "risky" | "unknown" | "vaulted";
   explanation: string;
   confidence: number;
 }

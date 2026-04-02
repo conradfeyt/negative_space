@@ -156,7 +156,7 @@ const totalSelected = computed(() => caches.value.filter((e) => selected.value.h
 </template>
 
 <style scoped>
-.caches-view { max-width: 740px; }
+.caches-view { max-width: 1440px; }
 
 .cache-list { display: flex; flex-direction: column; gap: 8px; }
 

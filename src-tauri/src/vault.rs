@@ -113,7 +113,15 @@ const SKIP_EXTENSIONS: &[&str] = &[
 
 fn vault_dir() -> Option<String> {
     let home = commands::home_dir()?;
-    Some(format!("{}/Library/Application Support/NegativeSpace/vault", home))
+    let new_path = format!("{}/Documents/MyNegativeSpaceVault", home);
+    let old_path = format!("{}/Library/Application Support/NegativeSpace/vault", home);
+    if std::path::Path::new(&new_path).exists() {
+        Some(new_path)
+    } else if std::path::Path::new(&old_path).exists() {
+        Some(old_path)
+    } else {
+        Some(new_path)
+    }
 }
 
 fn vault_data_dir() -> Option<String> {

@@ -314,7 +314,7 @@ const sortedGroups = computed((): ProcessGroup[] => {
 
 <style scoped>
 .memory-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* Header layout — extends global .view-header with flex for controls */

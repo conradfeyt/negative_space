@@ -138,7 +138,7 @@ onMounted(loadTrashInfo);
 
 <style scoped>
 .trash-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 .trash-card {

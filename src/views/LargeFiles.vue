@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
 import { formatSize } from "../utils";
 import {
@@ -13,6 +14,11 @@ import {
   deleteFiles,
   hasFullDiskAccess,
   checkFullDiskAccess,
+  fileClassifications,
+  classifyFiles,
+  vaultEntries,
+  toggleProtected,
+  isProtected,
 } from "../stores/scanStore";
 
 const selected = ref<Set<string>>(new Set());
@@ -24,7 +30,7 @@ const scanPath = ref("~");
 /** Track which groups are collapsed */
 const collapsedGroups = ref<Set<string>>(new Set());
 
-type SortMode = "size" | "directory";
+type SortMode = "size" | "directory" | "safety" | "type";
 const sortMode = ref<SortMode>("size");
 
 async function openFdaSettings() {
@@ -42,6 +48,117 @@ async function scan() {
   await scanLargeFiles(scanPath.value, minSizeMb.value);
 }
 
+// Classify files when scan completes
+watch(largeFilesScanned, (scanned) => {
+  if (scanned && largeFiles.value.length > 0) {
+    const files = largeFiles.value.map(f => ({
+      path: f.path,
+      name: f.name,
+      size: f.apparent_size,
+      file_type: f.name.split(".").pop()?.toLowerCase() ?? "",
+    }));
+    classifyFiles(files);
+  }
+});
+
+// Also classify on mount if scan results already exist (from cache)
+try {
+  if (largeFilesScanned.value && largeFiles.value.length > 0 && fileClassifications.value.size === 0) {
+    const files = largeFiles.value.map(f => ({
+      path: f.path,
+      name: f.name,
+      size: f.apparent_size,
+      file_type: f.name.split(".").pop()?.toLowerCase() ?? "",
+      modified: f.modified || null,
+    }));
+    classifyFiles(files);
+  }
+} catch { /* non-critical */ }
+
+function getClassification(path: string) {
+  return fileClassifications.value.get(path);
+}
+
+function safetyColor(safety: string): string {
+  switch (safety) {
+    case "safe":
+    case "safe_stale": return "var(--success)";
+    case "safe_rebuild": return "hsla(195, 55%, 42%, 0.85)";
+    case "probably_safe": return "var(--accent)";
+    case "risky": return "var(--danger)";
+    case "vaulted": return "hsla(280, 40%, 50%, 0.85)";
+    default: return "var(--muted)";
+  }
+}
+
+function safetyLabel(safety: string): string {
+  switch (safety) {
+    case "safe": return "Safe to delete";
+    case "safe_stale": return "Safe — older than 90 days";
+    case "safe_rebuild": return "Safe — recently modified";
+    case "probably_safe": return "Likely safe";
+    case "risky": return "Caution";
+    case "vaulted": return "Vaulted — do not delete";
+    default: return "";
+  }
+}
+
+async function exportSelected() {
+  if (selected.value.size === 0) return;
+  const selectedPaths = selected.value;
+
+  function mapFile(f: FileInfo) {
+    const c = getClassification(f.path);
+    return {
+      path: f.path,
+      name: f.name,
+      size: diskSize(f),
+      size_formatted: formatSize(diskSize(f)),
+      apparent_size: f.apparent_size,
+      is_sparse: f.is_sparse,
+      modified: f.modified,
+      safety: c?.safety ?? "unknown",
+      explanation: c?.explanation ?? null,
+    };
+  }
+
+  // Export using the same grouping as the current view
+  const groups: Record<string, { label: string; files: ReturnType<typeof mapFile>[] }> = {};
+  let totalFiles = 0;
+  let totalSize = 0;
+
+  for (const group of activeGroups.value) {
+    const selectedInGroup = group.flatFiles.filter(f => selectedPaths.has(f.path));
+    if (selectedInGroup.length === 0) continue;
+    const mapped = selectedInGroup.map(mapFile);
+    groups[group.id] = { label: group.label, files: mapped };
+    totalFiles += mapped.length;
+    totalSize += mapped.reduce((s, f) => s + f.size, 0);
+  }
+
+  const exportData = {
+    exported: new Date().toISOString(),
+    view_mode: sortMode.value,
+    total_files: totalFiles,
+    total_size: totalSize,
+    total_size_formatted: formatSize(totalSize),
+    groups,
+  };
+
+  const json = JSON.stringify(exportData, null, 2);
+  const path = await save({
+    defaultPath: `negativ-large-files-${sortMode.value}-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (!path) return;
+  try {
+    await invoke("export_disk_map", { data: json, path });
+    successMsg.value = `Exported ${totalFiles} file(s) to ${path}`;
+  } catch (e) {
+    largeFilesError.value = `Export failed: ${e}`;
+  }
+}
+
 async function deleteSelected() {
   if (selected.value.size === 0) return;
   deleting.value = true;
@@ -52,6 +169,8 @@ async function deleteSelected() {
     if (result.success) {
       successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
       largeFiles.value = largeFiles.value.filter((f) => !selected.value.has(f.path));
+      // Update the on-disk cache so deleted files don't reappear on next launch
+      invoke("save_scan_cache", { domain: "large-files", data: JSON.stringify(largeFiles.value) }).catch(() => {});
       selected.value = new Set();
     }
     if (result.errors.length > 0) {
@@ -68,7 +187,45 @@ async function revealInFinder(path: string) {
   try { await invoke("reveal_in_finder", { path }); } catch (_) {}
 }
 
+function isVaulted(path: string): boolean {
+  return getClassification(path)?.safety === "vaulted";
+}
+
+function isLocked(path: string): boolean {
+  return isVaulted(path) || isProtected(path);
+}
+
+// Map vault archive hashes back to original names
+const vaultNameMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const entry of vaultEntries.value) {
+    const originalName = entry.original_path.split("/").pop() ?? entry.vault_filename;
+    // Key by multiple formats to handle .zst / .tar.zst variants
+    const hash = entry.vault_filename.split(".")[0];
+    map.set(hash, originalName);
+    map.set(entry.vault_filename, originalName);
+    map.set(entry.id, originalName);
+    // Also key by blake3_hash if available
+    if (entry.blake3_hash) map.set(entry.blake3_hash, originalName);
+  }
+  return map;
+});
+
+function vaultDisplayName(filename: string): string {
+  // Try full filename, then hash prefix, then strip .tar.zst/.zst
+  return vaultNameMap.value.get(filename)
+    ?? vaultNameMap.value.get(filename.split(".")[0])
+    ?? vaultNameMap.value.get(filename.replace(/\.tar\.zst$/, ".zst"))
+    ?? filename;
+}
+
+// Load vault manifest for name resolution
+invoke<any[]>("get_vault_entries").then((entries) => {
+  vaultEntries.value = entries;
+}).catch(() => {});
+
 function toggleSelect(path: string) {
+  if (isLocked(path)) return;
   const next = new Set(selected.value);
   if (next.has(path)) next.delete(path);
   else next.add(path);
@@ -77,7 +234,7 @@ function toggleSelect(path: string) {
 
 function toggleAll() {
   if (allSelected.value) selected.value = new Set();
-  else selected.value = new Set(largeFiles.value.map((f) => f.path));
+  else selected.value = new Set(largeFiles.value.filter(f => !isLocked(f.path)).map((f) => f.path));
 }
 
 function toggleGroup(groupId: string) {
@@ -88,7 +245,8 @@ function toggleGroup(groupId: string) {
 }
 
 function toggleGroupSelect(files: FileInfo[]) {
-  const paths = files.map((f) => f.path);
+  const selectableFiles = files.filter(f => !isLocked(f.path));
+  const paths = selectableFiles.map((f) => f.path);
   const allGroupSelected = paths.every((p) => selected.value.has(p));
   const next = new Set(selected.value);
   if (allGroupSelected) {
@@ -99,8 +257,9 @@ function toggleGroupSelect(files: FileInfo[]) {
   selected.value = next;
 }
 
+const selectableCount = computed(() => largeFiles.value.filter(f => !isLocked(f.path)).length);
 const allSelected = computed(
-  () => largeFiles.value.length > 0 && selected.value.size === largeFiles.value.length
+  () => selectableCount.value > 0 && selected.value.size >= selectableCount.value
 );
 
 const totalSelected = computed(() =>
@@ -373,6 +532,150 @@ const groupedFiles = computed<CategoryGroup[]>(() => {
   return groups;
 });
 
+const safetyGroupOrder = ["safe", "safe_stale", "safe_rebuild", "probably_safe", "unknown", "risky"] as const;
+
+const safetyGroupMeta: Record<string, { label: string; description: string }> = {
+  safe: { label: "Safe to Delete", description: "Logs, temporary files, and cached installers that regenerate automatically" },
+  safe_stale: { label: "Safe — Older than 90 Days", description: "Caches and build artifacts not modified in 90+ days. Deleting is safe — your next build may need to re-download them." },
+  safe_rebuild: { label: "Safe — Recently Modified", description: "Caches and build artifacts modified in the last 90 days. Still safe to delete but will need to rebuild or re-download." },
+  probably_safe: { label: "Likely Safe", description: "Review recommended — these are usually safe but may be needed by some apps" },
+  unknown: { label: "Unknown", description: "No classification available — check before deleting" },
+  risky: { label: "Caution", description: "May contain user-created content or important application data" },
+  vaulted: { label: "Vaulted Archives", description: "Files archived by Negativ_ Vault. Manage these from the Vault view — do not delete directly." },
+};
+
+const safetyGroupedFiles = computed<CategoryGroup[]>(() => {
+  const buckets: Record<string, FileInfo[]> = { safe: [], safe_stale: [], safe_rebuild: [], probably_safe: [], unknown: [], risky: [], vaulted: [] };
+
+  for (const file of largeFiles.value) {
+    const c = getClassification(file.path);
+    const safety = c?.safety ?? "unknown";
+    (buckets[safety] ?? buckets.unknown).push(file);
+  }
+
+  const bySize = (a: FileInfo, b: FileInfo) => diskSize(b) - diskSize(a);
+  const groups: CategoryGroup[] = [];
+
+  for (const key of safetyGroupOrder) {
+    const files = buckets[key] ?? [];
+    if (files.length === 0) continue;
+    const sorted = [...files].sort(bySize);
+    const meta = safetyGroupMeta[key];
+    groups.push({
+      id: `safety-${key}`,
+      label: meta.label,
+      description: meta.description,
+      totalSize: files.reduce((s, f) => s + diskSize(f), 0),
+      totalFiles: files.length,
+      flatFiles: sorted,
+      tree: buildDirTree(files, `safety-${key}`),
+    });
+  }
+
+  return groups;
+});
+
+// Separate vaulted files from everything else
+const vaultedFiles = computed(() =>
+  largeFiles.value.filter(f => isVaulted(f.path)).sort((a, b) => diskSize(b) - diskSize(a))
+);
+
+const vaultedTotalSize = computed(() =>
+  vaultedFiles.value.reduce((s, f) => s + diskSize(f), 0)
+);
+
+// Filter vaulted files out of groups
+const typeLabels: Record<string, string> = {
+  // Libraries & compiled
+  a: "Libraries", rlib: "Libraries", dylib: "Libraries", so: "Libraries", framework: "Frameworks",
+  jar: "Java / Gradle", dex: "Java / Gradle",
+  // Logs
+  log: "Log Files",
+  // Disk & VM images
+  dmg: "Disk Images", iso: "Disk Images", img: "Disk Images", qcow2: "Virtual Disks", raw: "Virtual Disks", vmdk: "Virtual Disks",
+  // Archives
+  zst: "Compressed Archives", gz: "Compressed Archives", zip: "Compressed Archives", tar: "Archives", xz: "Compressed Archives",
+  // Git
+  pack: "Git Data", idx: "Git Data",
+  // Binary / data
+  bin: "Binary Data", dat: "Data Files", values: "Data Files",
+  // Databases
+  db: "Databases", sqlite: "Databases", sql: "Databases", vscdb: "Databases",
+  // App data
+  autosave: "Autosaves", backup: "Backups",
+  // Simulator / mobile
+  fst: "Simulator Data", adat: "Simulator Data", apk: "Android Packages", dill: "Flutter Data",
+  // Media
+  dash: "Audio / Media", mp4: "Audio / Media", mov: "Audio / Media", mp3: "Audio / Media",
+  png: "Images", jpg: "Images", jpeg: "Images", heic: "Images", tiff: "Images",
+  // Design / CAD
+  f3d: "CAD / Design", propcol: "CAD / Design",
+  // Dev tools
+  ort: "ML Models",
+};
+
+// Known binary names that don't have extensions
+const knownBinaries = new Set([
+  "node", "claude", "opencode", "clang-18", "clang-check", "clang-scan-deps",
+  "rust-lld", "lld", "trufflehog", "Flutter", "FlutterMacOS",
+  "Electron Framework", "Microsoft Edge Framework", "QtWebEngineCore",
+]);
+
+function fileTypeGroup(name: string): string {
+  // Check compound extensions first
+  if (name.endsWith(".tar.zst")) return "Compressed Archives";
+  // Known binaries without extensions
+  if (knownBinaries.has(name)) return "Developer Tools";
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  // If "extension" looks like a hash, version number, or is very long — it's not a real extension
+  if (!ext || ext.length > 10 || /^[0-9a-f]{8,}$/.test(ext) || /^\d+$/.test(ext)) return "Other";
+  return typeLabels[ext] ?? "Other";
+}
+
+const typeGroupedFiles = computed<CategoryGroup[]>(() => {
+  const buckets: Record<string, FileInfo[]> = {};
+  for (const file of largeFiles.value) {
+    if (isVaulted(file.path)) continue;
+    const group = fileTypeGroup(file.name);
+    if (!buckets[group]) buckets[group] = [];
+    buckets[group].push(file);
+  }
+
+  const bySize = (a: FileInfo, b: FileInfo) => diskSize(b) - diskSize(a);
+  return Object.entries(buckets)
+    .map(([label, files]) => {
+      const sorted = [...files].sort(bySize);
+      return {
+        id: `type-${label}`,
+        label,
+        description: `${files.length} file(s)`,
+        totalSize: files.reduce((s, f) => s + diskSize(f), 0),
+        totalFiles: files.length,
+        flatFiles: sorted,
+        tree: buildDirTree(sorted, `type-${label}`),
+      };
+    })
+    .sort((a, b) => b.totalSize - a.totalSize);
+});
+
+const activeGroups = computed(() => {
+  const base = sortMode.value === "safety" ? safetyGroupedFiles.value
+    : sortMode.value === "type" ? typeGroupedFiles.value
+    : groupedFiles.value;
+  return base
+    .map(g => {
+      const filtered = g.flatFiles.filter(f => !isVaulted(f.path));
+      return {
+        ...g,
+        flatFiles: filtered,
+        totalFiles: filtered.length,
+        totalSize: filtered.reduce((s, f) => s + diskSize(f), 0),
+        tree: buildDirTree(filtered, g.id),
+      };
+    })
+    .filter(g => g.flatFiles.length > 0);
+});
+
 const totalLargeFileSize = computed(() =>
   largeFiles.value.reduce((sum, f) => sum + diskSize(f), 0)
 );
@@ -389,21 +692,15 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 <template>
   <div class="large-files">
-    <div class="view-header">
-      <h2>Large Files</h2>
-      <p class="text-muted">Find and remove large files taking up space</p>
-    </div>
-
-    <div class="card controls-card">
-      <div class="controls-row">
-        <div class="control-group">
-          <label class="control-label">Minimum size (MB)</label>
-          <input v-model.number="minSizeMb" type="number" min="1" class="size-input" />
-        </div>
-        <div class="control-group">
-          <label class="control-label">Search path</label>
-          <input v-model="scanPath" type="text" class="path-input" />
-        </div>
+    <div class="view-header lf-header">
+      <div>
+        <h2>Large Files</h2>
+        <p class="text-muted">Find and remove large files taking up space</p>
+      </div>
+      <div class="lf-controls">
+        <input v-model.number="minSizeMb" type="number" min="1" class="size-input" title="Minimum size (MB)" />
+        <span class="lf-controls-label text-muted">MB in</span>
+        <input v-model="scanPath" type="text" class="path-input" title="Search path" />
         <button class="btn-primary scan-btn" :disabled="largeFilesScanning" @click="scan">
           <span v-if="largeFilesScanning" class="spinner-sm"></span>
           {{ largeFilesScanning ? "Scanning..." : "Scan" }}
@@ -450,21 +747,23 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       <!-- Summary bar -->
       <div class="results-summary">
         <div class="summary-left">
+          <label class="select-all-label">
+            <input type="checkbox" :checked="allSelected" @change="toggleAll" />
+          </label>
           <span class="results-count">{{ largeFiles.length }} file(s)</span>
           <span class="results-total-size">{{ formatSize(totalLargeFileSize) }} total</span>
+          <span v-if="selected.size > 0" class="selected-info">
+            {{ selected.size }} selected ({{ formatSize(totalSelected) }})
+          </span>
         </div>
         <div class="results-actions">
           <div class="sort-toggle">
             <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'size' }" @click="sortMode = 'size'">Size</button>
             <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'directory' }" @click="sortMode = 'directory'">Directory</button>
+            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'safety' }" @click="sortMode = 'safety'" v-if="fileClassifications.size > 0">Safety</button>
+            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'type' }" @click="sortMode = 'type'">Type</button>
           </div>
-          <label class="select-all-label">
-            <input type="checkbox" :checked="allSelected" @change="toggleAll" />
-            <span>Select all</span>
-          </label>
-          <span v-if="selected.size > 0" class="selected-info">
-            {{ selected.size }} selected ({{ formatSize(totalSelected) }})
-          </span>
+          <button class="btn-secondary export-btn" :disabled="selected.size === 0" @click="exportSelected">Export</button>
           <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="deleteSelected">
             <span v-if="deleting" class="spinner-sm"></span>
             {{ deleting ? "Deleting..." : "Delete Selected" }}
@@ -472,8 +771,51 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         </div>
       </div>
 
+      <!-- Vaulted archives — locked section at top -->
+      <div v-if="vaultedFiles.length > 0" class="file-group vault-group">
+        <div class="group-header vault-header" @click="toggleGroup('vaulted')">
+          <div class="group-header-left">
+            <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has('vaulted') }">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
+            </span>
+            <div class="group-title-block">
+              <span class="group-title vault-title">Vaulted Archives</span>
+              <span class="group-meta text-muted">
+                {{ vaultedFiles.length }} file(s) &middot; {{ formatSize(vaultedTotalSize) }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div v-if="!collapsedGroups.has('vaulted')" class="group-description vault-description">
+          Archived by Negativ_ Vault. Manage from the Vault view — do not delete directly.
+        </div>
+        <div v-if="!collapsedGroups.has('vaulted')" class="vault-file-list">
+          <div v-for="file in vaultedFiles" :key="file.path" class="vault-file-row">
+            <span class="vault-badge">Vaulted</span>
+            <span class="vault-file-name">{{ vaultDisplayName(file.name) }}</span>
+            <span class="vault-file-size mono">{{ formatSize(diskSize(file)) }}</span>
+            <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="isProtected(file.path) ? 'currentColor' : 'currentColor'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+              </svg>
+            </button>
+            <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+              </svg>
+            </button>
+            <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
+                <circle cx="8" cy="9" r="2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Category groups -->
-      <div v-for="group in groupedFiles" :key="group.id" class="file-group">
+      <div v-for="group in activeGroups" :key="group.id" class="file-group">
 
         <!-- Category header -->
         <div class="group-header" @click="toggleGroup(group.id)">
@@ -503,7 +845,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         </div>
 
         <!-- ===== SIZE MODE: flat file list ===== -->
-        <template v-if="!collapsedGroups.has(group.id) && sortMode === 'size'">
+        <template v-if="!collapsedGroups.has(group.id) && sortMode !== 'directory'">
           <div class="file-list">
             <div
               v-for="file in group.flatFiles"
@@ -513,20 +855,27 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               @click="toggleSelect(file.path)"
             >
               <div class="file-row-check">
-                <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
               </div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
                   <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
+                  <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                 </div>
                 <div class="file-row-path text-muted mono">{{ parentFolder(file.path) }}</div>
+                <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
               </div>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
               </div>
               <div class="file-row-date text-muted">{{ file.modified }}</div>
+              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                </svg>
+              </button>
               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -668,19 +1017,26 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           @click="toggleSelect(file.path)"
                                         >
                                           <div class="file-row-check">
-                                            <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                                            <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                                           </div>
                                           <div class="file-row-info">
                                             <div class="file-row-name">
                                               <span class="file-name">{{ file.name }}</span>
                                               <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
+                                              <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                                             </div>
+                                            <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
                                           </div>
                                           <div class="file-row-size mono">
                                             <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                             <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                                           </div>
                                           <div class="file-row-date text-muted">{{ file.modified }}</div>
+                                          <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                                            </svg>
+                                          </button>
                                           <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                               <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -702,7 +1058,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       @click="toggleSelect(file.path)"
                                     >
                                       <div class="file-row-check">
-                                        <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                                        <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                                       </div>
                                       <div class="file-row-info">
                                         <div class="file-row-name">
@@ -715,6 +1071,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                                       </div>
                                       <div class="file-row-date text-muted">{{ file.modified }}</div>
+                                      <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                                        </svg>
+                                      </button>
                                       <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                           <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -738,7 +1099,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               @click="toggleSelect(file.path)"
                             >
                               <div class="file-row-check">
-                                <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                               </div>
                               <div class="file-row-info">
                                 <div class="file-row-name">
@@ -751,6 +1112,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                               </div>
                               <div class="file-row-date text-muted">{{ file.modified }}</div>
+                              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                                </svg>
+                              </button>
                               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                   <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -774,7 +1140,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       @click="toggleSelect(file.path)"
                     >
                       <div class="file-row-check">
-                        <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                        <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                       </div>
                       <div class="file-row-info">
                         <div class="file-row-name">
@@ -787,6 +1153,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                       </div>
                       <div class="file-row-date text-muted">{{ file.modified }}</div>
+                      <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                        </svg>
+                      </button>
                       <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -810,20 +1181,27 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               @click="toggleSelect(file.path)"
             >
               <div class="file-row-check">
-                <input type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
               </div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
                   <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
+                  <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                 </div>
                 <div class="file-row-path text-muted mono">{{ parentFolder(file.path) }}</div>
+                <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
               </div>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
               </div>
               <div class="file-row-date text-muted">{{ file.modified }}</div>
+              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
+                </svg>
+              </button>
               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -839,7 +1217,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 </template>
 
 <style scoped>
-.large-files { max-width: 780px; }
+.large-files { max-width: 1440px; }
 .controls-card { margin-bottom: var(--sp-6); }
 .controls-row { display: flex; align-items: flex-end; gap: var(--sp-4); }
 .control-group { display: flex; flex-direction: column; gap: var(--sp-1); }
@@ -1085,7 +1463,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 .file-row {
   display: grid;
-  grid-template-columns: 36px 1fr auto auto 32px;
+  grid-template-columns: 36px 1fr auto auto 24px 28px;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
@@ -1139,6 +1517,120 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   flex-shrink: 0;
 }
 
+/* Header with inline controls */
+.lf-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lf-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lf-controls .size-input {
+  width: 60px;
+}
+
+.lf-controls .path-input {
+  width: 120px;
+}
+
+.lf-controls-label {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Vault section */
+.vault-group {
+  border: 1px solid hsla(280, 40%, 60%, 0.15);
+  border-radius: var(--radius-sm);
+  background: hsla(280, 40%, 70%, 0.03);
+  padding: 2px 4px;
+  margin-bottom: 8px;
+}
+
+.vault-title {
+  color: hsla(280, 40%, 45%, 0.9);
+}
+
+.vault-description {
+  color: hsla(280, 35%, 45%, 0.6);
+  font-style: italic;
+  font-size: 11px;
+}
+
+.vault-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.vault-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0.6;
+}
+
+.vault-file-row:hover {
+  background: hsla(280, 30%, 70%, 0.08);
+  opacity: 0.8;
+}
+
+.vault-badge {
+  color: hsla(280, 40%, 50%, 0.85);
+  border-color: hsla(280, 40%, 50%, 0.35);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.vault-file-name {
+  font-size: 11px;
+  color: hsla(280, 30%, 40%, 0.7);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-file-size {
+  font-size: 11px;
+  color: hsla(280, 30%, 40%, 0.5);
+  flex-shrink: 0;
+}
+
+.safety-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 8px;
+  border: 1px solid;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+.file-row-explanation {
+  font-size: 11px;
+  margin-top: 2px;
+  line-height: 1.3;
+  opacity: 0.7;
+}
+
 .file-row-path {
   font-size: 11px;
   margin-top: 2px;
@@ -1170,6 +1662,42 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   white-space: nowrap;
   min-width: 90px;
   text-align: right;
+}
+
+/* ---- Protect toggle button ---- */
+.protect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.25;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.protect-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.protect-btn:hover {
+  opacity: 0.7;
+}
+
+.protect-btn--active {
+  color: hsla(280, 40%, 50%, 0.85);
+  opacity: 0.8;
+}
+
+.protect-btn--active:hover {
+  opacity: 1;
 }
 
 /* ---- Reveal in Finder button ---- */

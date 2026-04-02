@@ -41,6 +41,7 @@ pub struct FileClassificationInput {
     pub name: String,
     pub size: u64,
     pub file_type: String,
+    pub modified: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

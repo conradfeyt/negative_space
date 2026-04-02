@@ -544,7 +544,7 @@ const timeAgo = computed(() => {
 
 <style scoped>
 .vitals-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* ---------------------------------------------------------------------------

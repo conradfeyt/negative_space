@@ -152,7 +152,7 @@ const totalSelected = computed(() => logs.value.filter((l) => selected.value.has
 </template>
 
 <style scoped>
-.logs-view { max-width: 740px; }
+.logs-view { max-width: 1440px; }
 .cell-name { max-width: 200px; font-weight: 400; }
 .cell-path { max-width: 280px; }
 </style>

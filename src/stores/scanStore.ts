@@ -49,6 +49,32 @@ import { getDisabledPaths } from "../composables/useScanSettings";
 // Apple Intelligence
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// User-protected files — persisted to localStorage
+// ---------------------------------------------------------------------------
+const PROTECTED_KEY = "negativ_protected_files";
+
+function loadProtected(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PROTECTED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+export const protectedFiles = ref<Set<string>>(loadProtected());
+
+export function toggleProtected(path: string) {
+  const next = new Set(protectedFiles.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  protectedFiles.value = next;
+  localStorage.setItem(PROTECTED_KEY, JSON.stringify([...next]));
+}
+
+export function isProtected(path: string): boolean {
+  return protectedFiles.value.has(path);
+}
+
 export const intelligenceAvailable = ref(false);
 export const aiAvailable = ref(false);
 export const fileClassifications = ref<Map<string, FileClassification>>(new Map());
@@ -64,8 +90,7 @@ export async function checkIntelligence() {
   }
 }
 
-export async function classifyFiles(files: { path: string; name: string; size: number; file_type: string }[]) {
-  if (!intelligenceAvailable.value) return;
+export async function classifyFiles(files: { path: string; name: string; size: number; file_type: string; modified?: string | null }[]) {
   try {
     const results = await invoke<FileClassification[]>("classify_files_ai", { files });
     const map = new Map(fileClassifications.value);
@@ -150,16 +175,50 @@ export async function restoreAllCaches() {
   ]);
 
   if (cachedDisk) diskUsage.value = cachedDisk;
-  if (cachedLargeFiles) { largeFiles.value = cachedLargeFiles; largeFilesScanned.value = true; }
-  if (cachedCaches) { caches.value = cachedCaches; cachesScanned.value = true; }
-  if (cachedLogs) { logs.value = cachedLogs; logsScanned.value = true; }
-  if (cachedApps) { apps.value = cachedApps; appsScanned.value = true; }
-  if (cachedTrash) trashInfo.value = cachedTrash;
-  if (cachedDocker) dockerInfo.value = cachedDocker;
+  if (cachedLargeFiles) {
+    largeFiles.value = cachedLargeFiles;
+    largeFilesScanned.value = true;
+    setDomain("largeFiles", { status: "done", itemCount: cachedLargeFiles.length, totalSize: cachedLargeFiles.reduce((s, f) => s + (f.is_sparse && f.actual_size < f.apparent_size * 0.8 ? f.actual_size : f.apparent_size), 0) });
+  }
+  if (cachedCaches) {
+    caches.value = cachedCaches;
+    cachesScanned.value = true;
+    setDomain("caches", { status: "done", itemCount: cachedCaches.length, totalSize: cachedCaches.reduce((s, c) => s + c.size, 0) });
+  }
+  if (cachedLogs) {
+    logs.value = cachedLogs;
+    logsScanned.value = true;
+    setDomain("logs", { status: "done", itemCount: cachedLogs.length, totalSize: cachedLogs.reduce((s, l) => s + l.size, 0) });
+  }
+  if (cachedApps) {
+    apps.value = cachedApps;
+    appsScanned.value = true;
+    setDomain("apps", { status: "done", itemCount: cachedApps.length, totalSize: cachedApps.reduce((s, a) => s + a.footprint, 0) });
+  }
+  if (cachedTrash) {
+    trashInfo.value = cachedTrash;
+    setDomain("trash", { status: "done", itemCount: cachedTrash.item_count, totalSize: cachedTrash.size });
+  }
+  if (cachedDocker) {
+    dockerInfo.value = cachedDocker;
+    setDomain("docker", { status: "done", itemCount: cachedDocker.images?.length ?? 0, totalSize: 0 });
+  }
   if (cachedSecurity) { securityResult.value = cachedSecurity; securityScanned.value = true; }
-  if (cachedBrowsers) { browserResult.value = cachedBrowsers; browserScanned.value = true; }
+  if (cachedBrowsers) {
+    browserResult.value = cachedBrowsers;
+    browserScanned.value = true;
+    setDomain("browsers", { status: "done", itemCount: cachedBrowsers.browsers?.length ?? 0, totalSize: cachedBrowsers.total_size ?? 0 });
+  }
   if (cachedDuplicates) { duplicateResult.value = cachedDuplicates; duplicateScanned.value = true; }
   if (cachedPackages) { packagesResult.value = cachedPackages; packagesScanned.value = true; }
+
+  // Restore most recent disk map cache (for dashboard waffle chart)
+  try {
+    const caches = await listDiskMapCaches();
+    if (caches.length > 0) {
+      await loadDiskMapCache(caches[0].id);
+    }
+  } catch (_) { /* non-critical */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +329,7 @@ export const thermalError = ref("");
 export const scanAllRunning = ref(false);
 export const scanAllStep = ref("");
 export const scanAllDone = ref(false);
+export const lastScanTime = ref<number | null>(null);
 
 // ---------------------------------------------------------------------------
 // Per-domain scan status — unified tracking for dashboard + sidebar
@@ -620,11 +680,11 @@ export async function scanAll() {
     scanAllStep.value = "docker";
     await loadDockerInfo();
 
-    scanAllStep.value = "security";
-    await scanSecurity();
+    // Security scan excluded from quick scan — too slow, run manually from Security view
 
     scanAllDone.value = true;
     scanAllStep.value = "";
+    lastScanTime.value = Date.now();
   } catch (_) {
     // errors captured per-scan
   } finally {

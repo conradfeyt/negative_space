@@ -278,7 +278,7 @@ const totalRuntimeSize = computed(() =>
 
 <style scoped>
 .packages-view {
-  max-width: 800px;
+  max-width: 1440px;
 }
 
 /* Stats row */

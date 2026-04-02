@@ -1,0 +1,82 @@
+# Negativ_ — Claude Context
+
+## Project
+macOS system cleaner and disk visualiser built with Tauri v2 (Rust backend + Vue 3/TypeScript frontend).
+~25,000 lines of code. Early alpha, distributed via Homebrew tap.
+
+## Key facts
+- **Correct project root:** `~/projects/negativ_` — always build from here, never from `~/projects/macsweep` (old name)
+- **Binary name:** `negative-space` (Rust crate name), installed as `Negativ_.app`
+- **Bundle ID:** `com.conradfe.negativespace`
+- **Git identity:** `conrad.feyt@gmail.com` / Conrad Feyt (local config only, not global)
+- **GitHub:** `github.com/conradfeyt/negative_space`
+- **Homebrew tap:** `conradfeyt/homebrew-negativespace` → `brew tap conradfeyt/negativespace`
+
+## Build workflow
+```bash
+# Fast iteration (no-bundle — copies binary into existing .app):
+touch ~/projects/negativ_/src-tauri/src/lib.rs   # REQUIRED — forces Cargo to re-embed frontend assets
+cd ~/projects/negativ_ && npm run tauri build -- --no-bundle
+cp -f ~/projects/negativ_/src-tauri/target/release/negative-space "/Applications/Negativ_.app/Contents/MacOS/Negativ_"
+xattr -dr com.apple.quarantine /Applications/Negativ_.app
+open /Applications/Negativ_.app
+
+# Full bundle (for releases or when .app doesn't exist):
+cd ~/projects/negativ_ && npm run tauri build
+cp -r ~/projects/negativ_/src-tauri/target/release/bundle/macos/Negativ_.app /Applications/
+xattr -dr com.apple.quarantine /Applications/Negativ_.app
+open /Applications/Negativ_.app
+```
+
+**IMPORTANT:** Always `touch src-tauri/src/lib.rs` before `--no-bundle` builds. Without it, Cargo uses cached artifacts and the old frontend JS is embedded — changes to `.vue` files won't appear.
+
+**Kill before rebuilding:** `pkill -x "Negativ_"` — macOS won't replace a running binary.
+
+## Stack
+- **Frontend:** Vue 3 + TypeScript + Vite + D3.js (`src/`)
+- **Backend:** Rust + Tauri v2 (`src-tauri/src/`)
+- **Native:** AppKit via objc2 — custom gradient layer, SMC sensor reading
+- **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance
+
+## Architecture notes
+
+### Background gradient
+Two-layer system:
+1. **CSS layer** (content panel) — warm palette JPEG generated on frontend via canvas, set as `--gradient-bg` CSS var on `#app`. Uses `RENDER_SCALE=0.20` (render at 20% then upscale for smooth blending), `BLOB_HOLD=0.35`, `saturate(6.0)`. Lives in `src/App.vue`.
+2. **Native layer** (sidebar) — cool palette JPEG sent to Rust via `invoke('set_native_background', ...)`, rendered as `NSImageView` behind WKWebView. Cannot be changed via CSS.
+
+The content panel has a 70% white overlay (`rgba(255,255,255,0.70)`) for readability — this is intentional and should not be changed.
+
+### Visualisations (SpaceMap)
+Three modes switchable in-app:
+- **Voronoi treemap** (`src/components/VoronoiViz.vue`) — d3-voronoi-treemap, white-opacity fills, dark gap mask via SVG
+- **Sunburst** (`src/views/SpaceMap.vue`) — D3 partition, white-opacity fills matching Voronoi aesthetic
+- **Galactic** (`src/components/GalacticViz.vue`) — star-field visualization
+
+### Vault
+Compressed file storage at `~/Documents/MyNegativeSpaceVault/`. Previously was at `~/Library/Application Support/MacSweep/vault` and `NegativeSpace/vault` — migration code exists in `vault.rs`.
+
+### Native gradient layer
+`src-tauri/src/gradient.rs` — receives JPEG from frontend, creates `NSImageView` behind WKWebView. Do NOT replace with CSS — it's there for zero-lag window drag tracking.
+
+## Design system
+- Glassmorphism — translucent cards over gradient background
+- Dark text on light frosted glass content panel
+- Sidebar: white text on native gradient (no backdrop-filter)
+- Accent: `rgba(59, 199, 232, ...)` aqua/teal
+- All opacity-based — white-on-dark for sidebar, dark-on-light for content
+
+## Distribution
+- Homebrew cask at `~/projects/homebrew-negativespace/Casks/negativ_.rb`
+- Cask handles quarantine removal and auto-launch in `postflight`
+- Current release: v0.1.0-alpha on GitHub Releases
+
+## Private docs
+`_private/` (gitignored) — ROADMAP.md, ARCHITECTURE.md, and test HTML files.
+
+## What NOT to do
+- Don't use git worktrees — causes complications with orphan branches and identity
+- Don't build from `~/projects/macsweep` — old project, WebKit cache there is stale
+- Don't change `gradient.rs` native layer to CSS
+- Don't skip `touch lib.rs` before `--no-bundle` builds
+- Don't use `--global` for git config — personal identity is local only

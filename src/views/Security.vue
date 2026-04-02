@@ -490,7 +490,7 @@ async function handleRemove(item: LaunchItem) {
 
 <style scoped>
 .security-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 /* Summary Cards */

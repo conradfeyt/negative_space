@@ -488,7 +488,7 @@ function shortPath(p: string): string {
 
 <style scoped>
 .duplicates-view {
-  max-width: 740px;
+  max-width: 1440px;
 }
 
 .scan-controls {
