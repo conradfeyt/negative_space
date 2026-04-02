@@ -20,6 +20,7 @@ extern "C" {
     fn msw_check_intelligence_available() -> i32;
     fn msw_classify_files(json_input: *const c_char) -> *mut c_char;
     fn msw_generate_scan_summary(json_input: *const c_char) -> *mut c_char;
+    fn msw_render_sf_symbol(json_input: *const c_char) -> *mut c_char;
     fn msw_free_string(ptr: *mut c_char);
 }
 
@@ -140,6 +141,30 @@ pub fn classify_files(files: &[FileClassificationInput]) -> Vec<FileClassificati
     {
         let _ = files;
         vec![]
+    }
+}
+
+/// Render a system icon to base64 PNG.
+pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>) -> String {
+    #[cfg(has_swift_bridge)]
+    {
+        let params = serde_json::json!({
+            "name": name,
+            "size": size,
+            "mode": mode.unwrap_or("sf"),
+        });
+        let json = params.to_string();
+        let result = call_swift(msw_render_sf_symbol, &json);
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&result) {
+            return parsed["base64"].as_str().unwrap_or("").to_string();
+        }
+        String::new()
+    }
+
+    #[cfg(not(has_swift_bridge))]
+    {
+        let _ = (name, size, mode);
+        String::new()
     }
 }
 

@@ -2593,6 +2593,11 @@ async fn generate_scan_summary_ai(input: intelligence::ScanSummaryInput) -> inte
     intelligence::generate_scan_summary(&input)
 }
 
+#[tauri::command]
+async fn render_sf_symbol(name: String, size: u32, mode: Option<String>) -> String {
+    intelligence::render_sf_symbol(&name, size, mode.as_deref())
+}
+
 // ---------------------------------------------------------------------------
 // Tauri app entry point
 // ---------------------------------------------------------------------------
@@ -2709,6 +2714,7 @@ pub fn run() {
             check_ai_available,
             classify_files_ai,
             generate_scan_summary_ai,
+            render_sf_symbol,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

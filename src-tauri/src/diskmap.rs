@@ -117,8 +117,19 @@ fn list_subdirs(path: &str) -> Vec<(String, String)> {
 }
 
 /// Categorize a directory for treemap coloring.
+/// Categories align with macOS System Settings > Storage where possible.
 fn categorize(name: &str, path: &str) -> String {
     let lower = name.to_lowercase();
+
+    // Applications
+    if lower == "applications" || lower.ends_with(".app") {
+        return "applications".to_string();
+    }
+
+    // Documents (Desktop, Documents, Downloads)
+    if lower == "desktop" || lower == "documents" || lower == "downloads" {
+        return "documents".to_string();
+    }
 
     // Developer tools
     if lower == "developer"
@@ -135,44 +146,67 @@ fn categorize(name: &str, path: &str) -> String {
         return "developer".to_string();
     }
 
-    // Media
-    if lower == "movies"
-        || lower == "music"
-        || lower == "pictures"
-        || lower == "photos"
-        || lower == "photos library.photoslibrary"
+    // Books (matches macOS "Books" category)
+    if lower == "books"
+        || lower == "audiobooks"
+        || path.contains("/BKAgentService/")
+        || path.contains("/com.apple.BKAgentService/")
     {
+        return "books".to_string();
+    }
+
+    // Mail
+    if lower == "mail"
+        || path.contains("/com.apple.mail/")
+        || path.contains("/Mail/")
+    {
+        return "mail".to_string();
+    }
+
+    // Photos
+    if lower == "photos"
+        || lower == "photos library.photoslibrary"
+        || path.contains("/com.apple.Photos/")
+    {
+        return "photos".to_string();
+    }
+
+    // Media (Movies, Music, Pictures — excluding Photos which is its own category)
+    if lower == "movies" || lower == "music" || lower == "pictures" {
         return "media".to_string();
     }
 
-    // Documents
-    if lower == "desktop" || lower == "documents" || lower == "downloads" {
-        return "documents".to_string();
+    // Trash / Bin
+    if lower == ".trash" {
+        return "bin".to_string();
     }
 
-    // Applications
-    if lower == "applications" || lower.ends_with(".app") {
-        return "applications".to_string();
-    }
-
-    // System / Library
-    if lower == "library"
-        || lower == "system"
-        || lower.starts_with(".")
-        || path.starts_with("/Library")
-        || path.starts_with("/System")
+    // macOS system files
+    if path.starts_with("/System")
+        || path.starts_with("/usr")
+        || path.starts_with("/sbin")
+        || path.starts_with("/bin")
+        || (lower == "system" && path.contains("/System"))
     {
-        return "system".to_string();
-    }
-
-    // Caches
-    if lower == "caches" || lower == ".cache" || lower == "cache" {
-        return "caches".to_string();
+        return "macos".to_string();
     }
 
     // Docker
     if lower == ".docker" || lower == "docker" || lower.contains("docker") {
         return "docker".to_string();
+    }
+
+    // Caches (explicit cache dirs)
+    if lower == "caches" || lower == ".cache" || lower == "cache" {
+        return "caches".to_string();
+    }
+
+    // System Data (Library, hidden dirs, everything system-level under ~)
+    if lower == "library"
+        || lower.starts_with(".")
+        || path.starts_with("/Library")
+    {
+        return "system_data".to_string();
     }
 
     "other".to_string()

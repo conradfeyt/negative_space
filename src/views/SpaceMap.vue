@@ -37,8 +37,8 @@ import VoronoiViz from "../components/VoronoiViz.vue";
 // ---------------------------------------------------------------------------
 // View switcher (Phase 4 shell — only Sunburst active)
 // ---------------------------------------------------------------------------
-type VizMode = "sunburst" | "galactic" | "voronoi";
-const activeViz = ref<VizMode>("sunburst");
+type VizMode = "overview" | "sunburst" | "galactic" | "voronoi";
+const activeViz = ref<VizMode>("overview");
 
 // ---------------------------------------------------------------------------
 // Color mode toggle: "size" (category) vs "recency" (cold→warm)
@@ -54,15 +54,153 @@ const enriched = ref(false);
 // Each top-level directory gets a unique hue from a well-separated palette.
 // Category colors for the legend only
 const categoryFills: Record<string, string> = {
-  developer: "#43a047",
-  media: "#e91e63",
-  documents: "#1e88e5",
-  applications: "#8e24aa",
-  system: "#5c6bc0",
-  caches: "#fb8c00",
+  applications: "#e53935",
+  documents: "#f57c00",
+  developer: "#f9a825",
+  books: "#43a047",
+  mail: "#1e88e5",
+  photos: "#ad1457",
+  media: "#8e24aa",
+  bin: "#78909c",
   docker: "#00acc1",
+  caches: "#fb8c00",
+  macos: "#5c6bc0",
+  system_data: "#546e7a",
+  system: "#5c6bc0",
   other: "#78909c",
 };
+
+// ---------------------------------------------------------------------------
+// Overview mode — macOS-style stacked bar + category list
+// ---------------------------------------------------------------------------
+// macOS-style category colors (matched to System Settings > Storage)
+const overviewColors: Record<string, string> = {
+  applications: "hsla(0, 65%, 58%, 0.9)",        // Red
+  documents:    "hsla(30, 75%, 55%, 0.9)",       // Orange
+  developer:    "hsla(210, 15%, 55%, 0.85)",     // Blue-gray
+  books:        "hsla(25, 75%, 55%, 0.9)",       // Orange
+  mail:         "hsla(215, 60%, 55%, 0.9)",      // Blue
+  photos:       "hsla(340, 55%, 55%, 0.9)",      // Pink/multicolor
+  media:        "hsla(280, 40%, 55%, 0.85)",     // Purple
+  bin:          "hsla(220, 8%, 60%, 0.7)",       // Gray
+  docker:       "hsla(195, 55%, 48%, 0.85)",     // Cyan
+  caches:       "hsla(35, 50%, 50%, 0.8)",       // Tan
+  macos:        "hsla(220, 10%, 50%, 0.75)",     // Gray
+  system_data:  "hsla(220, 8%, 48%, 0.7)",       // Dark gray
+  other:        "hsla(220, 8%, 58%, 0.6)",       // Light gray
+  free:         "hsla(0, 0%, 85%, 0.3)",         // Almost white
+};
+
+const overviewLabels: Record<string, string> = {
+  applications: "Applications",
+  documents: "Documents",
+  developer: "Developer",
+  books: "Books",
+  mail: "Mail",
+  photos: "Photos",
+  media: "Movies & Music",
+  bin: "Bin",
+  docker: "Docker",
+  caches: "Caches",
+  macos: "macOS",
+  system_data: "System Data",
+  other: "Other",
+  free: "Available",
+};
+
+// macOS system icons per category — using actual app icons and system images
+// { name: path-or-symbol, mode: "app"|"sf"|"system" }
+const categoryIcons: Record<string, { name: string; mode: string }> = {
+  applications: { name: "/System/Applications/App Store.app", mode: "app" },
+  documents:    { name: "NSFolder", mode: "system" },
+  developer:    { name: "/Applications/Xcode.app", mode: "app" },
+  books:        { name: "/System/Applications/Books.app", mode: "app" },
+  mail:         { name: "/System/Applications/Mail.app", mode: "app" },
+  photos:       { name: "/System/Applications/Photos.app", mode: "app" },
+  media:        { name: "/System/Applications/TV.app", mode: "app" },
+  bin:          { name: "NSTrashFull", mode: "system" },
+  docker:       { name: "/Applications/Docker.app", mode: "app" },
+  caches:       { name: "cylinder.split.1x2.fill", mode: "sf" },
+  macos:        { name: "desktopcomputer", mode: "sf" },
+  system_data:  { name: "ellipsis.circle.fill", mode: "sf" },
+  other:        { name: "questionmark.folder.fill", mode: "sf" },
+};
+
+// Cache for rendered icon base64 PNGs
+const sfSymbolCache = ref<Record<string, string>>({});
+
+async function loadSFSymbols() {
+  for (const [key, iconDef] of Object.entries(categoryIcons)) {
+    try {
+      const base64 = await invoke<string>("render_sf_symbol", {
+        name: iconDef.name,
+        size: 32,
+        mode: iconDef.mode,
+      });
+      if (base64) sfSymbolCache.value[key] = base64;
+    } catch { /* non-critical */ }
+  }
+}
+
+// Load icons on mount
+loadSFSymbols();
+
+interface OverviewCategory {
+  key: string;
+  label: string;
+  color: string;
+  size: number;
+  pct: number;
+}
+
+const overviewCategories = computed<OverviewCategory[]>(() => {
+  if (!diskMapResult.value) return [];
+  const total = diskMapResult.value.disk_total;
+  if (total <= 0) return [];
+
+  // Aggregate children by category
+  const byCategory: Record<string, number> = {};
+  for (const child of diskMapResult.value.root.children) {
+    const cat = child.category || "other";
+    byCategory[cat] = (byCategory[cat] || 0) + child.size;
+  }
+
+  // Build sorted entries (by size desc)
+  const entries: OverviewCategory[] = Object.entries(byCategory)
+    .map(([key, size]) => ({
+      key,
+      label: overviewLabels[key] || key,
+      color: overviewColors[key] || overviewColors.other,
+      size,
+      pct: (size / total) * 100,
+    }))
+    .filter(e => e.size > 0)
+    .sort((a, b) => b.size - a.size);
+
+  return entries;
+});
+
+const overviewFree = computed<OverviewCategory | null>(() => {
+  if (!diskMapResult.value) return null;
+  const total = diskMapResult.value.disk_total;
+  const free = diskMapResult.value.disk_free;
+  return {
+    key: "free",
+    label: "Available",
+    color: overviewColors.free,
+    size: free,
+    pct: (free / total) * 100,
+  };
+});
+
+// Bar segments: used categories + free
+const overviewBarSegments = computed(() => {
+  const cats = overviewCategories.value;
+  const free = overviewFree.value;
+  const segments = [...cats];
+  if (free) segments.push(free);
+  return segments;
+});
 
 
 function getFill(d: d3.HierarchyRectangularNode<DiskNode>): string {
@@ -673,6 +811,18 @@ onBeforeUnmount(() => {
     <div class="viz-switcher">
       <button
         class="viz-btn"
+        :class="{ active: activeViz === 'overview' }"
+        @click="activeViz = 'overview'"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="3" width="12" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="1" y="8" width="8" height="1.5" rx="0.5" fill="currentColor" opacity="0.3"/>
+          <rect x="1" y="11" width="5" height="1.5" rx="0.5" fill="currentColor" opacity="0.2"/>
+        </svg>
+        Overview
+      </button>
+      <button
+        class="viz-btn"
         :class="{ active: activeViz === 'sunburst' }"
         @click="activeViz = 'sunburst'"
       >
@@ -791,8 +941,8 @@ onBeforeUnmount(() => {
 
     <!-- Results -->
     <template v-else-if="diskMapResult">
-      <!-- Disk usage bar (shared across all viz modes) -->
-      <div class="disk-bar-container">
+      <!-- Disk usage bar (hidden in overview mode — overview has its own) -->
+      <div v-if="activeViz !== 'overview'" class="disk-bar-container">
         <div class="disk-bar">
           <div
             class="disk-bar-fill"
@@ -808,9 +958,70 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- ============================================================= -->
+      <!-- OVERVIEW VIEW (macOS-style)                                     -->
+      <!-- ============================================================= -->
+      <template v-if="activeViz === 'overview'">
+        <div class="overview-container">
+          <!-- Header -->
+          <div class="overview-header">
+            <span class="overview-disk-name">Macintosh HD</span>
+            <span class="overview-disk-usage text-muted">
+              {{ formatSize(diskMapResult.disk_used) }} of {{ formatSize(diskMapResult.disk_total) }} used
+            </span>
+          </div>
+
+          <!-- Stacked bar -->
+          <div class="overview-bar">
+            <div
+              v-for="seg in overviewBarSegments"
+              :key="seg.key"
+              class="overview-bar-seg"
+              :style="{ flex: seg.pct, background: seg.color }"
+              :title="seg.label + ': ' + formatSize(seg.size)"
+            ></div>
+          </div>
+
+          <!-- Inline legend -->
+          <div class="overview-bar-legend">
+            <span v-for="seg in overviewCategories.slice(0, 6)" :key="seg.key" class="overview-bar-legend-item">
+              <span class="overview-bar-legend-dot" :style="{ background: seg.color }"></span>
+              {{ seg.label }}
+            </span>
+          </div>
+
+          <!-- Category list -->
+          <div class="overview-list">
+            <div
+              v-for="cat in overviewCategories"
+              :key="cat.key"
+              class="overview-list-row"
+              @click="activeViz = 'sunburst'"
+            >
+              <div class="overview-list-icon">
+                <img v-if="sfSymbolCache[cat.key]" :src="sfSymbolCache[cat.key]" width="32" height="32" />
+              </div>
+              <span class="overview-list-label">{{ cat.label }}</span>
+              <span class="overview-list-size mono">{{ formatSize(cat.size) }}</span>
+              <button class="overview-list-info" @click.stop="activeViz = 'sunburst'" title="View details">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+            <!-- Free space row -->
+            <div v-if="overviewFree" class="overview-list-row overview-list-row--free">
+              <div class="overview-list-icon overview-list-icon--free"></div>
+              <span class="overview-list-label">{{ overviewFree.label }}</span>
+              <span class="overview-list-size mono">{{ formatSize(overviewFree.size) }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ============================================================= -->
       <!-- SUNBURST VIEW                                                   -->
       <!-- ============================================================= -->
-      <template v-if="activeViz === 'sunburst'">
+      <template v-else-if="activeViz === 'sunburst'">
         <!-- Color mode toggle -->
         <div class="color-toggle-row">
           <div class="color-toggle">
@@ -1556,5 +1767,163 @@ onBeforeUnmount(() => {
   width: 10px !important;
   height: 10px !important;
   border-width: 1.5px !important;
+}
+
+/* ====================================================================
+   Overview mode — macOS-style storage breakdown
+   ==================================================================== */
+.overview-container {
+  padding: var(--sp-4) 0;
+}
+
+.overview-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+
+.overview-disk-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.overview-disk-usage {
+  font-size: 13px;
+}
+
+/* Stacked bar */
+.overview-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 1.5px;
+  margin-bottom: var(--sp-3);
+}
+
+.overview-bar-seg {
+  min-width: 3px;
+  transition: flex 0.5s ease;
+  cursor: default;
+}
+
+.overview-bar-seg:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.overview-bar-seg:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Inline legend below bar */
+.overview-bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: var(--sp-6);
+}
+
+.overview-bar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.overview-bar-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Category list */
+.overview-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--sp-2);
+}
+
+.overview-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 8px;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+
+.overview-list-row:last-child {
+  border-bottom: none;
+}
+
+.overview-list-row:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.overview-list-row--free {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.overview-list-row--free:hover {
+  background: transparent;
+}
+
+.overview-list-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overview-list-icon img {
+  border-radius: 7px;
+}
+
+.overview-list-icon--free {
+  width: 36px;
+  height: 36px;
+}
+
+.overview-list-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  flex: 1;
+}
+
+.overview-list-size {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.overview-list-info {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.4;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.overview-list-info:hover {
+  opacity: 0.8;
 }
 </style>

@@ -53,6 +53,7 @@ fn build_swift_bridge() {
 
     // Link required system frameworks
     println!("cargo:rustc-link-lib=framework=Foundation");
+    println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=CoreSpotlight");
 
     // Rebuild if Swift sources change

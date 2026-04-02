@@ -358,21 +358,29 @@ const storageColor = computed(() => {
 // Storage card — waffle chart
 // ---------------------------------------------------------------------------
 const categoryColors: Record<string, string> = {
-  applications: "hsla(280, 35%, 60%, 0.75)",
-  documents:    "hsla(210, 45%, 60%, 0.75)",
-  media:        "hsla(340, 40%, 60%, 0.75)",
-  developer:    "hsla(35, 50%, 55%, 0.75)",
-  system:       "hsla(200, 25%, 55%, 0.65)",
-  caches:       "hsla(160, 35%, 50%, 0.65)",
-  docker:       "hsla(195, 55%, 50%, 0.75)",
-  other:        "hsla(220, 15%, 65%, 0.5)",
-  free:         "hsla(0, 0%, 88%, 0.4)",
+  applications: "hsla(0, 65%, 55%, 0.8)",
+  documents:    "hsla(35, 75%, 55%, 0.8)",
+  developer:    "hsla(45, 80%, 50%, 0.8)",
+  books:        "hsla(145, 50%, 45%, 0.8)",
+  mail:         "hsla(210, 60%, 55%, 0.8)",
+  photos:       "hsla(320, 45%, 55%, 0.8)",
+  media:        "hsla(280, 40%, 55%, 0.8)",
+  bin:          "hsla(220, 10%, 55%, 0.6)",
+  docker:       "hsla(195, 55%, 45%, 0.8)",
+  caches:       "hsla(35, 45%, 50%, 0.7)",
+  macos:        "hsla(220, 15%, 50%, 0.65)",
+  system_data:  "hsla(220, 10%, 45%, 0.6)",
+  system:       "hsla(220, 15%, 50%, 0.65)",
+  other:        "hsla(220, 10%, 60%, 0.45)",
+  free:         "hsla(0, 0%, 88%, 0.35)",
 };
 
 const categoryLabels: Record<string, string> = {
   applications: "Apps", documents: "Docs", media: "Media",
-  developer: "Dev", system: "System", caches: "Caches",
-  docker: "Docker", other: "Other", free: "Free",
+  developer: "Dev", books: "Books", mail: "Mail",
+  photos: "Photos", bin: "Bin", docker: "Docker",
+  caches: "Caches", macos: "macOS", system_data: "System",
+  system: "System", other: "Other", free: "Free",
 };
 
 const waffleCells = computed(() => {
