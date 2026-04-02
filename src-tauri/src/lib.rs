@@ -2594,8 +2594,13 @@ async fn generate_scan_summary_ai(input: intelligence::ScanSummaryInput) -> inte
 }
 
 #[tauri::command]
-async fn render_sf_symbol(name: String, size: u32, mode: Option<String>) -> String {
-    intelligence::render_sf_symbol(&name, size, mode.as_deref())
+async fn render_sf_symbol(name: String, size: u32, mode: Option<String>, grayscale: Option<bool>) -> String {
+    intelligence::render_sf_symbol(&name, size, mode.as_deref(), grayscale.unwrap_or(false))
+}
+
+#[tauri::command]
+async fn list_system_images() -> Vec<String> {
+    intelligence::list_system_images()
 }
 
 // ---------------------------------------------------------------------------
@@ -2715,6 +2720,7 @@ pub fn run() {
             classify_files_ai,
             generate_scan_summary_ai,
             render_sf_symbol,
+            list_system_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

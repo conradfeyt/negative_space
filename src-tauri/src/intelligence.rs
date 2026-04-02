@@ -21,6 +21,7 @@ extern "C" {
     fn msw_classify_files(json_input: *const c_char) -> *mut c_char;
     fn msw_generate_scan_summary(json_input: *const c_char) -> *mut c_char;
     fn msw_render_sf_symbol(json_input: *const c_char) -> *mut c_char;
+    fn msw_list_system_images() -> *mut c_char;
     fn msw_free_string(ptr: *mut c_char);
 }
 
@@ -145,13 +146,14 @@ pub fn classify_files(files: &[FileClassificationInput]) -> Vec<FileClassificati
 }
 
 /// Render a system icon to base64 PNG.
-pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>) -> String {
+pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>, grayscale: bool) -> String {
     #[cfg(has_swift_bridge)]
     {
         let params = serde_json::json!({
             "name": name,
             "size": size,
             "mode": mode.unwrap_or("sf"),
+            "grayscale": grayscale,
         });
         let json = params.to_string();
         let result = call_swift(msw_render_sf_symbol, &json);
@@ -163,9 +165,23 @@ pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>) -> String {
 
     #[cfg(not(has_swift_bridge))]
     {
-        let _ = (name, size, mode);
+        let _ = (name, size, mode, grayscale);
         String::new()
     }
+}
+
+/// List all available system image names.
+pub fn list_system_images() -> Vec<String> {
+    #[cfg(has_swift_bridge)]
+    {
+        let result_ptr = unsafe { msw_list_system_images() };
+        if result_ptr.is_null() { return vec![]; }
+        let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().to_string();
+        unsafe { msw_free_string(result_ptr) };
+        serde_json::from_str(&result).unwrap_or_default()
+    }
+    #[cfg(not(has_swift_bridge))]
+    { vec![] }
 }
 
 /// Generate a natural language scan summary.

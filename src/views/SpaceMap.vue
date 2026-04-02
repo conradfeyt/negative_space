@@ -58,6 +58,7 @@ const categoryFills: Record<string, string> = {
   documents: "#f57c00",
   developer: "#f9a825",
   books: "#43a047",
+  icloud: "#2196f3",
   mail: "#1e88e5",
   photos: "#ad1457",
   media: "#8e24aa",
@@ -79,6 +80,7 @@ const overviewColors: Record<string, string> = {
   documents:    "hsla(30, 75%, 55%, 0.9)",       // Orange
   developer:    "hsla(210, 15%, 55%, 0.85)",     // Blue-gray
   books:        "hsla(25, 75%, 55%, 0.9)",       // Orange
+  icloud:       "hsla(210, 70%, 55%, 0.9)",       // iCloud blue
   mail:         "hsla(215, 60%, 55%, 0.9)",      // Blue
   photos:       "hsla(340, 55%, 55%, 0.9)",      // Pink/multicolor
   media:        "hsla(280, 40%, 55%, 0.85)",     // Purple
@@ -93,13 +95,14 @@ const overviewColors: Record<string, string> = {
 
 const overviewLabels: Record<string, string> = {
   applications: "Applications",
-  documents: "Documents",
-  developer: "Developer",
+  bin: "Bin",
   books: "Books",
+  developer: "Developer",
+  documents: "Documents",
+  icloud: "iCloud Drive",
   mail: "Mail",
   photos: "Photos",
   media: "Movies & Music",
-  bin: "Bin",
   docker: "Docker",
   caches: "Caches",
   macos: "macOS",
@@ -108,17 +111,28 @@ const overviewLabels: Record<string, string> = {
   free: "Available",
 };
 
+// macOS display order: user categories alphabetical, then system categories at bottom
+const categoryOrder = [
+  "applications", "bin", "books", "developer", "documents",
+  "icloud", "mail", "photos", "media",
+  // Negativ_-specific
+  "docker", "caches",
+  // System (shown after divider)
+  "macos", "system_data", "other",
+];
+
 // macOS system icons per category — using actual app icons and system images
 // { name: path-or-symbol, mode: "app"|"sf"|"system" }
-const categoryIcons: Record<string, { name: string; mode: string }> = {
-  applications: { name: "/System/Applications/App Store.app", mode: "app" },
-  documents:    { name: "NSFolder", mode: "system" },
-  developer:    { name: "/Applications/Xcode.app", mode: "app" },
+const categoryIcons: Record<string, { name: string; mode: string; gray?: boolean }> = {
+  applications: { name: "/System/Applications/App Store.app", mode: "app", gray: true },
+  bin:          { name: "NSTrashFull", mode: "system" },
   books:        { name: "/System/Applications/Books.app", mode: "app" },
+  developer:    { name: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/DeveloperFolderIcon.icns", mode: "app" },
+  documents:    { name: "NSFolder", mode: "system" },
+  icloud:       { name: "icloud.fill", mode: "sf" },
   mail:         { name: "/System/Applications/Mail.app", mode: "app" },
   photos:       { name: "/System/Applications/Photos.app", mode: "app" },
   media:        { name: "/System/Applications/TV.app", mode: "app" },
-  bin:          { name: "NSTrashFull", mode: "system" },
   docker:       { name: "/Applications/Docker.app", mode: "app" },
   caches:       { name: "cylinder.split.1x2.fill", mode: "sf" },
   macos:        { name: "desktopcomputer", mode: "sf" },
@@ -136,6 +150,7 @@ async function loadSFSymbols() {
         name: iconDef.name,
         size: 32,
         mode: iconDef.mode,
+        grayscale: iconDef.gray ?? false,
       });
       if (base64) sfSymbolCache.value[key] = base64;
     } catch { /* non-critical */ }
@@ -165,17 +180,32 @@ const overviewCategories = computed<OverviewCategory[]>(() => {
     byCategory[cat] = (byCategory[cat] || 0) + child.size;
   }
 
-  // Build sorted entries (by size desc)
-  const entries: OverviewCategory[] = Object.entries(byCategory)
-    .map(([key, size]) => ({
-      key,
-      label: overviewLabels[key] || key,
-      color: overviewColors[key] || overviewColors.other,
-      size,
-      pct: (size / total) * 100,
-    }))
-    .filter(e => e.size > 0)
-    .sort((a, b) => b.size - a.size);
+  // Build entries in macOS display order
+  const entries: OverviewCategory[] = [];
+  for (const key of categoryOrder) {
+    const size = byCategory[key];
+    if (size && size > 0) {
+      entries.push({
+        key,
+        label: overviewLabels[key] || key,
+        color: overviewColors[key] || overviewColors.other,
+        size,
+        pct: (size / total) * 100,
+      });
+    }
+  }
+  // Add any categories not in the order list (future-proofing)
+  for (const [key, size] of Object.entries(byCategory)) {
+    if (!categoryOrder.includes(key) && size > 0) {
+      entries.push({
+        key,
+        label: overviewLabels[key] || key,
+        color: overviewColors[key] || overviewColors.other,
+        size,
+        pct: (size / total) * 100,
+      });
+    }
+  }
 
   return entries;
 });
@@ -991,9 +1021,10 @@ onBeforeUnmount(() => {
 
           <!-- Category list -->
           <div class="overview-list">
+            <template v-for="(cat, idx) in overviewCategories" :key="cat.key">
+              <!-- Divider before system categories -->
+              <div v-if="cat.key === 'macos' && idx > 0" class="overview-list-divider"></div>
             <div
-              v-for="cat in overviewCategories"
-              :key="cat.key"
               class="overview-list-row"
               @click="activeViz = 'sunburst'"
             >
@@ -1008,6 +1039,7 @@ onBeforeUnmount(() => {
                 </svg>
               </button>
             </div>
+            </template>
             <!-- Free space row -->
             <div v-if="overviewFree" class="overview-list-row overview-list-row--free">
               <div class="overview-list-icon overview-list-icon--free"></div>
@@ -1925,5 +1957,11 @@ onBeforeUnmount(() => {
 
 .overview-list-info:hover {
   opacity: 0.8;
+}
+
+.overview-list-divider {
+  height: 0;
+  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+  margin: 4px 8px;
 }
 </style>

@@ -362,6 +362,7 @@ const categoryColors: Record<string, string> = {
   documents:    "hsla(35, 75%, 55%, 0.8)",
   developer:    "hsla(45, 80%, 50%, 0.8)",
   books:        "hsla(145, 50%, 45%, 0.8)",
+  icloud:       "hsla(210, 65%, 55%, 0.8)",
   mail:         "hsla(210, 60%, 55%, 0.8)",
   photos:       "hsla(320, 45%, 55%, 0.8)",
   media:        "hsla(280, 40%, 55%, 0.8)",
@@ -378,7 +379,7 @@ const categoryColors: Record<string, string> = {
 const categoryLabels: Record<string, string> = {
   applications: "Apps", documents: "Docs", media: "Media",
   developer: "Dev", books: "Books", mail: "Mail",
-  photos: "Photos", bin: "Bin", docker: "Docker",
+  photos: "Photos", icloud: "iCloud", bin: "Bin", docker: "Docker",
   caches: "Caches", macos: "macOS", system_data: "System",
   system: "System", other: "Other", free: "Free",
 };

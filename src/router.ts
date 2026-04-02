@@ -17,6 +17,7 @@ import Thermal from "./views/Thermal.vue";
 import Maintenance from "./views/Maintenance.vue";
 import Security from "./views/Security.vue";
 import Settings from "./views/Settings.vue";
+import IconTest from "./views/IconTest.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -40,6 +41,7 @@ const router = createRouter({
     { path: "/maintenance", name: "maintenance", component: Maintenance },
     { path: "/security", name: "security", component: Security },
     { path: "/settings", name: "settings", component: Settings },
+    { path: "/icon-test", name: "icon-test", component: IconTest },
   ],
 });
 

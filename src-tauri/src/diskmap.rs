@@ -146,39 +146,51 @@ fn categorize(name: &str, path: &str) -> String {
         return "developer".to_string();
     }
 
+    // Bin / Trash
+    if lower == ".trash" {
+        return "bin".to_string();
+    }
+
     // Books (matches macOS "Books" category)
     if lower == "books"
         || lower == "audiobooks"
-        || path.contains("/BKAgentService/")
-        || path.contains("/com.apple.BKAgentService/")
+        || path.contains("/BKAgentService")
+        || path.contains("/com.apple.BKAgentService")
     {
         return "books".to_string();
     }
 
+    // iCloud Drive
+    if lower == "mobile documents"
+        || path.contains("/Mobile Documents")
+    {
+        return "icloud".to_string();
+    }
+
     // Mail
     if lower == "mail"
-        || path.contains("/com.apple.mail/")
-        || path.contains("/Mail/")
+        || path.contains("/com.apple.mail")
+        || (path.contains("/Library/Mail") && !path.contains("/Library/Mail Downloads"))
     {
         return "mail".to_string();
     }
 
     // Photos
-    if lower == "photos"
-        || lower == "photos library.photoslibrary"
-        || path.contains("/com.apple.Photos/")
+    if lower == "photos library.photoslibrary"
+        || path.contains("/Photos Library.photoslibrary")
+        || path.contains("/com.apple.Photos")
     {
         return "photos".to_string();
     }
 
-    // Media (Movies, Music, Pictures — excluding Photos which is its own category)
-    if lower == "movies" || lower == "music" || lower == "pictures" {
+    // Media (Movies, Music — Pictures goes to documents since Photos is separate)
+    if lower == "movies" || lower == "music" {
         return "media".to_string();
     }
 
-    // Trash / Bin
-    if lower == ".trash" {
-        return "bin".to_string();
+    // Pictures (not Photos library) goes to documents
+    if lower == "pictures" {
+        return "documents".to_string();
     }
 
     // macOS system files
@@ -258,6 +270,21 @@ pub fn build_disk_map(fda: bool, depth: u8) -> DiskMapResult {
         ("Applications", "/Applications".to_string()),
     ];
 
+    // System-level directories (matching macOS System Settings categories)
+    let system_dirs = vec![
+        (".Trash", format!("{}/.Trash", home)),
+        ("Books", format!("{}/Library/Containers/com.apple.BKAgentService", home)),
+        ("Mail", format!("{}/Library/Mail", home)),
+        ("Photos", format!("{}/Pictures/Photos Library.photoslibrary", home)),
+        ("Mobile Documents", format!("{}/Library/Mobile Documents", home)),
+    ];
+
+    for (name, path) in &system_dirs {
+        if dir_exists(&path) || std::path::Path::new(&path).exists() {
+            top_dirs.push((name, path.clone()));
+        }
+    }
+
     // Directories that are safe without FDA
     let safe_dirs = vec![
         ("Projects", format!("{}/Projects", home)),
@@ -270,9 +297,12 @@ pub fn build_disk_map(fda: bool, depth: u8) -> DiskMapResult {
         (".cargo", format!("{}/.cargo", home)),
         (".rustup", format!("{}/.rustup", home)),
         (".npm", format!("{}/.npm", home)),
+        (".gradle", format!("{}/.gradle", home)),
         (".docker", format!("{}/.docker", home)),
         (".local", format!("{}/.local", home)),
         (".cache", format!("{}/.cache", home)),
+        (".cocoapods", format!("{}/.cocoapods", home)),
+        (".android", format!("{}/.android", home)),
     ];
 
     // Directories that need FDA

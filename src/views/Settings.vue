@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { useRouter } from "vue-router";
+const router = useRouter();
 import type { PathAccess, ScanArea } from "../types";
 
 const checking = ref(false);
@@ -247,6 +249,12 @@ onMounted(() => {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Debug -->
+    <div class="card" style="margin-top: 24px;">
+      <h3>Debug</h3>
+      <button class="btn-secondary" style="margin-top: 8px;" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
     </div>
   </div>
 </template>

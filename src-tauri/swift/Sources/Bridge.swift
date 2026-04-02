@@ -90,6 +90,15 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
         return strdup("{\"base64\":\"\"}")!
     }
 
+    // Apply grayscale if requested
+    let grayscale = params.grayscale ?? false
+    let renderImage: NSImage
+    if grayscale && mode != "sf" {
+        renderImage = desaturateImage(finalImage) ?? finalImage
+    } else {
+        renderImage = finalImage
+    }
+
     // Render to bitmap at 2x for retina
     let pixelSize = NSSize(width: size * 2, height: size * 2)
     let rep = NSBitmapImageRep(
@@ -109,7 +118,7 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 
     let drawRect = NSRect(origin: .zero, size: pixelSize)
-    finalImage.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+    renderImage.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
     NSGraphicsContext.restoreGraphicsState()
 
@@ -126,6 +135,69 @@ private struct SFSymbolParams: Codable {
     let name: String
     let size: Int?
     let mode: String?
+    let grayscale: Bool?
+}
+
+/// Desaturate an NSImage to grayscale using CIFilter.
+private func desaturateImage(_ image: NSImage) -> NSImage? {
+    guard let tiffData = image.tiffRepresentation,
+          let ciImage = CIImage(data: tiffData) else { return nil }
+
+    let filter = CIFilter(name: "CIColorControls")!
+    filter.setValue(ciImage, forKey: kCIInputImageKey)
+    filter.setValue(0.0, forKey: kCIInputSaturationKey) // 0 = full grayscale
+
+    guard let output = filter.outputImage else { return nil }
+
+    let rep = NSCIImageRep(ciImage: output)
+    let nsImage = NSImage(size: rep.size)
+    nsImage.addRepresentation(rep)
+    return nsImage
+}
+
+// MARK: - List Available System Images
+
+/// Returns a JSON array of all known NSImage system image names.
+@_cdecl("msw_list_system_images")
+public func listSystemImages() -> UnsafeMutablePointer<CChar> {
+    // All documented NSImage.Name constants
+    let names: [String] = [
+        "NSAddTemplate", "NSAdvanced", "NSApplicationIcon", "NSBluetoothTemplate",
+        "NSBonjour", "NSBookmarksTemplate", "NSCaution", "NSColorPanel",
+        "NSColumnViewTemplate", "NSComputer", "NSEnterFullScreenTemplate",
+        "NSEveryone", "NSExitFullScreenTemplate", "NSFlowViewTemplate",
+        "NSFolder", "NSFolderBurnable", "NSFolderSmart",
+        "NSFollowLinkFreestandingTemplate", "NSFontPanel", "NSGoBackTemplate",
+        "NSGoForwardTemplate", "NSGoLeftTemplate", "NSGoRightTemplate",
+        "NSHomeTemplate", "NSIChatTheaterTemplate", "NSIconViewTemplate",
+        "NSInfo", "NSInvalidDataFreestandingTemplate",
+        "NSLeftFacingTriangleTemplate", "NSListViewTemplate",
+        "NSLockLockedTemplate", "NSLockUnlockedTemplate", "NSMenuMixedStateTemplate",
+        "NSMenuOnStateTemplate", "NSMobileMe", "NSMultipleDocuments",
+        "NSNetwork", "NSPathTemplate", "NSPreferencesGeneral",
+        "NSQuickLookTemplate", "NSRefreshFreestandingTemplate",
+        "NSRefreshTemplate", "NSRemoveTemplate", "NSRevealFreestandingTemplate",
+        "NSRightFacingTriangleTemplate", "NSShareTemplate",
+        "NSSlideshowTemplate", "NSSmartBadgeTemplate",
+        "NSStatusAvailable", "NSStatusNone", "NSStatusPartiallyAvailable",
+        "NSStatusUnavailable", "NSStopProgressFreestandingTemplate",
+        "NSStopProgressTemplate", "NSTrashEmpty", "NSTrashFull",
+        "NSUser", "NSUserAccounts", "NSUserGroup", "NSUserGuest",
+        "NSActionTemplate", "NSMenuMixedStateTemplate",
+        "NSMenuOnStateTemplate", "NSTouchBarAddDetailTemplate",
+        "NSTouchBarAddTemplate", "NSTouchBarColorPickerFill",
+        "NSTouchBarColorPickerFont", "NSTouchBarColorPickerStroke",
+        "NSTouchBarCommunicationAudioTemplate",
+        "NSTouchBarCommunicationVideoTemplate",
+        "NSTouchBarComposeTemplate", "NSTouchBarDeleteTemplate",
+        "NSTouchBarDownloadTemplate",
+    ]
+
+    guard let data = try? JSONEncoder().encode(names),
+          let str = String(data: data, encoding: .utf8) else {
+        return strdup("[]")!
+    }
+    return strdup(str)!
 }
 
 // MARK: - Memory Management
