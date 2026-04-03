@@ -183,14 +183,59 @@ fn categorize(name: &str, path: &str) -> String {
         return "photos".to_string();
     }
 
-    // Media (Movies, Music — Pictures goes to documents since Photos is separate)
-    if lower == "movies" || lower == "music" {
+    // Music
+    if lower == "music" {
+        return "music".to_string();
+    }
+
+    // Music Creation (GarageBand, Logic)
+    if path.contains("/GarageBand")
+        || path.contains("/Logic Pro")
+        || path.contains("/com.apple.garageband")
+        || path.contains("/Library/Audio")
+    {
+        return "music_creation".to_string();
+    }
+
+    // Messages
+    if lower == "messages"
+        || path.contains("/com.apple.MobileSMS")
+        || path.contains("/Library/Messages")
+    {
+        return "messages".to_string();
+    }
+
+    // Podcasts
+    if path.contains("/com.apple.podcasts")
+        || path.contains("/Podcasts")
+    {
+        return "podcasts".to_string();
+    }
+
+    // iOS Files (device backups)
+    if path.contains("/MobileSync/Backup")
+        || path.contains("/com.apple.iTunes")
+    {
+        return "ios_files".to_string();
+    }
+
+    // TV / Movies
+    if lower == "movies"
+        || path.contains("/com.apple.TV")
+    {
         return "media".to_string();
     }
 
     // Pictures (not Photos library) goes to documents
     if lower == "pictures" {
         return "documents".to_string();
+    }
+
+    // Other Users & Shared
+    if path.starts_with("/Users/Shared")
+        || (path.starts_with("/Users/") && !path.starts_with(&format!("/Users/{}", lower)))
+    {
+        return "other_users".to_string();
     }
 
     // macOS system files
@@ -275,8 +320,12 @@ pub fn build_disk_map(fda: bool, depth: u8) -> DiskMapResult {
         (".Trash", format!("{}/.Trash", home)),
         ("Books", format!("{}/Library/Containers/com.apple.BKAgentService", home)),
         ("Mail", format!("{}/Library/Mail", home)),
+        ("Messages", format!("{}/Library/Messages", home)),
         ("Photos", format!("{}/Pictures/Photos Library.photoslibrary", home)),
         ("Mobile Documents", format!("{}/Library/Mobile Documents", home)),
+        ("MobileSync", format!("{}/Library/Application Support/MobileSync/Backup", home)),
+        ("Podcasts", format!("{}/Library/Group Containers/243LU875E5.groups.com.apple.podcasts", home)),
+        ("GarageBand", format!("{}/Library/Audio", home)),
     ];
 
     for (name, path) in &system_dirs {

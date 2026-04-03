@@ -59,10 +59,16 @@ const categoryFills: Record<string, string> = {
   developer: "#f9a825",
   books: "#43a047",
   icloud: "#2196f3",
+  ios_files: "#78909c",
   mail: "#1e88e5",
+  messages: "#43a047",
+  music: "#e53935",
+  music_creation: "#78909c",
   photos: "#ad1457",
   media: "#8e24aa",
   bin: "#78909c",
+  podcasts: "#7b1fa2",
+  other_users: "#78909c",
   docker: "#00acc1",
   caches: "#fb8c00",
   macos: "#5c6bc0",
@@ -81,12 +87,18 @@ const overviewColors: Record<string, string> = {
   developer:    "hsla(210, 15%, 55%, 0.85)",     // Blue-gray
   books:        "hsla(25, 75%, 55%, 0.9)",       // Orange
   icloud:       "hsla(210, 70%, 55%, 0.9)",       // iCloud blue
+  ios_files:    "hsla(220, 8%, 55%, 0.7)",        // Gray
   mail:         "hsla(215, 60%, 55%, 0.9)",      // Blue
+  messages:     "hsla(145, 55%, 45%, 0.9)",      // Green
+  music:        "hsla(0, 65%, 55%, 0.9)",        // Red
+  music_creation: "hsla(220, 8%, 55%, 0.7)",     // Gray
   photos:       "hsla(340, 55%, 55%, 0.9)",      // Pink/multicolor
   media:        "hsla(280, 40%, 55%, 0.85)",     // Purple
   bin:          "hsla(220, 8%, 60%, 0.7)",       // Gray
+  podcasts:     "hsla(280, 50%, 50%, 0.9)",      // Purple
   docker:       "hsla(195, 55%, 48%, 0.85)",     // Cyan
   caches:       "hsla(35, 50%, 50%, 0.8)",       // Tan
+  other_users:  "hsla(220, 8%, 55%, 0.7)",       // Gray
   macos:        "hsla(220, 10%, 50%, 0.75)",     // Gray
   system_data:  "hsla(220, 8%, 48%, 0.7)",       // Dark gray
   other:        "hsla(220, 8%, 58%, 0.6)",       // Light gray
@@ -100,25 +112,32 @@ const overviewLabels: Record<string, string> = {
   developer: "Developer",
   documents: "Documents",
   icloud: "iCloud Drive",
+  ios_files: "iOS Files",
   mail: "Mail",
+  messages: "Messages",
+  music: "Music",
+  music_creation: "Music Creation",
   photos: "Photos",
-  media: "Movies & Music",
+  podcasts: "Podcasts",
+  media: "TV",
   docker: "Docker",
   caches: "Caches",
+  other_users: "Other Users & Shared",
   macos: "macOS",
   system_data: "System Data",
   other: "Other",
   free: "Available",
 };
 
-// macOS display order: user categories alphabetical, then system categories at bottom
+// macOS display order: user categories alphabetical, then system at bottom
 const categoryOrder = [
   "applications", "bin", "books", "developer", "documents",
-  "icloud", "mail", "photos", "media",
+  "icloud", "ios_files", "mail", "messages", "music",
+  "music_creation", "photos", "podcasts", "media",
   // Negativ_-specific
   "docker", "caches",
   // System (shown after divider)
-  "macos", "system_data", "other",
+  "other_users", "macos", "system_data", "other",
 ];
 
 // macOS system icons per category — using actual app icons and system images
@@ -1036,14 +1055,14 @@ onBeforeUnmount(() => {
           <!-- Category list -->
           <div class="overview-list">
             <template v-for="(cat, idx) in overviewCategories" :key="cat.key">
-              <!-- Divider before system categories -->
-              <div v-if="cat.key === 'macos' && idx > 0" class="overview-list-divider"></div>
+              <!-- Dividers between sections -->
+              <div v-if="(cat.key === 'docker' || cat.key === 'other_users') && idx > 0" class="overview-list-divider"></div>
             <div
               class="overview-list-row"
               @click="activeViz = 'sunburst'"
             >
               <div class="overview-list-icon">
-                <img v-if="sfSymbolCache[cat.key]" :src="sfSymbolCache[cat.key]" width="32" height="32" />
+                <img v-if="sfSymbolCache[cat.key]" :src="sfSymbolCache[cat.key]" width="25" height="25" />
               </div>
               <span class="overview-list-label">{{ cat.label }}</span>
               <span class="overview-list-size mono">{{ formatSize(cat.size) }}</span>
@@ -1892,14 +1911,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   margin-top: var(--sp-2);
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
+  padding: 4px 0;
 }
 
 .overview-list-row {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 8px;
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+  padding: 8.5px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   cursor: pointer;
   border-radius: 8px;
   transition: background 0.12s;
@@ -1923,8 +1946,8 @@ onBeforeUnmount(() => {
 }
 
 .overview-list-icon {
-  width: 36px;
-  height: 36px;
+  width: 25px;
+  height: 25px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1932,7 +1955,7 @@ onBeforeUnmount(() => {
 }
 
 .overview-list-icon img {
-  border-radius: 7px;
+  border-radius: 5px;
 }
 
 .overview-list-icon--free {
