@@ -219,6 +219,34 @@ function vaultDisplayName(filename: string): string {
     ?? filename;
 }
 
+// File type icons — cached by extension
+const fileIconCache = ref<Record<string, string>>({});
+
+async function loadFileIcon(ext: string) {
+  if (fileIconCache.value[ext] || ext === "") return;
+  fileIconCache.value[ext] = ""; // mark as loading
+  try {
+    // Use a dummy path with the extension — NSWorkspace returns the icon for that file type
+    const base64 = await invoke<string>("render_sf_symbol", {
+      name: ext,
+      size: 64,
+      mode: "uttype",
+      style: "plain",
+    });
+    if (base64) fileIconCache.value[ext] = base64;
+  } catch { /* non-critical */ }
+}
+
+function getFileIcon(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (!fileIconCache.value[ext] && ext) loadFileIcon(ext);
+  return fileIconCache.value[ext] || "";
+}
+
+// Preload common extensions on mount
+const commonExts = ["png", "jpg", "log", "dmg", "qcow2", "jar", "a", "rlib", "so", "dylib", "img", "raw", "db", "f3d", "zip", "zst", "bin", "dill", "fst", "dat", "pack", "idx"];
+for (const ext of commonExts) loadFileIcon(ext);
+
 // Load vault manifest for name resolution
 invoke<any[]>("get_vault_entries").then((entries) => {
   vaultEntries.value = entries;
@@ -857,19 +885,21 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               <div class="file-row-check">
                 <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
               </div>
+              <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+              <div v-else class="file-row-icon-placeholder"></div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
                   <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
-                  <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                 </div>
-                <div class="file-row-path text-muted mono">{{ parentFolder(file.path) }}</div>
-                <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
+                <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
               </div>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-date text-muted">{{ file.modified }}</div>
               <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1023,15 +1053,15 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                             <div class="file-row-name">
                                               <span class="file-name">{{ file.name }}</span>
                                               <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
-                                              <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                                             </div>
-                                            <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
                                           </div>
                                           <div class="file-row-size mono">
                                             <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                             <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                                           </div>
-                                          <div class="file-row-date text-muted">{{ file.modified }}</div>
+                                          <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
+              <div class="file-row-date text-muted">{{ file.modified }}</div>
                                           <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
@@ -1070,7 +1100,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                         <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                                       </div>
-                                      <div class="file-row-date text-muted">{{ file.modified }}</div>
+                                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
+              <div class="file-row-date text-muted">{{ file.modified }}</div>
                                       <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
@@ -1111,7 +1143,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                               </div>
-                              <div class="file-row-date text-muted">{{ file.modified }}</div>
+                              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
+              <div class="file-row-date text-muted">{{ file.modified }}</div>
                               <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
@@ -1152,7 +1186,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                         <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                       </div>
-                      <div class="file-row-date text-muted">{{ file.modified }}</div>
+                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
+              <div class="file-row-date text-muted">{{ file.modified }}</div>
                       <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
@@ -1183,19 +1219,21 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               <div class="file-row-check">
                 <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
               </div>
+              <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+              <div v-else class="file-row-icon-placeholder"></div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
                   <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
-                  <span v-if="getClassification(file.path)" class="safety-badge" :style="{ color: safetyColor(getClassification(file.path)?.safety ?? 'unknown'), borderColor: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
                 </div>
-                <div class="file-row-path text-muted mono">{{ parentFolder(file.path) }}</div>
-                <div v-if="getClassification(file.path)" class="file-row-explanation text-muted">{{ getClassification(file.path)?.explanation }}</div>
+                <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
               </div>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-date text-muted">{{ file.modified }}</div>
               <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1264,8 +1302,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--sp-6);
-  padding: 0 var(--sp-1);
+  margin-bottom: var(--sp-4);
+  padding: 0;
   flex-wrap: wrap;
   gap: var(--sp-3);
 }
@@ -1337,22 +1375,25 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* ---- Category group ---- */
 .file-group {
-  margin-bottom: var(--sp-8);
+  margin-bottom: var(--sp-4);
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
+  overflow: hidden;
 }
 
 .group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-3) var(--sp-2);
+  padding: 10px 16px;
   cursor: pointer;
-  border-radius: var(--radius-sm);
   transition: background 0.15s ease;
   user-select: none;
 }
 
 .group-header:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .group-header-left {
@@ -1383,8 +1424,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .group-description {
-  font-size: 12px;
-  padding: 0 var(--sp-2) var(--sp-3) 34px;
+  font-size: 11px;
+  padding: 0 16px 8px 16px;
+  color: rgba(0, 0, 0, 0.85);
 }
 
 /* ---- Directory tree ---- */
@@ -1400,15 +1442,15 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  padding: 6px 16px 6px 12px;
   cursor: pointer;
-  border-radius: var(--radius-sm);
   transition: background 0.15s ease;
   user-select: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .dir-header:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .dir-header-left {
@@ -1458,26 +1500,28 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 .file-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .file-row {
-  display: grid;
-  grid-template-columns: 36px 1fr auto auto 24px 28px;
+  display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--radius-sm);
+  gap: 8px;
+  padding: 12px 16px;
   cursor: pointer;
   transition: background 0.12s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.file-row:last-child {
+  border-bottom: none;
 }
 
 .file-row--tree {
-  padding-left: var(--sp-6);
+  padding-left: 24px;
 }
 
 .file-row:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .file-row--selected {
@@ -1492,10 +1536,23 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
+  order: 99;
 }
 
 .file-row-info {
   min-width: 0;
+  flex: 1;
+}
+
+.file-row-icon {
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+
+.file-row-icon-placeholder {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .file-row-name {
@@ -1505,7 +1562,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-name {
-  font-size: 13px;
+  font-family: "SF Pro Display", "SF Pro Text", -apple-system, sans-serif; font-size: 13px;
   font-weight: 500;
   color: var(--text);
   overflow: hidden;
@@ -1547,11 +1604,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* Vault section */
 .vault-group {
-  border: 1px solid hsla(280, 40%, 60%, 0.15);
-  border-radius: var(--radius-sm);
-  background: hsla(280, 40%, 70%, 0.03);
-  padding: 2px 4px;
-  margin-bottom: 8px;
+  border: 1px solid hsla(280, 40%, 60%, 0.12);
+  border-radius: 12px;
+  background: hsla(280, 40%, 70%, 0.04);
+  padding: 4px 0;
+  margin-bottom: var(--sp-4);
 }
 
 .vault-title {
@@ -1559,7 +1616,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .vault-description {
-  color: hsla(280, 35%, 45%, 0.6);
+  color: hsla(280, 35%, 35%, 0.7);
   font-style: italic;
   font-size: 11px;
 }
@@ -1575,9 +1632,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  opacity: 0.6;
+  padding: 6px 16px;
+  border-bottom: 1px solid hsla(280, 20%, 50%, 0.08);
 }
 
 .vault-file-row:hover {
@@ -1598,8 +1654,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .vault-file-name {
-  font-size: 11px;
-  color: hsla(280, 30%, 40%, 0.7);
+  font-size: 12px;
+  color: hsla(280, 30%, 30%, 0.8);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1608,41 +1664,54 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .vault-file-size {
-  font-size: 11px;
-  color: hsla(280, 30%, 40%, 0.5);
+  font-size: 12px;
+  color: hsla(280, 30%, 30%, 0.6);
   flex-shrink: 0;
 }
 
 .safety-badge {
+  display: none;
+}
+
+.safety-pill {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 8px;
-  border: 1px solid;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: white;
   line-height: 1.4;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.safety-pill-placeholder {
+  width: 60px;
+  flex-shrink: 0;
 }
 
 .file-row-explanation {
   font-size: 11px;
   margin-top: 2px;
   line-height: 1.3;
-  opacity: 0.7;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .file-row-path {
-  font-size: 11px;
-  margin-top: 2px;
+  font-family: "SF Pro Display", "SF Pro Text", -apple-system, sans-serif; font-size: 10px;
+  margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: rgba(0, 0, 0, 0.85);
 }
 
 .file-row-size {
   text-align: right;
   white-space: nowrap;
-  padding-right: var(--sp-2);
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .size-value {
@@ -1658,10 +1727,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row-date {
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
-  min-width: 90px;
   text-align: right;
+  color: rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
 }
 
 /* ---- Protect toggle button ---- */
@@ -1676,10 +1746,14 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   border-radius: 4px;
   background: transparent;
   color: var(--muted);
-  opacity: 0.25;
+  opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
   transition: opacity 0.15s, color 0.15s;
+}
+
+.file-row:hover .protect-btn {
+  opacity: 0.25;
 }
 
 .protect-btn svg {
@@ -1705,14 +1779,19 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
-  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  opacity: 0;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s;
   flex-shrink: 0;
+}
+
+.file-row:hover .reveal-btn {
+  opacity: 0.5;
 }
 
 .reveal-btn:hover {
@@ -1724,3 +1803,4 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   transform: scale(0.92);
 }
 </style>
+

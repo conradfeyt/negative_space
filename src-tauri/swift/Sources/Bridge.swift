@@ -6,6 +6,7 @@
 
 import Foundation
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Availability Check
 
@@ -85,6 +86,11 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
         image = NSWorkspace.shared.icon(forFile: resolvedPath)
     case "file":
         image = NSImage(contentsOfFile: params.name)
+    case "uttype":
+        // Get icon for a file extension via UTType
+        if let ut = UTType(filenameExtension: params.name) {
+            image = NSWorkspace.shared.icon(for: ut)
+        }
     case "system":
         image = NSImage(named: NSImage.Name(params.name))
     default: // "sf"

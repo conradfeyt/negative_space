@@ -363,11 +363,11 @@ enum RuleBasedClassifier {
             )
         }
 
-        // Default: unknown
+        // Default: unknown — empty explanation, don't show unhelpful generic text
         return FileClassification(
             path: path,
             safety: "unknown",
-            explanation: "Review before deleting. Check if any application depends on this file.",
+            explanation: "",
             confidence: 0.30
         )
     }
