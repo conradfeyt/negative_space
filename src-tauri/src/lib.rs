@@ -2594,8 +2594,8 @@ async fn generate_scan_summary_ai(input: intelligence::ScanSummaryInput) -> inte
 }
 
 #[tauri::command]
-async fn render_sf_symbol(name: String, size: u32, mode: Option<String>, grayscale: Option<bool>) -> String {
-    intelligence::render_sf_symbol(&name, size, mode.as_deref(), grayscale.unwrap_or(false))
+async fn render_sf_symbol(name: String, size: u32, mode: Option<String>, style: Option<String>, glyph_scale: Option<f64>) -> String {
+    intelligence::render_sf_symbol(&name, size, mode.as_deref(), style.as_deref(), glyph_scale)
 }
 
 #[tauri::command]

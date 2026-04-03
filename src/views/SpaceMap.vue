@@ -123,21 +123,34 @@ const categoryOrder = [
 
 // macOS system icons per category — using actual app icons and system images
 // { name: path-or-symbol, mode: "app"|"sf"|"system" }
-const categoryIcons: Record<string, { name: string; mode: string; gray?: boolean }> = {
-  applications: { name: "/System/Applications/App Store.app", mode: "app", gray: true },
-  bin:          { name: "NSTrashFull", mode: "system" },
-  books:        { name: "/System/Applications/Books.app", mode: "app" },
-  developer:    { name: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/DeveloperFolderIcon.icns", mode: "app" },
-  documents:    { name: "NSFolder", mode: "system" },
-  icloud:       { name: "icloud.fill", mode: "sf" },
-  mail:         { name: "/System/Applications/Mail.app", mode: "app" },
-  photos:       { name: "/System/Applications/Photos.app", mode: "app" },
-  media:        { name: "/System/Applications/TV.app", mode: "app" },
-  docker:       { name: "/Applications/Docker.app", mode: "app" },
-  caches:       { name: "cylinder.split.1x2.fill", mode: "sf" },
-  macos:        { name: "desktopcomputer", mode: "sf" },
-  system_data:  { name: "ellipsis.circle.fill", mode: "sf" },
-  other:        { name: "questionmark.folder.fill", mode: "sf" },
+// Icon definitions: { name, mode, style }
+// style: "plain" = full color, "grayBadge" = white glyph on gray bg, "grayscaleApp" = desaturated app icon
+const categoryIcons: Record<string, { name: string; mode: string; style: string; scale?: number }> = {
+  // Grayscale: white glyph on gray rounded rect
+  applications: { name: "/System/Applications/App Store.app", mode: "app", style: "grayscaleApp" },
+  bin:          { name: "trash.fill", mode: "sf", style: "grayBadgeHier" },
+  developer:    { name: "hammer.fill", mode: "sf", style: "grayBadgeHier" },
+  documents:    { name: "doc.fill", mode: "sf", style: "grayBadgeHier" },
+  ios_files:    { name: "iphone", mode: "sf", style: "grayBadgeHier" },
+  other_users:  { name: "person.2.fill", mode: "sf", style: "grayBadge" },
+  macos:        { name: "laptopcomputer", mode: "sf", style: "grayBadgeHier" },
+  system_data:  { name: "ellipsis", mode: "sf", style: "grayBadge" },
+  music_creation: { name: "guitars.fill", mode: "sf", style: "grayBadge", scale: 1.12 },
+
+  // Full color app icons
+  books:        { name: "/System/Applications/Books.app", mode: "app", style: "plain" },
+  icloud:       { name: "/System/Library/CoreServices/Finder.app/Contents/Applications/iCloud Drive.app/Contents/Resources/OpenICloudDriveAppIcon.icns", mode: "file", style: "plain" },
+  mail:         { name: "/System/Applications/Mail.app", mode: "app", style: "plain" },
+  messages:     { name: "/System/Applications/Messages.app", mode: "app", style: "plain" },
+  music:        { name: "/System/Applications/Music.app", mode: "app", style: "plain" },
+  photos:       { name: "/System/Applications/Photos.app", mode: "app", style: "plain" },
+  podcasts:     { name: "/System/Applications/Podcasts.app", mode: "app", style: "plain" },
+  media:        { name: "/System/Applications/TV.app", mode: "app", style: "plain" },
+
+  // Negativ_-specific
+  docker:       { name: "/Applications/Docker.app", mode: "app", style: "plain" },
+  caches:       { name: "archivebox.fill", mode: "sf", style: "grayBadge" },
+  other:        { name: "puzzlepiece.fill", mode: "sf", style: "grayBadge" },
 };
 
 // Cache for rendered icon base64 PNGs
@@ -150,7 +163,8 @@ async function loadSFSymbols() {
         name: iconDef.name,
         size: 32,
         mode: iconDef.mode,
-        grayscale: iconDef.gray ?? false,
+        style: iconDef.style,
+        glyphScale: iconDef.scale ?? 1.0,
       });
       if (base64) sfSymbolCache.value[key] = base64;
     } catch { /* non-critical */ }

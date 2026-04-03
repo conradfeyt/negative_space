@@ -146,14 +146,15 @@ pub fn classify_files(files: &[FileClassificationInput]) -> Vec<FileClassificati
 }
 
 /// Render a system icon to base64 PNG.
-pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>, grayscale: bool) -> String {
+pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>, style: Option<&str>, glyph_scale: Option<f64>) -> String {
     #[cfg(has_swift_bridge)]
     {
         let params = serde_json::json!({
             "name": name,
             "size": size,
             "mode": mode.unwrap_or("sf"),
-            "grayscale": grayscale,
+            "style": style.unwrap_or("plain"),
+            "glyphScale": glyph_scale.unwrap_or(1.0),
         });
         let json = params.to_string();
         let result = call_swift(msw_render_sf_symbol, &json);
@@ -165,7 +166,7 @@ pub fn render_sf_symbol(name: &str, size: u32, mode: Option<&str>, grayscale: bo
 
     #[cfg(not(has_swift_bridge))]
     {
-        let _ = (name, size, mode, grayscale);
+        let _ = (name, size, mode, style, glyph_scale);
         String::new()
     }
 }
