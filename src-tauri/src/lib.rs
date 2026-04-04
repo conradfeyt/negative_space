@@ -137,140 +137,7 @@ async fn get_disk_usage() -> Result<DiskUsage, String> {
 }
 
 // ---------------------------------------------------------------------------
-// Command 2: scan_large_files
-// ---------------------------------------------------------------------------
-
-/// Recursively scan for files larger than `min_size_mb` megabytes.
-///
-/// CRITICAL TCC DESIGN:
-/// Without Full Disk Access, we CANNOT walk from ~ (home directory).
-/// macOS has dozens of TCC-protected directories under ~/ and ~/Library/
-/// that trigger BLOCKING modal permission dialogs when accessed. There is
-/// no complete list — Apple adds new ones with each macOS version.
-///
-/// The ONLY safe approach without FDA:
-///   - Walk a whitelist of known-safe directories (developer tools, etc.)
-///   - Never touch ~/Library/ (too many protected subdirs)
-///   - Never touch ~/Desktop, ~/Documents, ~/Downloads, ~/Pictures, etc.
-///
-/// With FDA, we walk from the user-specified path (default ~) freely.
-#[tauri::command]
-async fn scan_large_files(
-    path: String,
-    min_size_mb: u64,
-    skip_paths: Option<Vec<String>>,
-    has_fda: Option<bool>,
-) -> Result<commands::LargeFileScanResult, String> {
-    let home = commands::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
-    let fda = has_fda.unwrap_or(false);
-    let min_bytes = min_size_mb * 1024 * 1024;
-
-    // Resolve user-configured skip paths via shared helper.
-    let user_skips = skip_paths.unwrap_or_default();
-    let skip_prefixes = commands::build_skip_prefixes(&home, &user_skips, &[]);
-
-    // Safe dirs for large-file scanner (developer-focused, broad coverage).
-    let safe_dirs = vec![
-        format!("{}/Library/Developer", home),
-        "/usr/local".to_string(),
-        "/opt/homebrew".to_string(),
-        format!("{}/Projects", home),
-        format!("{}/projects", home),
-        format!("{}/src", home),
-        format!("{}/dev", home),
-        format!("{}/code", home),
-        format!("{}/workspace", home),
-        format!("{}/go", home),
-        format!("{}/node_modules", home),
-        format!("{}/.cargo", home),
-        format!("{}/.rustup", home),
-        format!("{}/.npm", home),
-        format!("{}/.gradle", home),
-        format!("{}/.m2", home),
-        format!("{}/.docker", home),
-        format!("{}/.local", home),
-        format!("{}/.cache", home),
-        "/tmp".to_string(),
-        "/var/tmp".to_string(),
-        "/Applications".to_string(),
-    ];
-    let scan_roots = commands::build_scan_roots(&home, &path, fda, &safe_dirs);
-
-    // Track skipped paths so the UI can show what was missed.
-    let skipped_paths: Vec<String> = if fda {
-        vec![]
-    } else {
-        vec![
-            "~/Desktop".to_string(),
-            "~/Documents".to_string(),
-            "~/Downloads".to_string(),
-            "~/Movies".to_string(),
-            "~/Music".to_string(),
-            "~/Pictures".to_string(),
-            "~/Library (most subdirectories)".to_string(),
-        ]
-    };
-
-    let mut results: Vec<FileInfo> = Vec::new();
-
-    // Walk each scan root.
-    for root in &scan_roots {
-        for entry in walkdir::WalkDir::new(root)
-            .into_iter()
-            .filter_entry(|e| {
-                let p = e.path().to_string_lossy();
-                !skip_prefixes
-                    .iter()
-                    .any(|prefix| p.starts_with(prefix.as_str()))
-            })
-            .filter_map(|e| e.ok())
-        {
-            let metadata = match entry.metadata() {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if !metadata.is_file() {
-                continue;
-            }
-
-            let apparent_size = metadata.len();
-            if apparent_size < min_bytes {
-                continue;
-            }
-
-            let actual_size = metadata.blocks() * 512;
-            let is_sparse = (actual_size as f64) < (apparent_size as f64 * 0.8);
-
-            let modified = metadata
-                .modified()
-                .map(commands::format_system_time)
-                .unwrap_or_else(|_| "unknown".to_string());
-
-            let file_path = entry.path().to_string_lossy().to_string();
-            let file_name = entry.file_name().to_string_lossy().to_string();
-
-            results.push(FileInfo {
-                path: file_path,
-                name: file_name,
-                apparent_size,
-                actual_size,
-                modified,
-                is_sparse,
-            });
-        }
-    }
-
-    results.sort_by(|a, b| b.apparent_size.cmp(&a.apparent_size));
-    results.truncate(100);
-
-    Ok(commands::LargeFileScanResult {
-        files: results,
-        skipped_paths,
-    })
-}
-
-// ---------------------------------------------------------------------------
-// Command 2b: scan_large_files_stream (streaming version)
+// Command 2: scan_large_files_stream (streaming version)
 // ---------------------------------------------------------------------------
 
 /// Streaming variant of `scan_large_files`. Instead of collecting all results
@@ -2565,7 +2432,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_disk_usage,
-            scan_large_files,
             scan_large_files_stream,
             scan_caches,
             scan_logs,
