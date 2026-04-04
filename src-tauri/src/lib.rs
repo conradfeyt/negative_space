@@ -165,85 +165,36 @@ async fn scan_large_files(
     let fda = has_fda.unwrap_or(false);
     let min_bytes = min_size_mb * 1024 * 1024;
 
-    // Resolve user-configured skip paths.
-    let mut skip_prefixes: Vec<String> = vec![
-        "/System".to_string(),
-        "/Library/Apple".to_string(),
-        "/private/var/db".to_string(),
-        "/private/var/folders".to_string(),
+    // Resolve user-configured skip paths via shared helper.
+    let user_skips = skip_paths.unwrap_or_default();
+    let skip_prefixes = commands::build_skip_prefixes(&home, &user_skips, &[]);
+
+    // Safe dirs for large-file scanner (developer-focused, broad coverage).
+    let safe_dirs = vec![
+        format!("{}/Library/Developer", home),
+        "/usr/local".to_string(),
+        "/opt/homebrew".to_string(),
+        format!("{}/Projects", home),
+        format!("{}/projects", home),
+        format!("{}/src", home),
+        format!("{}/dev", home),
+        format!("{}/code", home),
+        format!("{}/workspace", home),
+        format!("{}/go", home),
+        format!("{}/node_modules", home),
+        format!("{}/.cargo", home),
+        format!("{}/.rustup", home),
+        format!("{}/.npm", home),
+        format!("{}/.gradle", home),
+        format!("{}/.m2", home),
+        format!("{}/.docker", home),
+        format!("{}/.local", home),
+        format!("{}/.cache", home),
+        "/tmp".to_string(),
+        "/var/tmp".to_string(),
+        "/Applications".to_string(),
     ];
-    if let Some(user_skips) = skip_paths {
-        for sp in user_skips {
-            let resolved = if sp == "~" {
-                home.clone()
-            } else if sp.starts_with("~/") {
-                format!("{}{}", home, &sp[1..])
-            } else {
-                sp
-            };
-            skip_prefixes.push(resolved);
-        }
-    }
-
-    // Build the list of directories to actually walk.
-    let scan_roots: Vec<String> = if fda {
-        // WITH FDA: walk from user-specified path (or home).
-        let start = if path.is_empty() || path == "~" {
-            home.clone()
-        } else if path.starts_with("~/") {
-            format!("{}{}", home, &path[1..])
-        } else {
-            path
-        };
-        vec![start]
-    } else {
-        // WITHOUT FDA: only walk known-safe directories.
-        // These directories are NOT TCC-protected and won't trigger dialogs.
-        let safe_dirs = vec![
-            // Developer tools — often contain huge build artifacts
-            format!("{}/Library/Developer", home),
-            // Application support data (owned by us, not TCC-protected at top level)
-            // NOTE: individual app subdirs may vary, but the top-level listing is safe
-            // Actually skip this — some subdirs can trigger TCC
-            // Homebrew / local tools
-            "/usr/local".to_string(),
-            "/opt/homebrew".to_string(),
-            // User's own project directories (common developer paths)
-            format!("{}/Projects", home),
-            format!("{}/projects", home),
-            format!("{}/src", home),
-            format!("{}/dev", home),
-            format!("{}/code", home),
-            format!("{}/workspace", home),
-            format!("{}/go", home),
-            format!("{}/node_modules", home),
-            format!("{}/.cargo", home),
-            format!("{}/.rustup", home),
-            format!("{}/.npm", home),
-            format!("{}/.gradle", home),
-            format!("{}/.m2", home),
-            format!("{}/.docker", home),
-            format!("{}/.local", home),
-            format!("{}/.cache", home),
-            // /tmp and /var/tmp can have large temporary files
-            "/tmp".to_string(),
-            "/var/tmp".to_string(),
-            // /Applications is safe
-            "/Applications".to_string(),
-        ];
-
-        // Only include directories that actually exist (checked via subprocess).
-        safe_dirs
-            .into_iter()
-            .filter(|dir| {
-                std::process::Command::new("test")
-                    .args(["-d", dir])
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false)
-            })
-            .collect()
-    };
+    let scan_roots = commands::build_scan_roots(&home, &path, fda, &safe_dirs);
 
     // Track skipped paths so the UI can show what was missed.
     let skipped_paths: Vec<String> = if fda {
@@ -349,72 +300,36 @@ async fn scan_large_files_stream(
     let fda = has_fda.unwrap_or(false);
     let min_bytes = min_size_mb * 1024 * 1024;
 
-    // --- Build skip prefixes (same logic as scan_large_files) ---
-    let mut skip_prefixes: Vec<String> = vec![
-        "/System".to_string(),
-        "/Library/Apple".to_string(),
-        "/private/var/db".to_string(),
-        "/private/var/folders".to_string(),
-    ];
-    if let Some(user_skips) = skip_paths {
-        for sp in user_skips {
-            let resolved = if sp == "~" {
-                home.clone()
-            } else if sp.starts_with("~/") {
-                format!("{}{}", home, &sp[1..])
-            } else {
-                sp
-            };
-            skip_prefixes.push(resolved);
-        }
-    }
+    // --- Build skip prefixes and scan roots via shared helpers ---
+    let user_skips = skip_paths.unwrap_or_default();
+    let skip_prefixes = commands::build_skip_prefixes(&home, &user_skips, &[]);
 
-    // --- Build scan roots (same logic as scan_large_files) ---
-    let scan_roots: Vec<String> = if fda {
-        let start = if path.is_empty() || path == "~" {
-            home.clone()
-        } else if path.starts_with("~/") {
-            format!("{}{}", home, &path[1..])
-        } else {
-            path
-        };
-        vec![start]
-    } else {
-        let safe_dirs = vec![
-            format!("{}/Library/Developer", home),
-            "/usr/local".to_string(),
-            "/opt/homebrew".to_string(),
-            format!("{}/Projects", home),
-            format!("{}/projects", home),
-            format!("{}/src", home),
-            format!("{}/dev", home),
-            format!("{}/code", home),
-            format!("{}/workspace", home),
-            format!("{}/go", home),
-            format!("{}/node_modules", home),
-            format!("{}/.cargo", home),
-            format!("{}/.rustup", home),
-            format!("{}/.npm", home),
-            format!("{}/.gradle", home),
-            format!("{}/.m2", home),
-            format!("{}/.docker", home),
-            format!("{}/.local", home),
-            format!("{}/.cache", home),
-            "/tmp".to_string(),
-            "/var/tmp".to_string(),
-            "/Applications".to_string(),
-        ];
-        safe_dirs
-            .into_iter()
-            .filter(|dir| {
-                std::process::Command::new("test")
-                    .args(["-d", dir])
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false)
-            })
-            .collect()
-    };
+    // Safe dirs for large-file scanner (same list as non-streaming variant).
+    let safe_dirs = vec![
+        format!("{}/Library/Developer", home),
+        "/usr/local".to_string(),
+        "/opt/homebrew".to_string(),
+        format!("{}/Projects", home),
+        format!("{}/projects", home),
+        format!("{}/src", home),
+        format!("{}/dev", home),
+        format!("{}/code", home),
+        format!("{}/workspace", home),
+        format!("{}/go", home),
+        format!("{}/node_modules", home),
+        format!("{}/.cargo", home),
+        format!("{}/.rustup", home),
+        format!("{}/.npm", home),
+        format!("{}/.gradle", home),
+        format!("{}/.m2", home),
+        format!("{}/.docker", home),
+        format!("{}/.local", home),
+        format!("{}/.cache", home),
+        "/tmp".to_string(),
+        "/var/tmp".to_string(),
+        "/Applications".to_string(),
+    ];
+    let scan_roots = commands::build_scan_roots(&home, &path, fda, &safe_dirs);
 
     let skipped_paths: Vec<String> = if fda {
         vec![]

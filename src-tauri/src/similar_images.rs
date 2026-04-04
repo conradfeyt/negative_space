@@ -117,39 +117,20 @@ pub fn run_similar_scan(
         None => return empty_result(),
     };
 
-    // Build skip prefixes (same logic as duplicates.rs).
-    let mut skip_prefixes: Vec<String> = vec![
-        "/System".to_string(),
-        "/Library/Apple".to_string(),
-        "/private/var/db".to_string(),
-        "/private/var/folders".to_string(),
-    ];
-    for sp in skip_paths {
-        let resolved = if *sp == "~" {
-            home.clone()
-        } else if sp.starts_with("~/") {
-            format!("{}{}", home, &sp[1..])
-        } else {
-            sp.clone()
-        };
-        skip_prefixes.push(resolved);
-    }
+    // Build skip prefixes via shared helper.
+    let skip_prefixes = commands::build_skip_prefixes(&home, skip_paths, &[]);
 
-    // Build scan roots.
-    let scan_roots: Vec<String> = if fda {
-        vec![home.clone()]
-    } else {
-        let safe_dirs = vec![
-            format!("{}/Pictures", home),
-            format!("{}/Downloads", home),
-            format!("{}/Documents", home),
-            format!("{}/Desktop", home),
-        ];
-        safe_dirs
-            .into_iter()
-            .filter(|dir| Path::new(dir).is_dir())
-            .collect()
-    };
+    // Safe dirs for similar-image scanner — intentionally limited to
+    // user media directories (Pictures, Downloads, Documents, Desktop).
+    let safe_dirs = vec![
+        format!("{}/Pictures", home),
+        format!("{}/Downloads", home),
+        format!("{}/Documents", home),
+        format!("{}/Desktop", home),
+    ];
+    // Note: with FDA the scanner walks from home (not a user-specified path),
+    // so we pass "~" to get the home directory as the sole root.
+    let scan_roots = commands::build_scan_roots(&home, "~", fda, &safe_dirs);
 
     // ── Phase 1: Discover image files ──────────────────────────────────────
     let _ = app.emit("similar-scan-progress", SimilarScanProgress {

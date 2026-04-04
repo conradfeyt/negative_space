@@ -135,71 +135,34 @@ pub fn run_duplicate_scan(
         MIN_FILE_SIZE
     };
 
-    // Build skip prefixes (same logic as large file scanner).
-    let mut skip_prefixes: Vec<String> = vec![
-        "/System".to_string(),
-        "/Library/Apple".to_string(),
-        "/private/var/db".to_string(),
-        "/private/var/folders".to_string(),
-        // Always skip .git directories — they contain many small identical objects
-        // that are not user-visible duplicates.
-    ];
-    for sp in skip_paths {
-        let resolved = if *sp == "~" {
-            home.clone()
-        } else if sp.starts_with("~/") {
-            format!("{}{}", home, &sp[1..])
-        } else {
-            sp.clone()
-        };
-        skip_prefixes.push(resolved);
-    }
+    // Build skip prefixes via shared helper.
+    let skip_prefixes = commands::build_skip_prefixes(&home, skip_paths, &[]);
 
-    // Build scan roots (same whitelist logic as large file scanner).
-    let scan_roots: Vec<String> = if fda {
-        let start = if scan_path.is_empty() || scan_path == "~" {
-            home.clone()
-        } else if scan_path.starts_with("~/") {
-            format!("{}{}", home, &scan_path[1..])
-        } else {
-            scan_path.to_string()
-        };
-        vec![start]
-    } else {
-        // Without FDA: only known-safe directories.
-        let safe_dirs = vec![
-            format!("{}/Library/Developer", home),
-            "/usr/local".to_string(),
-            "/opt/homebrew".to_string(),
-            format!("{}/Projects", home),
-            format!("{}/projects", home),
-            format!("{}/src", home),
-            format!("{}/dev", home),
-            format!("{}/code", home),
-            format!("{}/workspace", home),
-            format!("{}/go", home),
-            format!("{}/.cargo", home),
-            format!("{}/.rustup", home),
-            format!("{}/.npm", home),
-            format!("{}/.gradle", home),
-            format!("{}/.m2", home),
-            format!("{}/.docker", home),
-            format!("{}/.local", home),
-            format!("{}/.cache", home),
-            "/tmp".to_string(),
-            "/Applications".to_string(),
-        ];
-        safe_dirs
-            .into_iter()
-            .filter(|dir| {
-                std::process::Command::new("test")
-                    .args(["-d", dir])
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false)
-            })
-            .collect()
-    };
+    // Safe dirs for duplicate scanner — same as large-file scanner but without
+    // /var/tmp (intentional: duplicates scan focuses on user-owned content).
+    let safe_dirs = vec![
+        format!("{}/Library/Developer", home),
+        "/usr/local".to_string(),
+        "/opt/homebrew".to_string(),
+        format!("{}/Projects", home),
+        format!("{}/projects", home),
+        format!("{}/src", home),
+        format!("{}/dev", home),
+        format!("{}/code", home),
+        format!("{}/workspace", home),
+        format!("{}/go", home),
+        format!("{}/.cargo", home),
+        format!("{}/.rustup", home),
+        format!("{}/.npm", home),
+        format!("{}/.gradle", home),
+        format!("{}/.m2", home),
+        format!("{}/.docker", home),
+        format!("{}/.local", home),
+        format!("{}/.cache", home),
+        "/tmp".to_string(),
+        "/Applications".to_string(),
+    ];
+    let scan_roots = commands::build_scan_roots(&home, scan_path, fda, &safe_dirs);
 
     let skipped_paths: Vec<String> = if fda {
         vec![]

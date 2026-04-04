@@ -236,33 +236,24 @@ pub fn scan_candidates(
     let now = std::time::SystemTime::now();
     let recent_threshold = 7 * 86400; // 7 days = "recently accessed"
 
-    // Resolve scan root
-    let root = if scan_path.is_empty() || scan_path == "~" {
-        home.clone()
-    } else if scan_path.starts_with("~/") {
-        format!("{}{}", home, &scan_path[1..])
-    } else {
-        scan_path.to_string()
-    };
+    // Resolve scan root via shared helper (FDA always true here — vault
+    // scans from a single resolved root, not a safe_dirs whitelist).
+    let scan_roots = commands::build_scan_roots(&home, scan_path, true, &[]);
+    let root = scan_roots.into_iter().next().unwrap_or_else(|| home.clone());
 
     // Load existing vault to skip already-archived files
     let manifest = load_manifest();
     let archived_paths: std::collections::HashSet<String> =
         manifest.entries.iter().map(|e| e.original_path.clone()).collect();
 
-    // Vault data dir — skip scanning inside our own vault
+    // Vault-specific extra skip prefixes: vault data dir + ~/Library when no FDA.
     let vault = vault_dir().unwrap_or_default();
-
-    let mut skip_prefixes = vec![
-        "/System".to_string(),
-        "/Library/Apple".to_string(),
-        vault,
-    ];
+    let mut extra = vec![vault];
     if !fda {
-        // Without FDA, stick to known-safe directories
-        // (reuse same whitelist logic as large file scanner)
-        skip_prefixes.push(format!("{}/Library", home));
+        extra.push(format!("{}/Library", home));
     }
+    // No user skip_paths for vault; extra prefixes are vault-specific.
+    let skip_prefixes = commands::build_skip_prefixes(&home, &[], &extra);
 
     let mut candidates = Vec::new();
 
