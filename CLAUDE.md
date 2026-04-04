@@ -86,7 +86,10 @@ Thumbnails are generated during the duplicate scan (one per group, since all fil
 - Current release: v0.1.0-alpha on GitHub Releases
 
 ## Private docs
-`_private/` (gitignored) — ROADMAP.md, ARCHITECTURE.md, and test HTML files.
+`_private/` (gitignored):
+- `HANDOVER.md` — comprehensive project handover with architecture, design decisions, caveats
+- `ROADMAP.md` — feature roadmap with completed and planned work
+- `PERFORMANCE_ROADMAP.md` — 15-item performance optimisation plan with metrics and priorities
 
 ## What NOT to do
 - Don't use git worktrees — causes complications with orphan branches and identity
