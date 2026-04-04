@@ -144,13 +144,26 @@ fn ensure_vault_dirs() -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 fn load_manifest() -> VaultManifest {
+    let empty = || VaultManifest { version: 1, entries: vec![] };
+
     let path = match manifest_path() {
         Some(p) => p,
-        None => return VaultManifest { version: 1, entries: vec![] },
+        None => return empty(),
     };
-    match fs::read_to_string(&path) {
-        Ok(data) => serde_json::from_str(&data).unwrap_or(VaultManifest { version: 1, entries: vec![] }),
-        Err(_) => VaultManifest { version: 1, entries: vec![] },
+    let data = match fs::read_to_string(&path) {
+        Ok(d) => d,
+        Err(_) => return empty(),
+    };
+    match serde_json::from_str(&data) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("[vault] manifest parse failed: {}. Backing up corrupt file.", e);
+            let backup = format!("{}.corrupt", path);
+            if let Err(be) = fs::copy(&path, &backup) {
+                eprintln!("[vault] failed to back up corrupt manifest: {}", be);
+            }
+            empty()
+        }
     }
 }
 
