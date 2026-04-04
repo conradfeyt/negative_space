@@ -76,6 +76,14 @@ pub struct SimilarScanProgress {
     pub phase: String,
 }
 
+/// Options for running a similar image scan.
+pub struct SimilarScanOptions<'a> {
+    pub threshold: Option<u32>,
+    pub min_size_bytes: u64,
+    pub fda: bool,
+    pub skip_paths: &'a [String],
+}
+
 /// Internal struct holding a hashed image during scanning.
 struct HashedImage {
     path: String,
@@ -99,18 +107,17 @@ const DEFAULT_THRESHOLD: u32 = 10;
 
 /// Run a similar image scan.
 ///
-/// `threshold`: maximum Hamming distance to consider images "similar" (default 10).
-/// `min_size_bytes`: minimum file size in bytes.
-/// `fda`: whether Full Disk Access is available.
-/// `skip_paths`: user-configured paths to skip.
+/// `opts.threshold`: maximum Hamming distance to consider images "similar" (default 10).
+/// `opts.min_size_bytes`: minimum file size in bytes.
+/// `opts.fda`: whether Full Disk Access is available.
+/// `opts.skip_paths`: user-configured paths to skip.
 pub fn run_similar_scan(
     app: &AppHandle,
-    threshold: Option<u32>,
-    min_size_bytes: u64,
-    fda: bool,
-    skip_paths: &[String],
+    opts: SimilarScanOptions<'_>,
 ) -> SimilarScanResult {
-    let threshold = threshold.unwrap_or(DEFAULT_THRESHOLD);
+    let threshold = opts.threshold.unwrap_or(DEFAULT_THRESHOLD);
+    let min_size_bytes = opts.min_size_bytes;
+    let fda = opts.fda;
 
     let home = match commands::home_dir() {
         Some(h) => h,
@@ -118,7 +125,7 @@ pub fn run_similar_scan(
     };
 
     // Build skip prefixes via shared helper.
-    let skip_prefixes = commands::build_skip_prefixes(&home, skip_paths, &[]);
+    let skip_prefixes = commands::build_skip_prefixes(&home, opts.skip_paths, &[]);
 
     // Safe dirs for similar-image scanner — intentionally limited to
     // user media directories (Pictures, Downloads, Documents, Desktop).
@@ -140,8 +147,70 @@ pub fn run_similar_scan(
         phase: "discovery".to_string(),
     });
 
-    let mut image_paths: Vec<(String, u64)> = Vec::new(); // (path, size)
-    for root in &scan_roots {
+    let image_paths = discover_images(&scan_roots, &skip_prefixes, min_size_bytes);
+    let total_images = image_paths.len() as u64;
+
+    // ── Phase 2: Compute perceptual hashes ─────────────────────────────────
+    let (mut hashed_images, images_skipped) = hash_images(app, &image_paths, total_images);
+
+    // ── Phase 2b: Deduplicate — keep one representative per content hash ──
+    deduplicate_by_content(&mut hashed_images);
+
+    // ── Phase 3: Cluster by Hamming distance ───────────────────────────────
+    let _ = app.emit("similar-scan-progress", SimilarScanProgress {
+        images_processed: total_images,
+        total_images,
+        current_file: "Comparing hashes…".to_string(),
+        phase: "clustering".to_string(),
+    });
+
+    let groups = cluster_by_distance(&hashed_images, threshold);
+
+    // ── Phase 4: Build result groups ───────────────────────────────────────
+    let mut similar_groups = build_similar_groups(groups, &hashed_images);
+
+    similar_groups.sort_by(|a, b| b.wasted_bytes.cmp(&a.wasted_bytes));
+    similar_groups.truncate(MAX_GROUPS);
+
+    // ── Phase 5: Generate thumbnails ───────────────────────────────────────
+    let _ = app.emit("similar-scan-progress", SimilarScanProgress {
+        images_processed: total_images,
+        total_images,
+        current_file: "Generating thumbnails…".to_string(),
+        phase: "thumbnails".to_string(),
+    });
+
+    generate_thumbnails(&mut similar_groups);
+
+    let total_similar_files: u64 = similar_groups.iter().map(|g| g.files.len() as u64).sum();
+    let total_wasted_bytes: u64 = similar_groups.iter().map(|g| g.wasted_bytes).sum();
+
+    SimilarScanResult {
+        groups: similar_groups,
+        total_similar_files,
+        total_wasted_bytes,
+        images_scanned: hashed_images.len() as u64,
+        images_skipped,
+        skipped_paths: if fda {
+            vec![]
+        } else {
+            vec!["Limited scan — enable Full Disk Access for complete results".to_string()]
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase helpers (private)
+// ---------------------------------------------------------------------------
+
+/// Phase 1: Walk scan roots and collect image file paths that pass filters.
+fn discover_images(
+    scan_roots: &[String],
+    skip_prefixes: &[String],
+    min_size_bytes: u64,
+) -> Vec<(String, u64)> {
+    let mut image_paths: Vec<(String, u64)> = Vec::new();
+    for root in scan_roots {
         for entry in WalkDir::new(root)
             .follow_links(false)
             .into_iter()
@@ -168,10 +237,16 @@ pub fn run_similar_scan(
             image_paths.push((path_str.to_string(), size));
         }
     }
+    image_paths
+}
 
-    let total_images = image_paths.len() as u64;
-
-    // ── Phase 2: Compute perceptual hashes ─────────────────────────────────
+/// Phase 2: Compute perceptual hashes and partial content hashes for each image.
+/// Returns (hashed_images, images_skipped).
+fn hash_images(
+    app: &AppHandle,
+    image_paths: &[(String, u64)],
+    total_images: u64,
+) -> (Vec<HashedImage>, u64) {
     let hasher = HasherConfig::new()
         .hash_size(16, 16)
         .hash_alg(HashAlg::Gradient)
@@ -233,46 +308,43 @@ pub fn run_similar_scan(
         });
     }
 
-    // ── Phase 2b: Deduplicate — keep one representative per content hash ──
-    // Exact duplicates (byte-identical files) belong in the Exact Duplicates tab.
-    // Here we only want visually-similar-but-different images.
-    {
-        let mut seen_content: HashMap<String, usize> = HashMap::new();
-        let mut unique_indices: Vec<usize> = Vec::new();
-        for (i, hi) in hashed_images.iter().enumerate() {
-            if !seen_content.contains_key(&hi.content_hash) {
-                seen_content.insert(hi.content_hash.clone(), i);
-                unique_indices.push(i);
-            }
+    (hashed_images, images_skipped)
+}
+
+/// Phase 2b: Remove exact duplicates (same content hash), keeping one representative.
+/// Exact duplicates belong in the Exact Duplicates tab; here we only want
+/// visually-similar-but-different images.
+fn deduplicate_by_content(hashed_images: &mut Vec<HashedImage>) {
+    let mut seen_content: HashMap<String, usize> = HashMap::new();
+    let mut unique_indices: Vec<usize> = Vec::new();
+    for (i, hi) in hashed_images.iter().enumerate() {
+        if !seen_content.contains_key(&hi.content_hash) {
+            seen_content.insert(hi.content_hash.clone(), i);
+            unique_indices.push(i);
         }
-        let deduped: Vec<HashedImage> = unique_indices
-            .into_iter()
-            .map(|i| {
-                let hi = &hashed_images[i];
-                HashedImage {
-                    path: hi.path.clone(),
-                    hash: hi.hash.clone(),
-                    hash_b64: hi.hash_b64.clone(),
-                    content_hash: hi.content_hash.clone(),
-                    size: hi.size,
-                    modified: hi.modified.clone(),
-                }
-            })
-            .collect();
-        hashed_images = deduped;
     }
+    let deduped: Vec<HashedImage> = unique_indices
+        .into_iter()
+        .map(|i| {
+            let hi = &hashed_images[i];
+            HashedImage {
+                path: hi.path.clone(),
+                hash: hi.hash.clone(),
+                hash_b64: hi.hash_b64.clone(),
+                content_hash: hi.content_hash.clone(),
+                size: hi.size,
+                modified: hi.modified.clone(),
+            }
+        })
+        .collect();
+    *hashed_images = deduped;
+}
 
-    // ── Phase 3: Cluster by Hamming distance ───────────────────────────────
-    let _ = app.emit("similar-scan-progress", SimilarScanProgress {
-        images_processed: total_images,
-        total_images,
-        current_file: "Comparing hashes…".to_string(),
-        phase: "clustering".to_string(),
-    });
-
-    let groups = cluster_by_distance(&hashed_images, threshold);
-
-    // Build result groups.
+/// Phase 4: Convert clustered indices into SimilarGroup structs.
+fn build_similar_groups(
+    groups: Vec<Vec<usize>>,
+    hashed_images: &[HashedImage],
+) -> Vec<SimilarGroup> {
     let mut similar_groups: Vec<SimilarGroup> = Vec::new();
 
     for group_indices in groups {
@@ -329,18 +401,12 @@ pub fn run_similar_scan(
         });
     }
 
-    similar_groups.sort_by(|a, b| b.wasted_bytes.cmp(&a.wasted_bytes));
-    similar_groups.truncate(MAX_GROUPS);
+    similar_groups
+}
 
-    // Generate thumbnails for the first 10 files per group (matching frontend card cap).
-    // Each file in a similar group is visually different, so each needs its own thumbnail.
-    let _ = app.emit("similar-scan-progress", SimilarScanProgress {
-        images_processed: total_images,
-        total_images,
-        current_file: "Generating thumbnails…".to_string(),
-        phase: "thumbnails".to_string(),
-    });
-
+/// Phase 5: Generate thumbnails for the first 10 files per group (matching frontend card cap).
+/// Each file in a similar group is visually different, so each needs its own thumbnail.
+fn generate_thumbnails(similar_groups: &mut [SimilarGroup]) {
     let mut thumb_jobs: Vec<(usize, usize, String)> = Vec::new(); // (group_idx, file_idx, path)
     for (gi, group) in similar_groups.iter().enumerate() {
         for (fi, file) in group.files.iter().enumerate().take(10) {
@@ -362,22 +428,6 @@ pub fn run_similar_scan(
                 similar_groups[gi].files[fi].thumbnail = Some(b64);
             }
         }
-    }
-
-    let total_similar_files: u64 = similar_groups.iter().map(|g| g.files.len() as u64).sum();
-    let total_wasted_bytes: u64 = similar_groups.iter().map(|g| g.wasted_bytes).sum();
-
-    SimilarScanResult {
-        groups: similar_groups,
-        total_similar_files,
-        total_wasted_bytes,
-        images_scanned: hashed_images.len() as u64,
-        images_skipped,
-        skipped_paths: if fda {
-            vec![]
-        } else {
-            vec!["Limited scan — enable Full Disk Access for complete results".to_string()]
-        },
     }
 }
 

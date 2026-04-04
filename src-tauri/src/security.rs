@@ -243,163 +243,164 @@ pub fn scan_launch_items() -> Vec<LaunchItem> {
         }
 
         for filename in listing.lines() {
-            // Only process .plist files.
             if !filename.ends_with(".plist") {
                 continue;
             }
 
             let plist_path = format!("{}/{}", dir, filename);
-            let mut findings: Vec<SecurityFinding> = Vec::new();
-
-            // --- Extract plist keys ---
-
-            // The "Label" key is the unique identifier for the agent/daemon.
-            let label = plist_read(&plist_path, "Label");
-
-            // The target program can be specified two ways in a plist:
-            //   - "Program": a single string path
-            //   - "ProgramArguments": an array where [0] is the executable
-            let program = {
-                let prog = plist_read(&plist_path, "Program");
-                if prog.is_empty() {
-                    // Try ProgramArguments[0] instead.
-                    plist_read(&plist_path, "ProgramArguments:0")
-                } else {
-                    prog
-                }
-            };
-
-            // --- Check if the target program exists ---
-            let program_exists = if program.is_empty() {
-                false
-            } else {
-                run_cmd_ok("test", &["-e", &program])
-            };
-
-            // If the plist points to a program that doesn't exist, that's
-            // suspicious — it could be leftover malware or a broken agent.
-            if !program.is_empty() && !program_exists {
-                findings.push(SecurityFinding {
-                    id: make_finding_id("la", &mut finding_counter),
-                    category: "launch_agent".to_string(),
-                    severity: Severity::Suspicious,
-                    title: "Launch item points to missing program".to_string(),
-                    description: format!(
-                        "The launch item '{}' references '{}' which does not exist on disk. \
-                         This could be a leftover from uninstalled software or a failed \
-                         malware installation.",
-                        label, program
-                    ),
-                    path: plist_path.clone(),
-                    evidence: vec![
-                        format!("Target: {}", program),
-                        "Target does not exist on disk".to_string(),
-                    ],
-                    suggested_action: "Review and consider removing this launch item.".to_string(),
-                });
-            }
-
-            // --- Check code signing ---
-            // `codesign -v` verifies the signature. Exit code 0 = valid signature.
-            let is_signed = if program_exists {
-                run_cmd_ok("codesign", &["-v", &program])
-            } else {
-                false
-            };
-
-            // `codesign -d --verbose=2` prints signing details including the
-            // "Authority" field which tells us who signed the binary.
-            let signer = if program_exists && is_signed {
-                // Parse the "Authority=" line from codesign output.
-                // Output is on stderr for -d, so we need to capture stderr too.
-                let signer_output = match std::process::Command::new("codesign")
-                    .args(["-d", "--verbose=2", &program])
-                    .output()
-                {
-                    Ok(o) => String::from_utf8_lossy(&o.stderr).to_string(),
-                    Err(_) => String::new(),
-                };
-                // Find the first "Authority=" line — that's the top-level signer.
-                signer_output
-                    .lines()
-                    .find(|line| line.starts_with("Authority="))
-                    .map(|line| line.trim_start_matches("Authority=").to_string())
-                    .unwrap_or_else(|| "Unknown signer".to_string())
-            } else {
-                String::new()
-            };
-
-            // Flag unsigned programs — legitimate software is almost always signed.
-            if program_exists && !is_signed {
-                findings.push(SecurityFinding {
-                    id: make_finding_id("la", &mut finding_counter),
-                    category: "launch_agent".to_string(),
-                    severity: Severity::Suspicious,
-                    title: "Launch item target is unsigned".to_string(),
-                    description: format!(
-                        "The program '{}' launched by '{}' is not code-signed. \
-                         Legitimate macOS software is typically signed by its developer. \
-                         Unsigned launch items are a common indicator of adware or malware.",
-                        program, label
-                    ),
-                    path: plist_path.clone(),
-                    evidence: vec![
-                        format!("Target: {}", program),
-                        "Binary is not code-signed".to_string(),
-                    ],
-                    suggested_action:
-                        "Investigate this program. If you don't recognize it, consider removing it."
-                            .to_string(),
-                });
-            }
-
-            // Flag programs in suspicious locations.
-            if !program.is_empty() && is_suspicious_path(&program) {
-                findings.push(SecurityFinding {
-                    id: make_finding_id("la", &mut finding_counter),
-                    category: "launch_agent".to_string(),
-                    severity: Severity::LikelyUnwanted,
-                    title: "Launch item target in suspicious location".to_string(),
-                    description: format!(
-                        "The program '{}' is in a temporary or unusual directory. \
-                         Legitimate software rarely runs from /tmp, /var/tmp, or Downloads. \
-                         This is a common pattern for adware and malware persistence.",
-                        program
-                    ),
-                    path: plist_path.clone(),
-                    evidence: vec![
-                        format!("Target: {}", program),
-                        "Located in suspicious directory".to_string(),
-                    ],
-                    suggested_action:
-                        "This is likely unwanted software. Consider removing this launch item and its target."
-                            .to_string(),
-                });
-            }
-
-            // --- Check if the agent is enabled (loaded) ---
-            // `launchctl list <label>` succeeds if the agent is loaded.
-            let is_enabled = if !label.is_empty() {
-                run_cmd_ok("launchctl", &["list", &label])
-            } else {
-                false
-            };
-
-            items.push(LaunchItem {
-                path: plist_path,
-                label,
-                program,
-                program_exists,
-                is_enabled,
-                is_signed,
-                signer,
-                location: location.to_string(),
-                findings,
-            });
+            items.push(analyze_launch_item(&plist_path, location, &mut finding_counter));
         }
     }
 
     items
+}
+
+/// Analyze a single launch item plist and return a populated LaunchItem.
+///
+/// Extracts the Label and Program from the plist, checks if the target exists,
+/// verifies code signing, and flags anything suspicious.
+fn analyze_launch_item(
+    plist_path: &str,
+    location: &str,
+    finding_counter: &mut u32,
+) -> LaunchItem {
+    let mut findings: Vec<SecurityFinding> = Vec::new();
+
+    // The "Label" key is the unique identifier for the agent/daemon.
+    let label = plist_read(plist_path, "Label");
+
+    // The target program can be specified two ways in a plist:
+    //   - "Program": a single string path
+    //   - "ProgramArguments": an array where [0] is the executable
+    let program = {
+        let prog = plist_read(plist_path, "Program");
+        if prog.is_empty() {
+            plist_read(plist_path, "ProgramArguments:0")
+        } else {
+            prog
+        }
+    };
+
+    // --- Check if the target program exists ---
+    let program_exists = if program.is_empty() {
+        false
+    } else {
+        run_cmd_ok("test", &["-e", &program])
+    };
+
+    // If the plist points to a program that doesn't exist, that's
+    // suspicious — it could be leftover malware or a broken agent.
+    if !program.is_empty() && !program_exists {
+        findings.push(SecurityFinding {
+            id: make_finding_id("la", finding_counter),
+            category: "launch_agent".to_string(),
+            severity: Severity::Suspicious,
+            title: "Launch item points to missing program".to_string(),
+            description: format!(
+                "The launch item '{}' references '{}' which does not exist on disk. \
+                 This could be a leftover from uninstalled software or a failed \
+                 malware installation.",
+                label, program
+            ),
+            path: plist_path.to_string(),
+            evidence: vec![
+                format!("Target: {}", program),
+                "Target does not exist on disk".to_string(),
+            ],
+            suggested_action: "Review and consider removing this launch item.".to_string(),
+        });
+    }
+
+    // --- Check code signing ---
+    let is_signed = if program_exists {
+        run_cmd_ok("codesign", &["-v", &program])
+    } else {
+        false
+    };
+
+    let signer = if program_exists && is_signed {
+        let signer_output = match std::process::Command::new("codesign")
+            .args(["-d", "--verbose=2", &program])
+            .output()
+        {
+            Ok(o) => String::from_utf8_lossy(&o.stderr).to_string(),
+            Err(_) => String::new(),
+        };
+        signer_output
+            .lines()
+            .find(|line| line.starts_with("Authority="))
+            .map(|line| line.trim_start_matches("Authority=").to_string())
+            .unwrap_or_else(|| "Unknown signer".to_string())
+    } else {
+        String::new()
+    };
+
+    // Flag unsigned programs — legitimate software is almost always signed.
+    if program_exists && !is_signed {
+        findings.push(SecurityFinding {
+            id: make_finding_id("la", finding_counter),
+            category: "launch_agent".to_string(),
+            severity: Severity::Suspicious,
+            title: "Launch item target is unsigned".to_string(),
+            description: format!(
+                "The program '{}' launched by '{}' is not code-signed. \
+                 Legitimate macOS software is typically signed by its developer. \
+                 Unsigned launch items are a common indicator of adware or malware.",
+                program, label
+            ),
+            path: plist_path.to_string(),
+            evidence: vec![
+                format!("Target: {}", program),
+                "Binary is not code-signed".to_string(),
+            ],
+            suggested_action:
+                "Investigate this program. If you don't recognize it, consider removing it."
+                    .to_string(),
+        });
+    }
+
+    // Flag programs in suspicious locations.
+    if !program.is_empty() && is_suspicious_path(&program) {
+        findings.push(SecurityFinding {
+            id: make_finding_id("la", finding_counter),
+            category: "launch_agent".to_string(),
+            severity: Severity::LikelyUnwanted,
+            title: "Launch item target in suspicious location".to_string(),
+            description: format!(
+                "The program '{}' is in a temporary or unusual directory. \
+                 Legitimate software rarely runs from /tmp, /var/tmp, or Downloads. \
+                 This is a common pattern for adware and malware persistence.",
+                program
+            ),
+            path: plist_path.to_string(),
+            evidence: vec![
+                format!("Target: {}", program),
+                "Located in suspicious directory".to_string(),
+            ],
+            suggested_action:
+                "This is likely unwanted software. Consider removing this launch item and its target."
+                    .to_string(),
+        });
+    }
+
+    // --- Check if the agent is enabled (loaded) ---
+    let is_enabled = if !label.is_empty() {
+        run_cmd_ok("launchctl", &["list", &label])
+    } else {
+        false
+    };
+
+    LaunchItem {
+        path: plist_path.to_string(),
+        label,
+        program,
+        program_exists,
+        is_enabled,
+        is_signed,
+        signer,
+        location: location.to_string(),
+        findings,
+    }
 }
 
 // ---------------------------------------------------------------------------

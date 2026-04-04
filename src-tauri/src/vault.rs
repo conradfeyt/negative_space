@@ -219,13 +219,20 @@ fn is_skip_extension(path: &str) -> bool {
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Options for scanning vault compression candidates.
+pub struct VaultScanOptions<'a> {
+    pub scan_path: &'a str,
+    pub min_size_mb: u64,
+    pub min_age_days: u64,
+    pub fda: bool,
+}
+
 /// Scan for files that are good compression candidates.
-pub fn scan_candidates(
-    scan_path: &str,
-    min_size_mb: u64,
-    min_age_days: u64,
-    fda: bool,
-) -> Vec<CompressionCandidate> {
+pub fn scan_candidates(opts: VaultScanOptions<'_>) -> Vec<CompressionCandidate> {
+    let scan_path = opts.scan_path;
+    let min_size_mb = opts.min_size_mb;
+    let min_age_days = opts.min_age_days;
+    let fda = opts.fda;
     let home = match commands::home_dir() {
         Some(h) => h,
         None => return vec![],
@@ -389,121 +396,28 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
     }
 
     for path_str in paths {
-        let path = Path::new(path_str);
+        match compress_single_file(path_str, &data_dir) {
+            Ok((entry, original_size, compressed_size)) => {
+                crate::spotlight::index_vault_entry(&entry);
+                let hash = entry.blake3_hash.clone();
+                manifest.entries.push(entry);
+                *hash_refcount.entry(hash).or_insert(0) += 1;
 
-        // Read metadata before compression
-        let meta = match fs::metadata(path) {
-            Ok(m) => m,
-            Err(e) => {
-                result.errors.push(format!("{}: {}", path_str, e));
-                continue;
+                // Delete original — the critical step. Only after verified compression.
+                match fs::remove_file(Path::new(path_str)) {
+                    Ok(_) => {
+                        result.files_compressed += 1;
+                        result.total_original_size += original_size;
+                        result.total_compressed_size += compressed_size;
+                        result.total_savings += original_size.saturating_sub(compressed_size);
+                    }
+                    Err(e) => {
+                        result.errors.push(format!("Compressed but failed to delete original {}: {}", path_str, e));
+                    }
+                }
             }
-        };
-
-        let original_size = meta.len();
-        let permissions = meta.mode();
-
-        let modified = meta.modified()
-            .map(commands::format_system_time)
-            .unwrap_or_else(|_| "unknown".to_string());
-
-        let accessed = meta.accessed()
-            .map(commands::format_system_time)
-            .unwrap_or_else(|_| "unknown".to_string());
-
-        // Hash the original
-        let hash = match blake3_hash_file(path_str) {
-            Ok(h) => h,
             Err(e) => {
                 result.errors.push(e);
-                continue;
-            }
-        };
-
-        let vault_filename = format!("{}.zst", hash);
-        let vault_path = format!("{}/{}", data_dir, vault_filename);
-
-        // Compress (skip if already exists from dedup)
-        if !Path::new(&vault_path).exists() {
-            match compress_file_to(path_str, &vault_path) {
-                Ok(_) => {}
-                Err(e) => {
-                    result.errors.push(format!("{}: {}", path_str, e));
-                    if let Err(ce) = fs::remove_file(&vault_path) {
-                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
-                    }
-                    continue;
-                }
-            }
-
-            // Verify: decompress and check hash
-            match verify_compressed(&vault_path, &hash) {
-                Ok(true) => {}
-                Ok(false) => {
-                    result.errors.push(format!("{}: integrity check failed after compression", path_str));
-                    if let Err(ce) = fs::remove_file(&vault_path) {
-                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
-                    }
-                    continue;
-                }
-                Err(e) => {
-                    result.errors.push(format!("{}: verification error: {}", path_str, e));
-                    if let Err(ce) = fs::remove_file(&vault_path) {
-                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
-                    }
-                    continue;
-                }
-            }
-        }
-
-        let compressed_size = fs::metadata(&vault_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
-
-        let ratio = if original_size > 0 {
-            compressed_size as f64 / original_size as f64
-        } else {
-            1.0
-        };
-
-        let file_type = Path::new(path_str)
-            .extension()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase();
-
-        let now = chrono_now();
-
-        let entry = VaultEntry {
-            id: uuid::Uuid::new_v4().to_string(),
-            original_path: path_str.clone(),
-            original_size,
-            compressed_size,
-            compression_ratio: ratio,
-            blake3_hash: hash.clone(),
-            vault_filename,
-            archived_at: now,
-            original_modified: modified,
-            original_accessed: accessed,
-            permissions,
-            file_type,
-        };
-
-        crate::spotlight::index_vault_entry(&entry);
-        manifest.entries.push(entry);
-        *hash_refcount.entry(hash).or_insert(0) += 1;
-
-        // Delete original — the critical step. Only after verified compression.
-        match fs::remove_file(path) {
-            Ok(_) => {
-                result.files_compressed += 1;
-                result.total_original_size += original_size;
-                result.total_compressed_size += compressed_size;
-                result.total_savings += original_size.saturating_sub(compressed_size);
-            }
-            Err(e) => {
-                result.errors.push(format!("Compressed but failed to delete original {}: {}", path_str, e));
-                // Entry stays in manifest — user can manually delete the original
             }
         }
     }
@@ -513,6 +427,93 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
     }
 
     result
+}
+
+/// Compress a single file into the vault data directory.
+/// Returns (VaultEntry, original_size, compressed_size) on success,
+/// or an error message string on failure.
+fn compress_single_file(
+    path_str: &str,
+    data_dir: &str,
+) -> Result<(VaultEntry, u64, u64), String> {
+    let path = Path::new(path_str);
+
+    // Read metadata before compression
+    let meta = fs::metadata(path)
+        .map_err(|e| format!("{}: {}", path_str, e))?;
+
+    let original_size = meta.len();
+    let permissions = meta.mode();
+
+    let modified = meta.modified()
+        .map(commands::format_system_time)
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    let accessed = meta.accessed()
+        .map(commands::format_system_time)
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    // Hash the original
+    let hash = blake3_hash_file(path_str)?;
+
+    let vault_filename = format!("{}.zst", hash);
+    let vault_path = format!("{}/{}", data_dir, vault_filename);
+
+    // Compress (skip if already exists from dedup)
+    if !Path::new(&vault_path).exists() {
+        if let Err(e) = compress_file_to(path_str, &vault_path) {
+            let _ = fs::remove_file(&vault_path);
+            return Err(format!("{}: {}", path_str, e));
+        }
+
+        // Verify: decompress and check hash
+        match verify_compressed(&vault_path, &hash) {
+            Ok(true) => {}
+            Ok(false) => {
+                let _ = fs::remove_file(&vault_path);
+                return Err(format!("{}: integrity check failed after compression", path_str));
+            }
+            Err(e) => {
+                let _ = fs::remove_file(&vault_path);
+                return Err(format!("{}: verification error: {}", path_str, e));
+            }
+        }
+    }
+
+    let compressed_size = fs::metadata(&vault_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let ratio = if original_size > 0 {
+        compressed_size as f64 / original_size as f64
+    } else {
+        1.0
+    };
+
+    let file_type = Path::new(path_str)
+        .extension()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_lowercase();
+
+    let now = chrono_now();
+
+    let entry = VaultEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        original_path: path_str.to_string(),
+        original_size,
+        compressed_size,
+        compression_ratio: ratio,
+        blake3_hash: hash,
+        vault_filename,
+        archived_at: now,
+        original_modified: modified,
+        original_accessed: accessed,
+        permissions,
+        file_type,
+    };
+
+    Ok((entry, original_size, compressed_size))
 }
 
 /// Restore a file from the vault to its original location.

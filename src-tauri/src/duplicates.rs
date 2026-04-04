@@ -102,18 +102,25 @@ const MAX_GROUPS: usize = 200;
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Options for running a duplicate file scan.
+pub struct DuplicateScanOptions<'a> {
+    pub scan_path: &'a str,
+    pub min_size_mb: u64,
+    pub fda: bool,
+    pub skip_paths: &'a [String],
+}
+
 /// Run a full duplicate file scan.
 ///
-/// `scan_path`: root path to scan (default "~", expanded internally).
-/// `min_size_mb`: minimum file size in MB to consider (0 = use default 1KB).
-/// `fda`: whether Full Disk Access is available.
-/// `skip_paths`: user-configured paths to skip (from Settings).
-pub fn run_duplicate_scan(
-    scan_path: &str,
-    min_size_mb: u64,
-    fda: bool,
-    skip_paths: &[String],
-) -> DuplicateScanResult {
+/// `opts.scan_path`: root path to scan (default "~", expanded internally).
+/// `opts.min_size_mb`: minimum file size in MB to consider (0 = use default 1KB).
+/// `opts.fda`: whether Full Disk Access is available.
+/// `opts.skip_paths`: user-configured paths to skip (from Settings).
+pub fn run_duplicate_scan(opts: DuplicateScanOptions<'_>) -> DuplicateScanResult {
+    let scan_path = opts.scan_path;
+    let min_size_mb = opts.min_size_mb;
+    let fda = opts.fda;
+    let skip_paths = opts.skip_paths;
     let home = match commands::home_dir() {
         Some(h) => h,
         None => {
@@ -178,26 +185,64 @@ pub fn run_duplicate_scan(
         ]
     };
 
-    // -----------------------------------------------------------------------
     // Stage 0: Collect all file paths + sizes via walkdir
-    // -----------------------------------------------------------------------
-    let mut all_files: Vec<(String, u64, String)> = Vec::new(); // (path, size, modified)
+    let all_files = collect_files(&scan_roots, &skip_prefixes, min_bytes);
+    let files_scanned = all_files.len() as u64;
 
-    for root in &scan_roots {
+    // Stage 1: Group by file size
+    let (size_groups, stage1_candidates) = group_by_size(&all_files);
+
+    // Stage 2: Partial hash (first 4KB)
+    let (partial_groups, stage2_candidates) = group_by_partial_hash(&size_groups);
+
+    // Stage 3: Full hash to confirm duplicates
+    let confirmed_groups = confirm_by_full_hash(&partial_groups);
+
+    // Build result and generate thumbnails
+    let mut groups = assemble_groups(&confirmed_groups);
+    groups.sort_by(|a, b| b.wasted_bytes.cmp(&a.wasted_bytes));
+    groups.truncate(MAX_GROUPS);
+
+    generate_duplicate_thumbnails(&mut groups);
+
+    let total_duplicate_files: u64 = groups.iter().map(|g| g.files.len() as u64).sum();
+    let total_wasted_bytes: u64 = groups.iter().map(|g| g.wasted_bytes).sum();
+
+    DuplicateScanResult {
+        groups,
+        total_duplicate_files,
+        total_wasted_bytes,
+        files_scanned,
+        stage1_candidates,
+        stage2_candidates,
+        skipped_paths,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage helpers (private)
+// ---------------------------------------------------------------------------
+
+/// Stage 0: Walk scan roots and collect all file paths, sizes, and modified times.
+fn collect_files(
+    scan_roots: &[String],
+    skip_prefixes: &[String],
+    min_bytes: u64,
+) -> Vec<(String, u64, String)> {
+    let mut all_files: Vec<(String, u64, String)> = Vec::new();
+
+    for root in scan_roots {
         for entry in walkdir::WalkDir::new(root)
-            .follow_links(false) // Don't follow symlinks — avoids infinite loops and TCC
+            .follow_links(false)
             .into_iter()
             .filter_entry(|e| {
                 let p = e.path().to_string_lossy();
-                // Skip configured prefixes
                 if skip_prefixes
                     .iter()
                     .any(|prefix| p.starts_with(prefix.as_str()))
                 {
                     return false;
                 }
-                // Skip .git directories — they contain many small identical blobs
-                // that are internal to git, not user-visible duplicates.
                 if e.file_type().is_dir() {
                     if let Some(name) = e.path().file_name() {
                         if name == ".git" {
@@ -224,7 +269,6 @@ pub fn run_duplicate_scan(
             }
 
             // Skip sparse files — they report large apparent size but use little disk space.
-            // Deduplicating them wouldn't save real disk space.
             let actual_size = metadata.blocks() * 512;
             if (actual_size as f64) < (size as f64 * 0.5) {
                 continue;
@@ -239,13 +283,15 @@ pub fn run_duplicate_scan(
         }
     }
 
-    let files_scanned = all_files.len() as u64;
+    all_files
+}
 
-    // -----------------------------------------------------------------------
-    // Stage 1: Group by file size
-    // -----------------------------------------------------------------------
+/// Stage 1: Group files by size. Returns (size_groups, stage1_candidates count).
+fn group_by_size(
+    all_files: &[(String, u64, String)],
+) -> (HashMap<u64, Vec<(String, String)>>, u64) {
     let mut size_groups: HashMap<u64, Vec<(String, String)>> = HashMap::new();
-    for (path, size, modified) in &all_files {
+    for (path, size, modified) in all_files {
         size_groups
             .entry(*size)
             .or_default()
@@ -256,17 +302,18 @@ pub fn run_duplicate_scan(
     size_groups.retain(|_, files| files.len() >= 2);
 
     let stage1_candidates: u64 = size_groups.values().map(|v| v.len() as u64).sum();
+    (size_groups, stage1_candidates)
+}
 
-    // -----------------------------------------------------------------------
-    // Stage 2: Partial hash (first 4KB)
-    // -----------------------------------------------------------------------
-    // For each size group, hash the first 4KB of each file. Files with
-    // different headers can't be duplicates even if they're the same size.
-
-    // Key: (size, partial_hash) -> list of (path, modified)
+/// Stage 2: For each size group, hash the first 4KB of each file.
+/// Files with different headers can't be duplicates even if they're the same size.
+/// Returns (partial_groups, stage2_candidates count).
+fn group_by_partial_hash(
+    size_groups: &HashMap<u64, Vec<(String, String)>>,
+) -> (HashMap<(u64, String), Vec<(String, String)>>, u64) {
     let mut partial_groups: HashMap<(u64, String), Vec<(String, String)>> = HashMap::new();
 
-    for (size, files) in &size_groups {
+    for (size, files) in size_groups {
         for (path, modified) in files {
             match partial_hash(path) {
                 Some(hash) => {
@@ -275,30 +322,25 @@ pub fn run_duplicate_scan(
                         .or_default()
                         .push((path.clone(), modified.clone()));
                 }
-                None => {
-                    // Can't read file — skip silently.
-                    continue;
-                }
+                None => continue,
             }
         }
     }
 
-    // Keep only groups with 2+ files.
     partial_groups.retain(|_, files| files.len() >= 2);
 
     let stage2_candidates: u64 = partial_groups.values().map(|v| v.len() as u64).sum();
+    (partial_groups, stage2_candidates)
+}
 
-    // -----------------------------------------------------------------------
-    // Stage 3: Full hash to confirm duplicates
-    // -----------------------------------------------------------------------
-    // Only files that matched on both size AND partial hash get fully hashed.
-    // This is the most expensive step but operates on the smallest set of files.
-
-    // Key: (size, full_hash) -> list of (path, modified)
-    // The partial_groups key is (size, partial_hash), so we carry size through.
+/// Stage 3: Full hash to confirm duplicates. Only files that matched on both
+/// size AND partial hash get fully hashed.
+fn confirm_by_full_hash(
+    partial_groups: &HashMap<(u64, String), Vec<(String, String)>>,
+) -> HashMap<(u64, String), Vec<(String, String)>> {
     let mut confirmed_groups: HashMap<(u64, String), Vec<(String, String)>> = HashMap::new();
 
-    for ((size, _partial), files) in &partial_groups {
+    for ((size, _partial), files) in partial_groups {
         for (path, modified) in files {
             match full_hash(path) {
                 Some(hash) => {
@@ -312,16 +354,17 @@ pub fn run_duplicate_scan(
         }
     }
 
-    // Keep only groups with 2+ files — these are confirmed duplicates.
     confirmed_groups.retain(|_, files| files.len() >= 2);
+    confirmed_groups
+}
 
-    // -----------------------------------------------------------------------
-    // Build result
-    // -----------------------------------------------------------------------
-
+/// Build DuplicateGroup structs from confirmed hash groups.
+fn assemble_groups(
+    confirmed_groups: &HashMap<(u64, String), Vec<(String, String)>>,
+) -> Vec<DuplicateGroup> {
     let mut groups: Vec<DuplicateGroup> = Vec::new();
 
-    for ((size, hash), files) in &confirmed_groups {
+    for ((size, hash), files) in confirmed_groups {
         let dup_files: Vec<DuplicateFile> = files
             .iter()
             .map(|(path, modified)| {
@@ -354,14 +397,12 @@ pub fn run_duplicate_scan(
         });
     }
 
-    // Sort by wasted bytes descending (biggest savings first).
-    groups.sort_by(|a, b| b.wasted_bytes.cmp(&a.wasted_bytes));
+    groups
+}
 
-    // Truncate to avoid overwhelming the frontend.
-    groups.truncate(MAX_GROUPS);
-
-    // Generate thumbnails for image groups (concurrent via threads).
-    // Only for the final truncated set — at most MAX_GROUPS (200) thumbnails.
+/// Generate thumbnails for image groups (concurrent via threads).
+/// Only for the final truncated set — at most MAX_GROUPS (200) thumbnails.
+fn generate_duplicate_thumbnails(groups: &mut [DuplicateGroup]) {
     let thumb_handles: Vec<_> = groups
         .iter()
         .enumerate()
@@ -382,19 +423,6 @@ pub fn run_duplicate_scan(
         if let Ok(Some(b64)) = handle.join() {
             groups[idx].thumbnail = Some(b64);
         }
-    }
-
-    let total_duplicate_files: u64 = groups.iter().map(|g| g.files.len() as u64).sum();
-    let total_wasted_bytes: u64 = groups.iter().map(|g| g.wasted_bytes).sum();
-
-    DuplicateScanResult {
-        groups,
-        total_duplicate_files,
-        total_wasted_bytes,
-        files_scanned,
-        stage1_candidates,
-        stage2_candidates,
-        skipped_paths,
     }
 }
 
@@ -567,12 +595,12 @@ mod tests {
         temp_file(dir.path(), "dup3.bin", &content);
         temp_file(dir.path(), "unique.bin", &vec![0xFFu8; 2048]);
 
-        let result = run_duplicate_scan(
-            dir.path().to_str().unwrap(),
-            0, // use default min size
-            true, // pretend FDA
-            &[],
-        );
+        let result = run_duplicate_scan(DuplicateScanOptions {
+            scan_path: dir.path().to_str().unwrap(),
+            min_size_mb: 0, // use default min size
+            fda: true, // pretend FDA
+            skip_paths: &[],
+        });
 
         assert_eq!(result.groups.len(), 1, "should find exactly one duplicate group");
         assert_eq!(result.groups[0].files.len(), 3, "group should contain all 3 copies");
@@ -588,12 +616,12 @@ mod tests {
         temp_file(dir.path(), "small1.bin", &content);
         temp_file(dir.path(), "small2.bin", &content);
 
-        let result = run_duplicate_scan(
-            dir.path().to_str().unwrap(),
-            1, // 1MB minimum
-            true,
-            &[],
-        );
+        let result = run_duplicate_scan(DuplicateScanOptions {
+            scan_path: dir.path().to_str().unwrap(),
+            min_size_mb: 1, // 1MB minimum
+            fda: true,
+            skip_paths: &[],
+        });
 
         assert_eq!(result.groups.len(), 0, "files below min_size_mb should be excluded");
     }

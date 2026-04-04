@@ -1783,7 +1783,12 @@ async fn scan_duplicates(
 ) -> Result<duplicates::DuplicateScanResult, String> {
     let fda = has_fda.unwrap_or(false);
     let skips = skip_paths.unwrap_or_default();
-    Ok(duplicates::run_duplicate_scan(&path, min_size_mb, fda, &skips))
+    Ok(duplicates::run_duplicate_scan(duplicates::DuplicateScanOptions {
+        scan_path: &path,
+        min_size_mb,
+        fda,
+        skip_paths: &skips,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -1839,7 +1844,12 @@ async fn scan_similar_images(
     let fda = has_fda.unwrap_or(false);
     let skips = skip_paths.unwrap_or_default();
     let min_bytes = if min_size_mb > 0 { min_size_mb * 1024 * 1024 } else { 10 * 1024 }; // default 10KB min
-    Ok(similar_images::run_similar_scan(&app, threshold, min_bytes, fda, &skips))
+    Ok(similar_images::run_similar_scan(&app, similar_images::SimilarScanOptions {
+        threshold,
+        min_size_bytes: min_bytes,
+        fda,
+        skip_paths: &skips,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -2309,7 +2319,12 @@ async fn scan_vault_candidates(
     min_age_days: u64,
     fda: bool,
 ) -> Vec<vault::CompressionCandidate> {
-    vault::scan_candidates(&path, min_size_mb, min_age_days, fda)
+    vault::scan_candidates(vault::VaultScanOptions {
+        scan_path: &path,
+        min_size_mb,
+        min_age_days,
+        fda,
+    })
 }
 
 #[tauri::command]
