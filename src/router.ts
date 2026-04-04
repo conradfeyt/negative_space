@@ -42,6 +42,7 @@ const router = createRouter({
     { path: "/security", name: "security", component: Security },
     { path: "/settings", name: "settings", component: Settings },
     { path: "/icon-test", name: "icon-test", component: IconTest },
+    { path: "/:pathMatch(.*)*", redirect: "/dashboard" },
   ],
 });
 
