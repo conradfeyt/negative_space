@@ -155,20 +155,13 @@ fn make_finding_id(prefix: &str, counter: &mut u32) -> String {
 /// Run a subprocess and return its stdout as a trimmed String.
 /// Returns an empty string if the command fails.
 fn run_cmd(program: &str, args: &[&str]) -> String {
-    match std::process::Command::new(program).args(args).output() {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => String::new(),
-    }
+    crate::commands::run_cmd(program, args)
 }
 
 /// Run a subprocess and return whether it exited successfully.
 /// This is useful for commands like `test -e` or `codesign -v`.
 fn run_cmd_ok(program: &str, args: &[&str]) -> bool {
-    std::process::Command::new(program)
-        .args(args)
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+    crate::commands::run_cmd_ok(program, args)
 }
 
 /// Extract a value from a plist file using PlistBuddy.

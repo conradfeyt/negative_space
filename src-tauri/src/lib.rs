@@ -938,21 +938,7 @@ async fn scan_apps(has_fda: Option<bool>) -> Result<Vec<AppInfo>, String> {
 ///
 /// Uses `du` subprocess to avoid triggering TCC prompts for protected directories.
 fn get_du_size(path: &str) -> u64 {
-    let output = std::process::Command::new("du")
-        .args(["-sk", path])
-        .output();
-    match output {
-        Ok(o) if o.status.success() => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            // Output format: "12345\t/path/to/thing"
-            text.split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0)
-                * 1024 // du -sk gives kilobytes
-        }
-        _ => 0,
-    }
+    crate::commands::get_du_size(path)
 }
 
 /// Extract CFBundleIdentifier from an Info.plist using PlistBuddy.

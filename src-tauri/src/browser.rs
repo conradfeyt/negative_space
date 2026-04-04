@@ -621,21 +621,7 @@ fn discover_firefox_profiles(firefox_base: &str) -> Vec<String> {
 /// Get the size of a path using `du -sk` (subprocess — TCC-safe).
 /// Returns size in bytes. Returns 0 if the path doesn't exist or can't be read.
 fn get_du_size(path: &str) -> u64 {
-    let output = std::process::Command::new("du")
-        .args(["-sk", path])
-        .output();
-    match output {
-        Ok(o) if o.status.success() => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            // Output: "12345\t/path/to/thing"
-            text.split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0)
-                * 1024 // du -sk gives kilobytes
-        }
-        _ => 0,
-    }
+    crate::commands::get_du_size(path)
 }
 
 /// Check if a path exists using `test -e` (subprocess — TCC-safe).

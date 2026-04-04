@@ -112,15 +112,12 @@ pub struct PackageScanResult {
 
 /// Get user's home directory.
 fn home_dir() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| "/Users/unknown".to_string())
+    crate::commands::home_dir().unwrap_or_else(|| "/Users/unknown".to_string())
 }
 
 /// Run a command and return stdout as a trimmed String, or empty on failure.
 fn run_cmd(program: &str, args: &[&str]) -> String {
-    match Command::new(program).args(args).output() {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => String::new(),
-    }
+    crate::commands::run_cmd(program, args)
 }
 
 /// Check if a command exists on the system.
@@ -134,18 +131,7 @@ fn command_exists(name: &str) -> bool {
 
 /// Get directory size via `du -sk`. Returns bytes.
 fn dir_size(path: &str) -> u64 {
-    let output = Command::new("du").args(["-sk", path]).output();
-    match output {
-        Ok(o) if o.status.success() => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            text.split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0)
-                * 1024
-        }
-        _ => 0,
-    }
+    crate::commands::get_du_size(path)
 }
 
 // ---------------------------------------------------------------------------

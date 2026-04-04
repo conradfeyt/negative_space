@@ -211,6 +211,47 @@ pub struct CacheMetadata {
 // Utility functions
 // ---------------------------------------------------------------------------
 
+/// Run `du -sk <path>` and return the result in bytes.
+///
+/// Uses `du` subprocess to avoid triggering TCC prompts for protected directories.
+/// Returns 0 if the path doesn't exist or can't be read.
+pub fn get_du_size(path: &str) -> u64 {
+    let output = std::process::Command::new("du")
+        .args(["-sk", path])
+        .output();
+    match output {
+        Ok(o) if o.status.success() => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            // Output format: "12345\t/path/to/thing"
+            text.split_whitespace()
+                .next()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0)
+                * 1024 // du -sk gives kilobytes
+        }
+        _ => 0,
+    }
+}
+
+/// Run a subprocess and return its stdout as a trimmed String.
+/// Returns an empty string if the command fails.
+pub fn run_cmd(program: &str, args: &[&str]) -> String {
+    match std::process::Command::new(program).args(args).output() {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Run a subprocess and return whether it exited successfully.
+/// This is useful for commands like `test -e` or `codesign -v`.
+pub fn run_cmd_ok(program: &str, args: &[&str]) -> bool {
+    std::process::Command::new(program)
+        .args(args)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Convert a byte count into a human-readable string (B, KB, MB, GB, TB).
 ///
 /// # Examples
