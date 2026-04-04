@@ -3,7 +3,7 @@ import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
-import { formatSize } from "../utils";
+import { formatSize, fileDiskSize } from "../utils";
 import {
   largeFiles,
   largeFilesScanning,
@@ -313,9 +313,7 @@ function isSparse(file: FileInfo): boolean {
   return file.is_sparse && file.actual_size < file.apparent_size * 0.8;
 }
 
-function diskSize(file: FileInfo): number {
-  return isSparse(file) ? file.actual_size : file.apparent_size;
-}
+const diskSize = fileDiskSize;
 
 // ---------------------------------------------------------------------------
 // File categorization

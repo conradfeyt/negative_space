@@ -8,6 +8,7 @@
  */
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { fileDiskSize } from "../utils";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   DiskUsage,
@@ -181,7 +182,7 @@ export async function restoreAllCaches() {
   if (cachedLargeFiles) {
     largeFiles.value = cachedLargeFiles;
     largeFilesScanned.value = true;
-    setDomain("largeFiles", { status: "done", itemCount: cachedLargeFiles.length, totalSize: cachedLargeFiles.reduce((s, f) => s + (f.is_sparse && f.actual_size < f.apparent_size * 0.8 ? f.actual_size : f.apparent_size), 0) });
+    setDomain("largeFiles", { status: "done", itemCount: cachedLargeFiles.length, totalSize: cachedLargeFiles.reduce((s, f) => s + fileDiskSize(f), 0) });
   }
   if (cachedCaches) {
     caches.value = cachedCaches;
@@ -404,10 +405,7 @@ export const totalLogSize = computed(() =>
 );
 
 export const totalLargeFileSize = computed(() =>
-  largeFiles.value.reduce((sum, f) => {
-    const sparse = f.is_sparse && f.actual_size < f.apparent_size * 0.8;
-    return sum + (sparse ? f.actual_size : f.apparent_size);
-  }, 0)
+  largeFiles.value.reduce((sum, f) => sum + fileDiskSize(f), 0)
 );
 
 // ---------------------------------------------------------------------------
@@ -427,11 +425,6 @@ export async function loadDiskUsage() {
   }
 }
 
-/** Helper: compute actual disk size for a file (respects sparse files). */
-function fileDiskSize(f: FileInfo): number {
-  const sparse = f.is_sparse && f.actual_size < f.apparent_size * 0.8;
-  return sparse ? f.actual_size : f.apparent_size;
-}
 
 /**
  * Streaming large-file scan. Files appear in the UI immediately as they're

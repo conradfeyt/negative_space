@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize } from "../utils";
+import { formatSize, fileDiskSize } from "../utils";
 import {
   diskUsage,
   scanAllRunning,
@@ -120,8 +120,8 @@ const scanProgress = computed(() => {
 const topFiles = computed(() =>
   [...largeFiles.value]
     .sort((a, b) => {
-      const sizeA = a.is_sparse && a.actual_size < a.apparent_size * 0.8 ? a.actual_size : a.apparent_size;
-      const sizeB = b.is_sparse && b.actual_size < b.apparent_size * 0.8 ? b.actual_size : b.apparent_size;
+      const sizeA = fileDiskSize(a);
+      const sizeB = fileDiskSize(b);
       return sizeB - sizeA;
     })
     .slice(0, 5)
@@ -146,9 +146,6 @@ function fileDir(path: string): string {
   return parts.join("/");
 }
 
-function diskSize(file: { is_sparse: boolean; actual_size: number; apparent_size: number }): number {
-  return file.is_sparse && file.actual_size < file.apparent_size * 0.8 ? file.actual_size : file.apparent_size;
-}
 
 const reclaimBreakdown = computed(() => {
   const entries: string[] = [];
@@ -818,7 +815,7 @@ onUnmounted(() => stopPolling());
               <div class="file-name">{{ file.name }}</div>
               <div class="file-path">{{ fileDir(file.path) }}</div>
             </div>
-            <span class="file-size mono">{{ formatSize(diskSize(file)) }}</span>
+            <span class="file-size mono">{{ formatSize(fileDiskSize(file)) }}</span>
           </div>
         </template>
         <p v-else class="text-muted side-empty">Run a scan to see largest files</p>
