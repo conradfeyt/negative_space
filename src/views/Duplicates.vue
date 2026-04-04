@@ -15,10 +15,9 @@ import {
   similarProgress,
   scanSimilarImages,
   deleteFiles,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
   previewFile,
 } from "../stores/scanStore";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 
 // Tab state
@@ -173,16 +172,6 @@ const cleanError = ref("");
 const previewData = ref<FilePreview | null>(null);
 const previewLoading = ref(false);
 const previewPath = ref<string | null>(null);
-
-async function openFdaSettings() {
-  try {
-    await invoke("open_full_disk_access_settings");
-  } catch (_) {}
-}
-
-async function recheckFda() {
-  await checkFullDiskAccess();
-}
 
 async function scan() {
   successMsg.value = "";
@@ -370,27 +359,11 @@ function shortPath(p: string): string {
     </div>
 
     <!-- FDA warning -->
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">
-          Limited scan -- Full Disk Access required for full coverage
-        </div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, only developer tools, package managers, and
-          project directories are scanned. Desktop, Documents, Downloads, and
-          most of ~/Library are skipped.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">
-            Open System Settings
-          </button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">
-            Re-check
-          </button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      title="Limited scan -- Full Disk Access required for full coverage"
+      text="Without Full Disk Access, only developer tools, package managers, and project directories are scanned. Desktop, Documents, Downloads, and most of ~/Library are skipped."
+      @fda-granted="scan"
+    />
 
     <!-- ══════ EXACT DUPLICATES TAB ══════ -->
     <template v-if="activeTab === 'exact'">

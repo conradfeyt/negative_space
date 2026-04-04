@@ -10,19 +10,13 @@ import {
   scanLogs,
   deleteFiles,
   totalLogSize,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
 } from "../stores/scanStore";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
 const successMsg = ref("");
 const deleteError = ref("");
-
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
-}
-async function recheckFda() { await checkFullDiskAccess(); }
 
 async function scan() {
   successMsg.value = "";
@@ -151,17 +145,10 @@ function shortPath(path: string): string {
       </div>
     </div>
 
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">Limited scan -- Full Disk Access required</div>
-        <div class="fda-warning-text">Without Full Disk Access, only /var/log is scanned. ~/Library/Logs is skipped.</div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">Open System Settings</button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">Re-check</button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      text="Without Full Disk Access, only /var/log is scanned. ~/Library/Logs is skipped."
+      @fda-granted="scan"
+    />
 
     <div v-if="logsError" class="error-message">{{ logsError }}</div>
     <div v-if="deleteError" class="error-message">{{ deleteError }}</div>

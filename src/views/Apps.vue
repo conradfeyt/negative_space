@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import type { AppInfo } from "../types";
 import { formatSize } from "../utils";
 import {
@@ -11,8 +10,8 @@ import {
   scanApps,
   uninstallApp as storeUninstallApp,
   hasFullDiskAccess,
-  checkFullDiskAccess,
 } from "../stores/scanStore";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
@@ -45,14 +44,6 @@ const filteredApps = computed(() => {
       a.install_source.includes(q)
   );
 });
-
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
-}
-
-async function recheckFda() {
-  await checkFullDiskAccess();
-}
 
 async function scan() {
   successMsg.value = "";
@@ -127,20 +118,11 @@ function sourceLabel(source: string): string {
       </div>
     </div>
 
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">Leftover detection limited -- Full Disk Access required</div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, leftover files in ~/Library cannot be detected.
-          Apps are still listed with their bundle sizes.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">Open System Settings</button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">Re-check</button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      title="Leftover detection limited -- Full Disk Access required"
+      text="Without Full Disk Access, leftover files in ~/Library cannot be detected. Apps are still listed with their bundle sizes."
+      @fda-granted="scan"
+    />
 
     <div v-if="appsError" class="error-message">{{ appsError }}</div>
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>

@@ -10,9 +10,8 @@ import {
   scanCaches,
   deleteFiles,
   totalCacheSize,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
 } from "../stores/scanStore";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 // Native macOS blue folder icon via NSWorkspace.shared.icon(forFile:)
 const folderIcon = ref("");
@@ -25,11 +24,6 @@ const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
 const successMsg = ref("");
 const deleteError = ref("");
-
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
-}
-async function recheckFda() { await checkFullDiskAccess(); }
 
 async function scan() {
   successMsg.value = "";
@@ -174,20 +168,10 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
       </div>
     </div>
 
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">Limited scan -- Full Disk Access required</div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, only Xcode and CoreSimulator caches are shown.
-          Other app caches in ~/Library/Caches are skipped.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">Open System Settings</button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">Re-check</button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      text="Without Full Disk Access, only Xcode and CoreSimulator caches are shown. Other app caches in ~/Library/Caches are skipped."
+      @fda-granted="scan"
+    />
 
     <div v-if="cachesError" class="error-message">{{ cachesError }}</div>
     <div v-if="deleteError" class="error-message">{{ deleteError }}</div>

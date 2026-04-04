@@ -12,14 +12,13 @@ import {
   largeFilesCurrentDir,
   scanLargeFiles,
   deleteFiles,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
   fileClassifications,
   classifyFiles,
   vaultEntries,
   toggleProtected,
   isProtected,
 } from "../stores/scanStore";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
@@ -32,14 +31,6 @@ const collapsedGroups = ref<Set<string>>(new Set());
 
 type SortMode = "size" | "directory" | "safety" | "type";
 const sortMode = ref<SortMode>("size");
-
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
-}
-
-async function recheckFda() {
-  await checkFullDiskAccess();
-}
 
 async function scan() {
   successMsg.value = "";
@@ -747,20 +738,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
     </div>
 
     <!-- FDA warning -->
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">Limited scan -- Full Disk Access required</div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, Desktop, Documents, Downloads, and other
-          protected folders are skipped to avoid macOS permission prompts.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">Open System Settings</button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">Re-check</button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      text="Without Full Disk Access, Desktop, Documents, Downloads, and other protected folders are skipped to avoid macOS permission prompts."
+      @fda-granted="scan"
+    />
 
     <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>

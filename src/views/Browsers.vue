@@ -9,10 +9,9 @@ import {
   browserError,
   scanBrowsers,
   cleanBrowserData,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
 } from "../stores/scanStore";
 import type { BrowserInfo, BrowserDataCategory } from "../types";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 // ── Browser app icons via NSWorkspace ─────────────────────────────────
 const browserIcons = ref<Record<string, string>>({});
@@ -61,16 +60,6 @@ const cleanError = ref("");
 const showConfirmModal = ref(false);
 const confirmMessage = ref("");
 const pendingCleanPaths = ref<string[]>([]);
-async function openFdaSettings() {
-  try {
-    await invoke("open_full_disk_access_settings");
-  } catch (_) {}
-}
-
-async function recheckFda() {
-  await checkFullDiskAccess();
-}
-
 async function scan() {
   successMsg.value = "";
   cleanError.value = "";
@@ -253,27 +242,11 @@ function selectAllSafe(browser: BrowserInfo) {
     </div>
 
     <!-- FDA warning for Safari -->
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">
-          Safari data requires Full Disk Access
-        </div>
-        <div class="fda-warning-text">
-          Safari stores data in TCC-protected directories. Without Full Disk
-          Access, Safari cache, cookies, and history cannot be scanned or
-          cleaned. Other browsers are not affected.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">
-            Open System Settings
-          </button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">
-            Re-check
-          </button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      title="Safari data requires Full Disk Access"
+      text="Safari stores data in TCC-protected directories. Without Full Disk Access, Safari cache, cookies, and history cannot be scanned or cleaned. Other browsers are not affected."
+      @fda-granted="scan"
+    />
 
     <!-- Error/success messages -->
     <div v-if="browserError" class="error-message">{{ browserError }}</div>

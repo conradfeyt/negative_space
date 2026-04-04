@@ -20,8 +20,6 @@ import {
   diskMapLoaded,
   diskMapError,
   loadDiskMap,
-  hasFullDiskAccess,
-  checkFullDiskAccess,
   diskMapCaches,
   diskMapActiveCacheId,
   listDiskMapCaches,
@@ -33,6 +31,7 @@ import {
 import type { DiskNode, CacheMetadata } from "../types";
 import GalacticViz from "../components/GalacticViz.vue";
 import VoronoiViz from "../components/VoronoiViz.vue";
+import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 // ---------------------------------------------------------------------------
 // View switcher (Phase 4 shell — only Sunburst active)
@@ -385,14 +384,6 @@ const cacheBadgeLabel = computed(() => {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
-}
-
-async function recheckFda() {
-  await checkFullDiskAccess();
-}
-
 async function scan() {
   enriched.value = false;
   colorMode.value = "size";
@@ -968,26 +959,11 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- FDA warning -->
-    <div v-if="hasFullDiskAccess === false" class="fda-warning-banner">
-      <span class="fda-warning-dot"></span>
-      <div class="fda-warning-body">
-        <div class="fda-warning-title">
-          Limited view -- Full Disk Access shows all directories
-        </div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, Desktop, Documents, Downloads, and media
-          folders are not included. Sizes shown may not account for all disk usage.
-        </div>
-        <div class="fda-warning-actions">
-          <button class="btn-fda btn-fda-primary" @click="openFdaSettings">
-            Open System Settings
-          </button>
-          <button class="btn-fda btn-fda-secondary" @click="recheckFda">
-            Re-check
-          </button>
-        </div>
-      </div>
-    </div>
+    <FdaWarningBanner
+      title="Limited view -- Full Disk Access shows all directories"
+      text="Without Full Disk Access, Desktop, Documents, Downloads, and media folders are not included. Sizes shown may not account for all disk usage."
+      @fda-granted="scan"
+    />
 
     <!-- Messages -->
     <div v-if="diskMapError" class="error-message">{{ diskMapError }}</div>
