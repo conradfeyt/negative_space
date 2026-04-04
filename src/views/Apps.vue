@@ -16,6 +16,7 @@ import {
 
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
+const confirmUninstall = ref<string | null>(null);
 const successMsg = ref("");
 const searchQuery = ref("");
 
@@ -60,7 +61,16 @@ async function scan() {
   await scanApps();
 }
 
+function requestUninstall(app: AppInfo) {
+  confirmUninstall.value = app.path;
+}
+
+function cancelUninstall() {
+  confirmUninstall.value = null;
+}
+
 async function handleUninstall(app: AppInfo) {
+  confirmUninstall.value = null;
   uninstalling.value = app.path;
   successMsg.value = "";
   try {
@@ -241,12 +251,27 @@ function sourceLabel(source: string): string {
 
             <!-- Actions -->
             <div class="app-actions">
+              <template v-if="confirmUninstall === app.path">
+                <span class="confirm-text">Uninstall this app?</span>
+                <button class="btn-secondary btn-sm" @click.stop="cancelUninstall">
+                  Cancel
+                </button>
+                <button
+                  class="btn-danger btn-sm"
+                  :disabled="uninstalling === app.path"
+                  @click.stop="handleUninstall(app)"
+                >
+                  <span v-if="uninstalling === app.path" class="spinner spinner-sm"></span>
+                  {{ uninstalling === app.path ? "Removing..." : "Yes, Uninstall" }}
+                </button>
+              </template>
               <button
+                v-else
                 class="btn-danger btn-sm"
-                :disabled="uninstalling === app.path"
-                @click.stop="handleUninstall(app)"
+                :disabled="!!uninstalling"
+                @click.stop="requestUninstall(app)"
               >
-                {{ uninstalling === app.path ? "Removing..." : "Uninstall" }}
+                Uninstall
               </button>
             </div>
           </div>
