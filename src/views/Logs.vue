@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { formatSize } from "../utils";
+import { formatSize, timeAgo } from "../utils";
 import {
   logs,
   logsScanning,
@@ -70,26 +70,6 @@ invoke<string>("render_sf_symbol", { name: "log", size: 64, mode: "uttype", styl
   .catch(() => {});
 
 // ── Friendly time ago ─────────────────────────────────────────────────
-function timeAgo(modified: string | null): string {
-  if (!modified) return "";
-  const date = new Date(modified.replace(" ", "T"));
-  if (isNaN(date.getTime())) return modified;
-  const diff = Date.now() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 14) return "a week ago";
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 60) return "a month ago";
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-  const years = Math.floor(days / 365);
-  return years === 1 ? "a year ago" : `${years} years ago`;
-}
 
 // ── Grouping by source ────────────────────────────────────────────────
 function getLogSource(path: string, _name: string): string {

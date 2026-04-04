@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { formatSize } from "../utils";
+import { formatSize, KIND_COLORS, KIND_COLOR_DEFAULT } from "../utils";
 import {
   duplicateResult,
   duplicateScanning,
@@ -145,15 +145,7 @@ function isImageFile(name: string): boolean {
 }
 
 function extCardColor(name: string): string {
-  const kind = getFileKind(name);
-  switch (kind) {
-    case "documents": return "#E74C3C";
-    case "code": return "#3498DB";
-    case "archives": return "#F39C12";
-    case "audio": return "#9B59B6";
-    case "video": return "#27AE60";
-    default: return "#95A5A6";
-  }
+  return KIND_COLORS[getFileKind(name)] ?? KIND_COLOR_DEFAULT;
 }
 
 function getExtLabel(name: string): string {

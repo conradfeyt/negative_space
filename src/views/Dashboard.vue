@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize, fileDiskSize, tempToColor } from "../utils";
+import { formatSize, fileDiskSize, tempToColor, revealInFinder } from "../utils";
 import {
   diskUsage,
   scanAllRunning,
@@ -42,9 +42,7 @@ async function openFdaSettings() {
   try { await invoke("open_full_disk_access_settings"); } catch (_) {}
 }
 
-async function revealInFinder(path: string) {
-  try { await invoke("reveal_in_finder", { path }); } catch (_) {}
-}
+
 
 const router = useRouter();
 const navigateTo = (id: string) => router.push({ name: id });

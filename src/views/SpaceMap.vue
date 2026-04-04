@@ -13,7 +13,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import * as d3 from "d3";
-import { formatSize } from "../utils";
+import { formatSize, revealInFinder } from "../utils";
 import {
   diskMapResult,
   diskMapLoading,
@@ -399,10 +399,6 @@ async function scan() {
   await loadDiskMap();
 }
 
-async function revealInFinder(path: string) {
-  if (!path) return;
-  try { await invoke("reveal_in_finder", { path }); } catch (_) {}
-}
 
 async function toggleRecency() {
   if (colorMode.value === "recency") {

@@ -3,7 +3,7 @@ import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
-import { formatSize, fileDiskSize } from "../utils";
+import { formatSize, fileDiskSize, timeAgo, revealInFinder } from "../utils";
 import {
   largeFiles,
   largeFilesScanning,
@@ -190,9 +190,6 @@ async function deleteSelected() {
   }
 }
 
-async function revealInFinder(path: string) {
-  try { await invoke("reveal_in_finder", { path }); } catch (_) {}
-}
 
 function isVaulted(path: string): boolean {
   return getClassification(path)?.safety === "vaulted";
@@ -369,27 +366,6 @@ function parentFolder(path: string): string {
 }
 
 /** Format a timestamp string like "2025-01-14 22:27:26" as a friendly relative time. */
-function timeAgo(modified: string | null): string {
-  if (!modified) return "";
-  const date = new Date(modified.replace(" ", "T"));
-  if (isNaN(date.getTime())) return modified;
-  const now = Date.now();
-  const diff = now - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 14) return "a week ago";
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 60) return "a month ago";
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-  const years = Math.floor(days / 365);
-  return years === 1 ? "a year ago" : `${years} years ago`;
-}
 
 // ---------------------------------------------------------------------------
 // Directory tree data structure
