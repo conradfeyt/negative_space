@@ -438,8 +438,9 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
                 Ok(_) => {}
                 Err(e) => {
                     result.errors.push(format!("{}: {}", path_str, e));
-                    // Clean up partial file
-                    let _ = fs::remove_file(&vault_path);
+                    if let Err(ce) = fs::remove_file(&vault_path) {
+                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
+                    }
                     continue;
                 }
             }
@@ -449,12 +450,16 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
                 Ok(true) => {}
                 Ok(false) => {
                     result.errors.push(format!("{}: integrity check failed after compression", path_str));
-                    let _ = fs::remove_file(&vault_path);
+                    if let Err(ce) = fs::remove_file(&vault_path) {
+                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
+                    }
                     continue;
                 }
                 Err(e) => {
                     result.errors.push(format!("{}: verification error: {}", path_str, e));
-                    let _ = fs::remove_file(&vault_path);
+                    if let Err(ce) = fs::remove_file(&vault_path) {
+                        eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
+                    }
                     continue;
                 }
             }
@@ -572,21 +577,27 @@ pub fn restore_file(entry_id: &str) -> RestoreResult {
     if is_directory {
         // Restore directory from tar.zst
         if let Err(e) = restore_directory(&vault_path, &original_path) {
-            let _ = fs::remove_dir_all(&original_path);
+            let mut errors = vec![format!("Directory restore failed: {}", e)];
+            if let Err(ce) = fs::remove_dir_all(&original_path) {
+                errors.push(format!("Warning: failed to clean up partial restore at {}: {}", original_path, ce));
+            }
             return RestoreResult {
                 success: false,
                 restored_path: original_path,
-                errors: vec![format!("Directory restore failed: {}", e)],
+                errors,
             };
         }
     } else {
         // Restore single file from .zst
         if let Err(e) = decompress_file_to(&vault_path, &original_path) {
-            let _ = fs::remove_file(&original_path);
+            let mut errors = vec![format!("Decompression failed: {}", e)];
+            if let Err(ce) = fs::remove_file(&original_path) {
+                errors.push(format!("Warning: failed to clean up partial restore at {}: {}", original_path, ce));
+            }
             return RestoreResult {
                 success: false,
                 restored_path: original_path,
-                errors: vec![format!("Decompression failed: {}", e)],
+                errors,
             };
         }
 
@@ -594,19 +605,25 @@ pub fn restore_file(entry_id: &str) -> RestoreResult {
         match blake3_hash_file(&original_path) {
             Ok(hash) if hash == expected_hash => {}
             Ok(_) => {
-                let _ = fs::remove_file(&original_path);
+                let mut errors = vec!["Integrity check failed: restored file hash does not match original".to_string()];
+                if let Err(ce) = fs::remove_file(&original_path) {
+                    errors.push(format!("Warning: failed to clean up partial restore at {}: {}", original_path, ce));
+                }
                 return RestoreResult {
                     success: false,
                     restored_path: original_path,
-                    errors: vec!["Integrity check failed: restored file hash does not match original".to_string()],
+                    errors,
                 };
             }
             Err(e) => {
-                let _ = fs::remove_file(&original_path);
+                let mut errors = vec![format!("Hash verification error: {}", e)];
+                if let Err(ce) = fs::remove_file(&original_path) {
+                    errors.push(format!("Warning: failed to clean up partial restore at {}: {}", original_path, ce));
+                }
                 return RestoreResult {
                     success: false,
                     restored_path: original_path,
-                    errors: vec![format!("Hash verification error: {}", e)],
+                    errors,
                 };
             }
         }
@@ -627,7 +644,9 @@ pub fn restore_file(entry_id: &str) -> RestoreResult {
 
     // Only delete compressed file if no other entries reference it
     if hash_ref_count <= 1 {
-        let _ = fs::remove_file(&vault_path);
+        if let Err(e) = fs::remove_file(&vault_path) {
+            eprintln!("[vault] failed to remove vault file {}: {}", vault_path, e);
+        }
     }
 
     if let Err(e) = save_manifest(&manifest) {
@@ -687,7 +706,9 @@ pub fn delete_entry(entry_id: &str) -> Result<(), String> {
     if hash_ref_count <= 1 {
         if let Some(data_dir) = vault_data_dir() {
             let vault_path = format!("{}/{}", data_dir, vault_filename);
-            let _ = fs::remove_file(&vault_path);
+            if let Err(e) = fs::remove_file(&vault_path) {
+                eprintln!("[vault] failed to remove vault file {}: {}", vault_path, e);
+            }
         }
     }
 
@@ -805,7 +826,9 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
         Ok(_) => {}
         Err(e) => {
             result.errors.push(format!("Compression failed: {}", e));
-            let _ = fs::remove_file(&vault_path);
+            if let Err(ce) = fs::remove_file(&vault_path) {
+                eprintln!("[vault] cleanup failed for {}: {}", vault_path, ce);
+            }
             return result;
         }
     }
