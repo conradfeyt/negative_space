@@ -61,7 +61,7 @@ const totalSelected = computed(() => logs.value.filter((l) => selected.value.has
 const logIcon = ref("");
 invoke<string>("render_sf_symbol", { name: "log", size: 64, mode: "uttype", style: "plain" })
   .then(b64 => { if (b64) logIcon.value = b64; })
-  .catch(() => {});
+  .catch(e => console.warn('[logs] log icon load failed:', e));
 
 // ── Friendly time ago ─────────────────────────────────────────────────
 

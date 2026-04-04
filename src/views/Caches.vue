@@ -17,7 +17,7 @@ import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 const folderIcon = ref("");
 invoke<string>("render_sf_symbol", { name: "public.folder", size: 64, mode: "uttype", style: "plain" })
   .then(b64 => { if (b64) folderIcon.value = b64; })
-  .catch(() => {});
+  .catch(e => console.warn('[caches] folder icon load failed:', e));
 
 
 const selected = ref<Set<string>>(new Set());

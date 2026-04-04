@@ -651,6 +651,7 @@ function shortPath(p: string): string {
             :disabled="similarSelected.size === 0 || cleaning"
             @click="deleteSimilarSelected"
           >
+            <span v-if="cleaning" class="spinner spinner-sm"></span>
             {{ cleaning ? "Deleting..." : `Delete ${similarSelected.size} selected` }}
           </button>
         </div>

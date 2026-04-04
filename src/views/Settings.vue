@@ -37,8 +37,8 @@ function loadSettings() {
 
     const savedDragMode = localStorage.getItem(DRAG_MODE_KEY);
     customJsDrag.value = savedDragMode === null ? true : savedDragMode !== "false";
-  } catch (_) {
-    // ignore parse errors
+  } catch (e) {
+    console.warn('[settings] load settings failed:', e);
   }
 }
 
@@ -77,7 +77,8 @@ async function checkAllAccess() {
       const checks = scanAreas.value.map(async (area) => {
         try {
           area.access = await invoke<PathAccess>("check_path_access", { path: area.path });
-        } catch (_) {
+        } catch (e) {
+          console.warn('[settings] check path access failed:', e);
           area.access = { path: area.path, resolved_path: "", exists: false, readable: false };
         }
       });
@@ -101,8 +102,8 @@ async function checkAllAccess() {
 async function openSettings() {
   try {
     await invoke("open_full_disk_access_settings");
-  } catch (_) {
-    // fallback
+  } catch (e) {
+    console.warn('[settings] open system settings failed:', e);
   }
 }
 
@@ -124,7 +125,8 @@ async function toggleArea(area: ScanArea) {
         area.enabled = false;
         deniedMessage.value = `Access to ${area.label} was denied. To change this, open System Settings > Privacy & Security > Files and Folders, find Negativ_, and enable access.`;
       }
-    } catch (_) {
+    } catch (e) {
+      console.warn('[settings] request path access failed:', e);
       area.enabled = false;
     }
   } else {

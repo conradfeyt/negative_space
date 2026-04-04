@@ -112,22 +112,27 @@ async function compressQueue() {
     const item = items[i];
     compressProgress.value = { current: i + 1, total: items.length, name: item.name };
 
-    if (item.isDirectory) {
-      const result = await compressDirectoryToVault(item.path);
-      if (result.success || result.files_compressed > 0) {
-        totalSavings += result.total_savings;
-        compressed++;
-        queue.value = queue.value.filter(q => q.path !== item.path);
+    try {
+      if (item.isDirectory) {
+        const result = await compressDirectoryToVault(item.path);
+        if (result.success || result.files_compressed > 0) {
+          totalSavings += result.total_savings;
+          compressed++;
+          queue.value = queue.value.filter(q => q.path !== item.path);
+        }
+        if (result.errors.length) errors.push(...result.errors);
+      } else {
+        const result = await compressToVault([item.path]);
+        if (result.success || result.files_compressed > 0) {
+          totalSavings += result.total_savings;
+          compressed++;
+          queue.value = queue.value.filter(q => q.path !== item.path);
+        }
+        if (result.errors.length) errors.push(...result.errors);
       }
-      if (result.errors.length) errors.push(...result.errors);
-    } else {
-      const result = await compressToVault([item.path]);
-      if (result.success || result.files_compressed > 0) {
-        totalSavings += result.total_savings;
-        compressed++;
-        queue.value = queue.value.filter(q => q.path !== item.path);
-      }
-      if (result.errors.length) errors.push(...result.errors);
+    } catch (e) {
+      console.warn('[vault] compress failed for', item.path, e);
+      errors.push(`${item.name}: ${String(e)}`);
     }
   }
 

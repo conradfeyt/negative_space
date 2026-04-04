@@ -223,7 +223,7 @@ export async function restoreAllCaches() {
     if (caches.length > 0) {
       await loadDiskMapCache(caches[0].id);
     }
-  } catch (_) { /* non-critical */ }
+  } catch (e) { console.warn('[disk-map] cache restore failed:', e); }
 }
 
 // ---------------------------------------------------------------------------
@@ -418,8 +418,8 @@ export async function loadDiskUsage() {
   try {
     diskUsage.value = await invoke<DiskUsage>("get_disk_usage");
     void saveCache("disk-usage", diskUsage.value);
-  } catch (_) {
-    // non-critical
+  } catch (e) {
+    console.warn('[disk-usage] load failed:', e);
   } finally {
     diskUsageLoading.value = false;
   }
@@ -634,7 +634,8 @@ export async function loadTrashInfo() {
 export async function checkFullDiskAccess() {
   try {
     hasFullDiskAccess.value = await invoke<boolean>("check_full_disk_access");
-  } catch (_) {
+  } catch (e) {
+    console.warn('[fda] check failed:', e);
     hasFullDiskAccess.value = false;
   }
 }
@@ -689,8 +690,8 @@ export async function scanAll() {
     scanAllDone.value = true;
     scanAllStep.value = "";
     lastScanTime.value = Date.now();
-  } catch (_) {
-    // errors captured per-scan
+  } catch (e) {
+    console.warn('[scanAll] unexpected error:', e);
   } finally {
     scanAllRunning.value = false;
     scanAllStep.value = "";
@@ -859,7 +860,7 @@ export async function loadDiskMap() {
     diskMapLoaded.value = true;
 
     // Auto-save scan result to cache (fire-and-forget).
-    saveDiskMapCache().catch(() => {});
+    saveDiskMapCache().catch(e => console.warn('[disk-map] cache save failed:', e));
   } catch (e) {
     diskMapError.value = String(e);
   } finally {
@@ -892,7 +893,8 @@ export async function saveDiskMapCache(): Promise<string | null> {
     // Refresh the cache list so the UI shows the new entry.
     await listDiskMapCaches();
     return id;
-  } catch (_) {
+  } catch (e) {
+    console.warn('[disk-map] cache save failed:', e);
     return null;
   }
 }
@@ -902,7 +904,8 @@ export async function listDiskMapCaches(): Promise<CacheMetadata[]> {
   try {
     diskMapCaches.value = await invoke<CacheMetadata[]>("list_disk_map_caches");
     return diskMapCaches.value;
-  } catch (_) {
+  } catch (e) {
+    console.warn('[disk-map] list caches failed:', e);
     diskMapCaches.value = [];
     return [];
   }
@@ -936,7 +939,8 @@ export async function deleteDiskMapCache(id: string): Promise<boolean> {
     }
     await listDiskMapCaches();
     return true;
-  } catch (_) {
+  } catch (e) {
+    console.warn('[disk-map] delete cache failed:', e);
     return false;
   }
 }
@@ -947,7 +951,8 @@ export async function loadMostRecentCache(): Promise<boolean> {
     const caches = await listDiskMapCaches();
     if (caches.length === 0) return false;
     return await loadDiskMapCache(caches[0].id);
-  } catch (_) {
+  } catch (e) {
+    console.warn('[disk-map] load most recent cache failed:', e);
     return false;
   }
 }
@@ -997,8 +1002,8 @@ export async function enrichDiskNodes(batchSize = 50): Promise<void> {
         }
       }
       patchNode(diskMapResult.value!.root);
-    } catch (_) {
-      // Non-critical — enrichment is best-effort.
+    } catch (e) {
+      console.warn('[disk-map] recency enrichment failed:', e);
     }
   }
 }

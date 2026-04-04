@@ -168,7 +168,7 @@ async function deleteSelected() {
       successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
       largeFiles.value = largeFiles.value.filter((f) => !selected.value.has(f.path));
       // Update the on-disk cache so deleted files don't reappear on next launch
-      invoke("save_scan_cache", { domain: "large-files", data: JSON.stringify(largeFiles.value) }).catch(() => {});
+      invoke("save_scan_cache", { domain: "large-files", data: JSON.stringify(largeFiles.value) }).catch(e => console.warn('[large-files] cache save failed:', e));
       selected.value = new Set();
     }
     if (result.errors.length > 0) {
@@ -242,7 +242,7 @@ function getFileIcon(name: string): string {
 const nativeFolderIcon = ref("");
 invoke<string>("render_sf_symbol", { name: "public.folder", size: 32, mode: "uttype", style: "plain" })
   .then(b64 => { if (b64) nativeFolderIcon.value = b64; })
-  .catch(() => {});
+  .catch(e => console.warn('[large-files] folder icon load failed:', e));
 
 // Preload common extensions on mount
 const commonExts = ["png", "jpg", "log", "dmg", "qcow2", "jar", "a", "rlib", "so", "dylib", "img", "raw", "db", "f3d", "zip", "zst", "bin", "dill", "fst", "dat", "pack", "idx"];
@@ -251,7 +251,7 @@ for (const ext of commonExts) loadFileIcon(ext);
 // Load vault manifest for name resolution
 invoke<any[]>("get_vault_entries").then((entries) => {
   vaultEntries.value = entries;
-}).catch(() => {});
+}).catch(e => console.warn('[large-files] vault entries load failed:', e));
 
 function toggleSelect(path: string) {
   if (isLocked(path)) return;
