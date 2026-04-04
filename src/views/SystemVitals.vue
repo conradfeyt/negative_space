@@ -27,7 +27,7 @@ import {
   diskUsage,
   loadDiskUsage,
 } from "../stores/scanStore";
-import { formatSize } from "../utils";
+import { formatSize, tempToColor } from "../utils";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -132,13 +132,6 @@ interface ThermalBar {
   color: string;
 }
 
-function tempToColor(t: number): string {
-  if (t >= 95) return "hsla(0, 50%, 48%, 0.85)";
-  if (t >= 80) return "hsla(25, 55%, 45%, 0.85)";
-  if (t >= 65) return "hsla(40, 55%, 45%, 0.85)";
-  if (t >= 45) return "hsla(160, 35%, 42%, 0.85)";
-  return "hsla(195, 35%, 42%, 0.85)";
-}
 
 const thermalBars = computed<ThermalBar[]>(() => {
   if (!thermalResult.value) return [];

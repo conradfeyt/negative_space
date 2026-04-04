@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize, fileDiskSize } from "../utils";
+import { formatSize, fileDiskSize, tempToColor } from "../utils";
 import {
   diskUsage,
   scanAllRunning,
@@ -177,13 +177,6 @@ const thermalBarCategories = [
   { id: "storage", short: "SSD" }, { id: "battery", short: "BAT" },
 ] as const;
 
-function tempToColor(t: number): string {
-  if (t >= 95) return "hsla(0, 50%, 48%, 0.85)";
-  if (t >= 80) return "hsla(25, 55%, 45%, 0.85)";
-  if (t >= 65) return "hsla(40, 55%, 45%, 0.85)";
-  if (t >= 45) return "hsla(160, 35%, 42%, 0.85)";
-  return "hsla(195, 35%, 42%, 0.85)";
-}
 
 const thermalBars = computed(() => {
   if (!thermalResult.value) return [];

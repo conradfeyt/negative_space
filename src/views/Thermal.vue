@@ -15,6 +15,7 @@
  * Refreshes every 5 seconds for a live feel.
  */
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
+import { tempToColor } from "../utils";
 import {
   thermalResult,
   thermalScanning,
@@ -125,12 +126,7 @@ const sensorsByCategory = computed(() => {
 });
 
 // Color for a temperature value
-function tempColor(temp: number): string {
-  if (temp >= 95) return "hsla(0, 45%, 42%, 0.85)";
-  if (temp >= 80) return "hsla(25, 50%, 38%, 0.85)";
-  if (temp >= 65) return "hsla(40, 50%, 40%, 0.85)";
-  return "hsla(195, 35%, 38%, 0.85)";
-}
+const tempColor = tempToColor;
 
 // Color for a fan percentage
 function fanColor(pct: number): string {
