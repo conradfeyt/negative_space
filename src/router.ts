@@ -21,6 +21,9 @@ import IconTest from "./views/IconTest.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition || { top: 0 };
+  },
   routes: [
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", name: "dashboard", component: Dashboard },
