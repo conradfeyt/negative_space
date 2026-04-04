@@ -1,11 +1,5 @@
 // lib.rs — Main Tauri application setup and command handlers for Negative _.
-//
-// RUST CONCEPT: `lib.rs` is the root of a *library* crate. Our `main.rs` calls
-// `negative_space_lib::run()` to start the app. The `#[tauri::command]` attribute
-// turns regular functions into handlers the Vue frontend can call via `invoke()`.
 
-// RUST CONCEPT: `mod commands;` tells the compiler to include `commands.rs`
-// as a child module. We can then refer to its types as `commands::DiskUsage`, etc.
 mod commands;
 
 // The security module handles scanning for potential security issues:
@@ -77,9 +71,6 @@ use std::fs;
 use std::path::Path;
 
 
-// RUST CONCEPT: `use ... as _` imports a trait so its methods are available on
-// types that implement it, without bringing the trait name itself into scope.
-// We need `MetadataExt` for the `.blocks()` method on file metadata (macOS/Unix).
 use std::os::unix::fs::MetadataExt;
 
 // ---------------------------------------------------------------------------
@@ -87,13 +78,6 @@ use std::os::unix::fs::MetadataExt;
 // ---------------------------------------------------------------------------
 
 /// Query disk usage for the root volume (`/`) via `df -k`.
-///
-/// RUST CONCEPT: `#[tauri::command]` is a procedural macro that generates the
-/// glue code Tauri needs to call this function from JavaScript. The return type
-/// must implement `serde::Serialize` so it can be sent as JSON to the frontend.
-///
-/// The `Result<T, String>` return type lets us propagate errors to JS as rejected
-/// promises instead of panicking the whole app.
 // NOTE ON ASYNC: All commands are `async` so Tauri runs them on a background
 // thread pool instead of the main thread. This prevents the spinning beach
 // ball — the main thread stays free to handle UI events while scans run.
@@ -107,10 +91,6 @@ async fn get_disk_usage() -> Result<DiskUsage, String> {
         .args(["-k", "/System/Volumes/Data"])
         .output()
         .map_err(|e| format!("Failed to run df: {}", e))?;
-    // RUST CONCEPT: `.map_err(...)? ` converts the error type and then the `?`
-    // operator returns early if it's an `Err`. This is Rust's way of propagating
-    // errors without exceptions.
-
     if !output.status.success() {
         return Err("df command failed".to_string());
     }
@@ -124,9 +104,6 @@ async fn get_disk_usage() -> Result<DiskUsage, String> {
         return Err("Unexpected df output".to_string());
     }
 
-    // RUST CONCEPT: `split_whitespace()` yields an iterator of string slices
-    // that we collect into a Vec. This handles any amount of whitespace between
-    // columns.
     let parts: Vec<&str> = lines[1].split_whitespace().collect();
     if parts.len() < 4 {
         return Err("Could not parse df output".to_string());
@@ -355,12 +332,6 @@ async fn scan_large_files(
 /// - `"large-file-done"` — emitted once when the entire scan finishes.
 ///   Payload: `LargeFileScanDone { total_files, skipped_paths }`.
 ///
-/// RUST CONCEPT: `app: tauri::AppHandle` is a special parameter that Tauri
-/// injects automatically — it's not passed from the frontend. It gives us
-/// access to the event emitter so we can push data to the webview mid-scan.
-///
-/// RUST CONCEPT: `tauri::Emitter` is a trait that provides the `.emit()` method.
-/// We import it with `use tauri::Emitter;` inside the function.
 #[tauri::command]
 async fn scan_large_files_stream(
     app: tauri::AppHandle,
@@ -369,8 +340,6 @@ async fn scan_large_files_stream(
     skip_paths: Option<Vec<String>>,
     has_fda: Option<bool>,
 ) -> Result<(), String> {
-    // RUST CONCEPT: Importing a trait inside the function keeps the import
-    // scoped to just where we need it, avoiding global namespace pollution.
     use tauri::Emitter;
 
     let home = commands::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
@@ -531,8 +500,6 @@ async fn scan_large_files_stream(
                 continue;
             }
 
-            // RUST CONCEPT: `.blocks()` comes from `MetadataExt` (Unix-specific).
-            // It returns the number of 512-byte blocks the file physically occupies.
             let actual_size = metadata.blocks() * 512;
             let is_sparse = (actual_size as f64) < (apparent_size as f64 * 0.8);
 
@@ -694,9 +661,6 @@ async fn scan_logs(has_fda: Option<bool>) -> Result<Vec<LogEntry>, String> {
             let path = entry.path();
 
             // Only include regular files ending in `.log`.
-            // RUST CONCEPT: `path.extension()` returns `Option<&OsStr>`.
-            // We convert to a string slice with `and_then(|ext| ext.to_str())`
-            // and then check equality.
             let is_log = path
                 .extension()
                 .and_then(|ext| ext.to_str())
@@ -755,8 +719,6 @@ async fn is_docker_installed() -> bool {
 /// Check if Docker is installed and, if so, gather image/disk info.
 #[tauri::command]
 async fn get_docker_info() -> Result<DockerInfo, String> {
-    // RUST CONCEPT: Helper closure to create a "not installed" response so we
-    // don't repeat ourselves. Closures in Rust look like `|args| body`.
     // 1. Check if docker is installed by looking in common locations.
     // Tauri apps launched from the dock may have a minimal PATH that
     // doesn't include /usr/local/bin or /opt/homebrew/bin.
@@ -974,9 +936,7 @@ async fn scan_apps(has_fda: Option<bool>) -> Result<Vec<AppInfo>, String> {
 
 /// Run `du -sk <path>` and return the result in bytes.
 ///
-/// RUST CONCEPT: We shell out to `du` instead of using `walkdir` because `du`
-/// does a stat-based calculation that avoids triggering TCC (Transparency,
-/// Consent, and Control) prompts for protected directories.
+/// Uses `du` subprocess to avoid triggering TCC prompts for protected directories.
 fn get_du_size(path: &str) -> u64 {
     let output = std::process::Command::new("du")
         .args(["-sk", path])
@@ -1394,9 +1354,6 @@ async fn get_trash_info() -> Result<TrashInfo, String> {
 // ---------------------------------------------------------------------------
 
 /// Delete a list of files and/or directories. Returns a summary of what happened.
-///
-/// RUST CONCEPT: The parameter `paths: Vec<String>` is automatically deserialized
-/// from the JSON array the frontend sends via `invoke("delete_files", { paths: [...] })`.
 #[tauri::command]
 async fn delete_files(paths: Vec<String>) -> CleanResult {
     let mut freed_bytes: u64 = 0;
@@ -1415,8 +1372,6 @@ async fn delete_files(paths: Vec<String>) -> CleanResult {
             continue;
         }
 
-        // RUST CONCEPT: `if path.is_dir()` ... `else` determines whether to
-        // use `remove_dir_all` (recursive) or `remove_file`.
         let result = if path.is_dir() {
             fs::remove_dir_all(path)
         } else {
@@ -1612,8 +1567,6 @@ async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanResult 
 
     // Use AppleScript to move the .app to Trash. This is the macOS-native way
     // and shows the expected "moved to Trash" behaviour.
-    // RUST CONCEPT: `format!` builds a string at runtime, substituting `{}`
-    // placeholders with variables — like JavaScript template literals.
     let script = format!(
         "tell application \"Finder\" to delete POSIX file \"{}\"",
         app_path
@@ -2176,8 +2129,7 @@ async fn enrich_disk_nodes(paths: Vec<String>) -> Result<std::collections::HashM
 
     for path in &paths {
         // `stat -f %m <path>` returns the modification time as a Unix timestamp.
-        // RUST CONCEPT: We use a subprocess here (not std::fs::metadata) to stay
-        // TCC-safe — subprocess stat doesn't trigger permission dialogs.
+        // Use subprocess stat (not std::fs::metadata) to stay TCC-safe.
         let output = std::process::Command::new("stat")
             .args(["-f", "%m", path.as_str()])
             .output();
@@ -2244,8 +2196,6 @@ async fn list_disk_map_caches() -> Result<Vec<commands::CacheMetadata>, String> 
     let cache_dir = get_cache_dir()?;
     let mut entries: Vec<commands::CacheMetadata> = Vec::new();
 
-    // RUST CONCEPT: `std::fs::read_dir` returns an iterator of Result<DirEntry>.
-    // We use `filter_map(|e| e.ok())` to skip any entries that fail to read.
     let dir = std::fs::read_dir(&cache_dir)
         .map_err(|e| format!("Failed to read cache directory: {}", e))?;
 
@@ -2351,8 +2301,6 @@ async fn import_disk_map(path: String) -> Result<String, String> {
 ///
 /// Path: `~/Library/Application Support/NegativeSpace/cache/`
 ///
-/// RUST CONCEPT: `?` operator propagates errors up. If `create_dir_all` fails,
-/// the function returns early with the Err variant.
 fn get_cache_dir() -> Result<String, String> {
     let home = commands::home_dir()
         .ok_or_else(|| "Could not determine home directory".to_string())?;
@@ -2671,22 +2619,12 @@ async fn list_system_images() -> Vec<String> {
 // Tauri app entry point
 // ---------------------------------------------------------------------------
 
-/// RUST CONCEPT: `#[cfg_attr(mobile, tauri::mobile_entry_point)]` is a
-/// conditional attribute — on mobile builds it adds the mobile entry point
-/// annotation; on desktop builds it does nothing.
-///
-/// `pub fn run()` is the function `main.rs` calls. It configures the Tauri
-/// runtime, registers all our command handlers with `invoke_handler`, and starts
-/// the event loop.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // The opener plugin lets the frontend open URLs / files with the OS.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        // RUST CONCEPT: `.setup()` takes a closure that runs once after the
-        // window is created but before the event loop starts. This is the
-        // right place to apply native effects that need a live window handle.
         .setup(|app| {
             use tauri::Manager;
             let window = app
@@ -2721,9 +2659,6 @@ pub fn run() {
 
             Ok(())
         })
-        // RUST CONCEPT: `generate_handler!` is a macro that builds the dispatch
-        // table mapping command names (strings) to the Rust functions above.
-        // Every `#[tauri::command]` function must be listed here.
         .invoke_handler(tauri::generate_handler![
             get_disk_usage,
             scan_large_files,

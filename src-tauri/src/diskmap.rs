@@ -3,8 +3,6 @@
 // Builds a tree of directory sizes for the treemap visualization.
 // Each node represents a directory with its total size and top children.
 //
-// RUST CONCEPT: This is a module — declared in lib.rs with `mod diskmap;`.
-//
 // TCC CONSIDERATIONS:
 //   We use `du -sk` (subprocess) for sizing individual directories. This is
 //   TCC-safe — it returns 0 or errors silently on protected directories

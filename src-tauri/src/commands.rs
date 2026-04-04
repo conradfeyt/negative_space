@@ -1,22 +1,10 @@
 // commands.rs — Data structures and utility functions for Negative _.
-//
-// RUST CONCEPT: This file is a "module". We declare it in lib.rs with `mod commands;`
-// so the compiler includes it as part of our crate. Everything marked `pub` here
-// is accessible from lib.rs via `commands::SomeType`.
 
-// RUST CONCEPT: `use` brings items from other crates/modules into scope so we
-// don't have to type the full path every time.
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // Data structures
 // ---------------------------------------------------------------------------
-// RUST CONCEPT: `#[derive(...)]` auto-generates trait implementations.
-//   - Serialize / Deserialize: lets serde convert these to/from JSON.
-//     Tauri uses this to send data to the Vue frontend.
-//   - Clone: lets us duplicate values with `.clone()`.
-//   - Debug: lets us print the struct with `{:?}` in format strings (handy for logging).
-
 /// Disk usage statistics for the root volume.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DiskUsage {
@@ -160,10 +148,6 @@ pub struct LargeFileScanResult {
 // ---------------------------------------------------------------------------
 // Streaming large-file scan event payloads
 // ---------------------------------------------------------------------------
-// RUST CONCEPT: These structs are the event payloads that the streaming scan
-// emits to the frontend via Tauri's `app.emit()`. Each event name maps to one
-// of these types, and the frontend listens with `listen("event-name", cb)`.
-
 /// Emitted each time a large file is discovered during a streaming scan.
 /// The frontend appends it to the reactive list immediately so the user
 /// sees files appear in real time.
@@ -229,9 +213,6 @@ pub struct CacheMetadata {
 
 /// Convert a byte count into a human-readable string (B, KB, MB, GB, TB).
 ///
-/// RUST CONCEPT: This is a plain function. `pub` makes it visible outside this
-/// module. The return type `String` is a heap-allocated, growable UTF-8 string.
-///
 /// # Examples
 /// ```ignore
 /// assert_eq!(format_size(0), "0 B");
@@ -239,8 +220,6 @@ pub struct CacheMetadata {
 /// ```
 #[allow(dead_code)] // Utility exposed for future use by other modules.
 pub fn format_size(bytes: u64) -> String {
-    // RUST CONCEPT: `as f64` casts the integer to a 64-bit float so we can
-    // do floating-point math.
     let bytes_f = bytes as f64;
 
     // We define the unit thresholds as constants.
@@ -249,7 +228,6 @@ pub fn format_size(bytes: u64) -> String {
     const GB: f64 = MB * 1024.0;
     const TB: f64 = GB * 1024.0;
 
-    // RUST CONCEPT: `if / else if` is an expression in Rust — it returns a value.
     if bytes_f >= TB {
         format!("{:.2} TB", bytes_f / TB)
     } else if bytes_f >= GB {
@@ -264,10 +242,6 @@ pub fn format_size(bytes: u64) -> String {
 }
 
 /// Get the current user's home directory as a `String`.
-///
-/// RUST CONCEPT: `Option<String>` means the function may return `Some(path)` or
-/// `None`. We use `std::env::var` which returns a `Result`; `.ok()` converts
-/// that to an `Option`, discarding the error variant.
 pub fn home_dir() -> Option<String> {
     std::env::var("HOME").ok()
 }
@@ -277,8 +251,6 @@ pub fn home_dir() -> Option<String> {
 ///
 /// Returns `(total_bytes, file_count)`.
 pub fn dir_size(path: &str) -> (u64, u64) {
-    // RUST CONCEPT: `walkdir::WalkDir` is an iterator that lazily yields
-    // directory entries. We chain `.into_iter()` so we can call `.filter_map()`.
     let mut total: u64 = 0;
     let mut count: u64 = 0;
 
@@ -288,8 +260,6 @@ pub fn dir_size(path: &str) -> (u64, u64) {
         // (e.g. permission denied).
         .filter_map(|e| e.ok())
     {
-        // RUST CONCEPT: `.metadata()` returns a `Result`. The `if let Ok(m)`
-        // pattern only enters the block when metadata was successfully read.
         if let Ok(m) = entry.metadata() {
             if m.is_file() {
                 total += m.len();
@@ -303,16 +273,11 @@ pub fn dir_size(path: &str) -> (u64, u64) {
 
 /// Try to format a `SystemTime` as a human-readable "YYYY-MM-DD HH:MM:SS" string.
 /// Falls back to "unknown" on error.
-///
-/// RUST CONCEPT: `std::time::SystemTime` doesn't have built-in formatting, so we
-/// convert through `UNIX_EPOCH` to get a timestamp and do basic math. This avoids
-/// pulling in the `chrono` crate.
 pub fn format_system_time(time: std::time::SystemTime) -> String {
     match time.duration_since(std::time::UNIX_EPOCH) {
         Ok(dur) => {
             let secs = dur.as_secs();
             // We shell out to `date` for reliable local-time formatting.
-            // RUST CONCEPT: `std::process::Command` spawns a child process.
             let output = std::process::Command::new("date")
                 .args(["-r", &secs.to_string(), "+%Y-%m-%d %H:%M:%S"])
                 .output();
@@ -333,8 +298,6 @@ pub fn format_system_time(time: std::time::SystemTime) -> String {
 // ---------------------------------------------------------------------------
 // Tests (optional but good practice)
 // ---------------------------------------------------------------------------
-// RUST CONCEPT: `#[cfg(test)]` means this module is only compiled when running
-// `cargo test`, not in production builds.
 #[cfg(test)]
 mod tests {
     use super::*;

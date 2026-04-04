@@ -5,8 +5,6 @@
 // Activity Monitor showing 20+ separate Chrome helper processes or
 // cryptic names like "mds_stores" without explanation.
 //
-// RUST CONCEPT: This is a module — declared in lib.rs with `mod memory;`.
-//
 // DATA SOURCE:
 //   We use `ps -eo pid,ppid,rss,%mem,comm` to get all processes with their
 //   parent-child relationships and memory usage. RSS (Resident Set Size) is

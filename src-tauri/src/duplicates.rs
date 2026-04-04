@@ -10,9 +10,6 @@
 //   - Stage 2 eliminates ~95% of the remainder (same size, different headers)
 //   - Stage 3 confirms the actual duplicates
 //
-// RUST CONCEPT: This is a module — declared in lib.rs with `mod duplicates;`.
-// All public items are accessible from lib.rs via `duplicates::SomeType`.
-//
 // TCC CONSIDERATIONS:
 //   Same approach as large file scanning — without FDA, we only walk known-safe
 //   directories. With FDA, we can walk from ~ freely. All directory walking uses
@@ -221,9 +218,6 @@ pub fn run_duplicate_scan(
     // -----------------------------------------------------------------------
     // Stage 0: Collect all file paths + sizes via walkdir
     // -----------------------------------------------------------------------
-    // RUST CONCEPT: We collect into a Vec of (path, size, metadata) tuples.
-    // walkdir gives us metadata for free (it stat()s each entry already).
-
     let mut all_files: Vec<(String, u64, String)> = Vec::new(); // (path, size, modified)
 
     for root in &scan_roots {
@@ -287,9 +281,6 @@ pub fn run_duplicate_scan(
     // -----------------------------------------------------------------------
     // Stage 1: Group by file size
     // -----------------------------------------------------------------------
-    // RUST CONCEPT: HashMap<u64, Vec<...>> groups files by their size.
-    // Only groups with 2+ files can contain duplicates.
-
     let mut size_groups: HashMap<u64, Vec<(String, String)>> = HashMap::new();
     for (path, size, modified) in &all_files {
         size_groups
@@ -450,9 +441,6 @@ pub fn run_duplicate_scan(
 
 /// Compute a BLAKE3 hash of the first PARTIAL_HASH_BYTES of a file.
 /// Returns None if the file can't be opened or read.
-///
-/// RUST CONCEPT: `Option<String>` — returns Some(hex_hash) on success, None on failure.
-/// We don't propagate errors here; a file we can't read is simply skipped.
 fn partial_hash(path: &str) -> Option<String> {
     let mut file = File::open(path).ok()?;
     let mut buf = vec![0u8; PARTIAL_HASH_BYTES];

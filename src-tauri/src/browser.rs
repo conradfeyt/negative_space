@@ -4,10 +4,6 @@
 // Opera, Vivaldi, Chromium) and enumerates their cache, cookies, history,
 // sessions, and other cleanable data.
 //
-// RUST CONCEPT: This file is a "module" — we declare it in lib.rs with
-// `mod browser;` and then call its functions from our Tauri command handlers.
-// Everything marked `pub` here is accessible from lib.rs via `browser::SomeType`.
-//
 // TCC CONSIDERATIONS:
 //   - Safari data lives under ~/Library/Safari/ and ~/Library/Cookies/ — both
 //     are TCC-protected. Without Full Disk Access, we CANNOT enumerate or size

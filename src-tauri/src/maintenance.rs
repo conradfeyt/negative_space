@@ -8,9 +8,6 @@
 //   - Clear font caches
 //   - Flush memory (purge inactive memory pages)
 //
-// RUST CONCEPT: This is a module — declared in lib.rs with `mod maintenance;`.
-// All public items are accessible from lib.rs via `maintenance::SomeType`.
-//
 // IMPORTANT: Several of these operations require administrator (root) privileges.
 // We use `osascript` with `do shell script ... with administrator privileges`
 // to prompt the user for their password via macOS's native authentication dialog.
@@ -244,8 +241,6 @@ pub fn run_task(task_id: &str) -> MaintenanceResult {
 /// This triggers macOS's native password dialog. If the user cancels,
 /// we get an error back from osascript (exit code 1 with "User canceled").
 ///
-/// RUST CONCEPT: The `format!` macro builds the AppleScript command string.
-/// We escape single quotes in the shell command to prevent injection.
 fn run_admin_command(shell_cmd: &str) -> Result<String, String> {
     // Escape single quotes for AppleScript string embedding.
     // AppleScript uses '' (two single quotes) to escape a single quote inside

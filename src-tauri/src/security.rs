@@ -5,10 +5,6 @@
 //   - App Trust: whether installed apps are properly code-signed and notarized
 //   - Shell Init Files: suspicious lines in ~/.zshrc, ~/.bashrc, etc.
 //
-// RUST CONCEPT: This file is a "module" — we declare it in lib.rs with
-// `mod security;` and then call its functions from our Tauri command handlers.
-// Everything marked `pub` here is accessible from lib.rs via `security::SomeType`.
-//
 // IMPORTANT (TCC): For paths that may be TCC-protected, we use subprocesses
 // (`test`, `cat`, `codesign`, etc.) instead of in-process filesystem calls.
 // This avoids blocking modal permission dialogs in the app UI thread.
@@ -21,17 +17,7 @@ use crate::commands;
 // ---------------------------------------------------------------------------
 // Data structures
 // ---------------------------------------------------------------------------
-// RUST CONCEPT: `#[derive(...)]` auto-generates trait implementations.
-//   - Serialize / Deserialize: lets serde convert these to/from JSON.
-//     Tauri uses this to send data to the Vue frontend.
-//   - Clone: lets us duplicate values with `.clone()`.
-//   - Debug: lets us print the struct with `{:?}` in format strings.
-
 /// Severity levels for security findings, from most to least critical.
-///
-/// RUST CONCEPT: `enum` in Rust is more powerful than in most languages —
-/// each variant can hold data (though here they don't). Deriving Serialize
-/// means the variant name becomes a JSON string like "Malicious".
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Severity {
     /// Known malware or clear malicious intent
@@ -161,9 +147,6 @@ pub struct SecuritySummary {
 // ---------------------------------------------------------------------------
 
 /// Generate a unique finding ID from a category prefix and a counter.
-///
-/// RUST CONCEPT: `format!` is like JavaScript template literals — it builds
-/// a new String by substituting `{}` placeholders with the arguments.
 fn make_finding_id(prefix: &str, counter: &mut u32) -> String {
     *counter += 1;
     format!("{}-{:03}", prefix, counter)
@@ -171,10 +154,6 @@ fn make_finding_id(prefix: &str, counter: &mut u32) -> String {
 
 /// Run a subprocess and return its stdout as a trimmed String.
 /// Returns an empty string if the command fails.
-///
-/// RUST CONCEPT: This is a helper that wraps `std::process::Command`.
-/// We use `String::from_utf8_lossy` because subprocess output may contain
-/// invalid UTF-8 — lossy conversion replaces bad bytes with '�'.
 fn run_cmd(program: &str, args: &[&str]) -> String {
     match std::process::Command::new(program).args(args).output() {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
@@ -220,8 +199,6 @@ fn compute_summary(findings: &[&SecurityFinding]) -> SecuritySummary {
     };
 
     for f in findings {
-        // RUST CONCEPT: `match` is like a switch statement but exhaustive —
-        // the compiler ensures we handle every variant of the enum.
         match f.severity {
             Severity::Malicious => summary.malicious += 1,
             Severity::LikelyUnwanted => summary.likely_unwanted += 1,
@@ -254,8 +231,6 @@ pub fn scan_launch_items() -> Vec<LaunchItem> {
     let mut items: Vec<LaunchItem> = Vec::new();
     let mut finding_counter: u32 = 0;
 
-    // RUST CONCEPT: A slice of tuples — each tuple is (directory_path, location_label).
-    // We iterate over all three launch item directories.
     let dirs: Vec<(String, &str)> = vec![
         (format!("{}/Library/LaunchAgents", home), "user_agents"),
         ("/Library/LaunchAgents".to_string(), "system_agents"),
@@ -269,7 +244,6 @@ pub fn scan_launch_items() -> Vec<LaunchItem> {
         }
 
         // List plist files in the directory using `ls`.
-        // RUST CONCEPT: We collect the output into a String, then split by lines.
         let listing = run_cmd("ls", &[dir]);
         if listing.is_empty() {
             continue;
@@ -445,8 +419,6 @@ pub fn scan_launch_items() -> Vec<LaunchItem> {
 /// from identified developers, or were downloaded from the internet without
 /// Apple's notarization check.
 ///
-/// RUST CONCEPT: `&[String]` is a "slice" — a borrowed view into a Vec or array.
-/// This is more flexible than `&Vec<String>` because it also accepts arrays.
 pub fn scan_app_trust(apps: &[String]) -> Vec<AppTrustInfo> {
     let mut results: Vec<AppTrustInfo> = Vec::new();
     let mut finding_counter: u32 = 0;
@@ -602,8 +574,6 @@ pub fn scan_shell_inits() -> Vec<ShellInitFinding> {
     let mut results: Vec<ShellInitFinding> = Vec::new();
     let mut finding_counter: u32 = 0;
 
-    // RUST CONCEPT: A Vec of string slices (`&str`) — these are the shell init
-    // files we'll check. They're relative to the home directory.
     let init_files = vec![
         ".zshrc",
         ".bashrc",
@@ -630,8 +600,6 @@ pub fn scan_shell_inits() -> Vec<ShellInitFinding> {
         }
 
         // Check each line for suspicious patterns.
-        // RUST CONCEPT: `.enumerate()` gives us `(index, value)` tuples,
-        // so we can track line numbers.
         for (line_idx, line) in content.lines().enumerate() {
             let line_number = (line_idx + 1) as u32; // 1-based line numbers
             let trimmed = line.trim();
@@ -810,8 +778,6 @@ pub fn scan_shell_inits() -> Vec<ShellInitFinding> {
                     });
                 }
 
-                // RUST CONCEPT: `continue` skips to the next loop iteration.
-                // We don't need to check further patterns for PATH lines.
                 continue;
             }
 
@@ -880,9 +846,6 @@ pub fn run_full_scan() -> SecurityScanResult {
     let shell_findings = scan_shell_inits();
 
     // 4. Compute summary from all findings.
-    // RUST CONCEPT: We collect references to all findings into a single Vec
-    // to pass to compute_summary. The `iter()` + `flat_map()` chain flattens
-    // nested Vecs into a single iterator.
     let all_findings: Vec<&SecurityFinding> = launch_items
         .iter()
         .flat_map(|item| item.findings.iter())
@@ -944,10 +907,7 @@ pub fn remove_launch_item(plist_path: &str) -> Result<(), String> {
         return Err(format!("Plist file not found: {}", plist_path));
     }
 
-    // Delete the plist file.
-    // RUST CONCEPT: `std::fs::remove_file` deletes a single file. We use the
-    // standard library here because plist files in LaunchAgents directories
-    // are NOT TCC-protected — they're owned by the user.
+    // Delete the plist file (LaunchAgent plists are user-owned, not TCC-protected).
     std::fs::remove_file(plist_path)
         .map_err(|e| format!("Failed to delete {}: {}", plist_path, e))?;
 

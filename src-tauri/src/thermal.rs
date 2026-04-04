@@ -304,9 +304,6 @@ pub fn scan_thermal() -> Result<ThermalScanResult, String> {
 
     for key_str in &known_keys {
         // Convert 4-char string to FourCharCode for SMC lookup.
-        // RUST CONCEPT: `Into` trait converts &str → FourCharCode using the
-        // From<&str> impl in the four_char_code crate. The string must be
-        // exactly 4 bytes (ASCII).
         if key_str.len() != 4 {
             continue; // Safety: FourCharCode panics on non-4-byte strings
         }
@@ -378,7 +375,6 @@ pub fn scan_thermal() -> Result<ThermalScanResult, String> {
     let sensor_count = sensors.len() as u32;
 
     // --- Chip model name from sysctl ---
-    // RUST CONCEPT: Command::output() runs the process and captures stdout.
     // We use the absolute path because bundled .app has minimal PATH.
     let chip_name = std::process::Command::new("/usr/sbin/sysctl")
         .args(["-n", "machdep.cpu.brand_string"])
@@ -588,8 +584,6 @@ fn classify_sensor(key: &str) -> (String, String) {
 
 /// Build per-category summaries from the sensor list.
 fn build_summaries(sensors: &[ThermalSensor]) -> Vec<CategorySummary> {
-    // RUST CONCEPT: We use a HashMap to group sensors by category, then
-    // compute avg/max/count for each group.
     let mut groups: std::collections::HashMap<String, Vec<f64>> = std::collections::HashMap::new();
 
     for s in sensors {
