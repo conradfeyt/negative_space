@@ -22,6 +22,9 @@ mod duplicates;
 // Uses `du -sk` subprocess for TCC-safe sizing.
 mod diskmap;
 
+// Shared process name dictionaries used by both memory.rs and vitals.rs.
+mod process_info;
+
 // The memory module analyzes running processes, groups them by application/category,
 // and provides human-readable descriptions for macOS system daemons.
 mod memory;
