@@ -2689,7 +2689,9 @@ pub fn run() {
         // right place to apply native effects that need a live window handle.
         .setup(|app| {
             use tauri::Manager;
-            let window = app.get_webview_window("main").unwrap();
+            let window = app
+                .get_webview_window("main")
+                .expect("main window must exist per tauri.conf.json");
 
             // The sidebar gradient is a standalone background NSWindow that
             // never moves (see gradient.rs). We manage its visibility based
