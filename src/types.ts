@@ -258,6 +258,7 @@ export interface DuplicateGroup {
   size: number;
   files: DuplicateFile[];
   wasted_bytes: number;
+  thumbnail: string | null;
 }
 
 export interface DuplicateScanResult {
@@ -268,6 +269,42 @@ export interface DuplicateScanResult {
   stage1_candidates: number;
   stage2_candidates: number;
   skipped_paths: string[];
+}
+
+// Similar image detection types
+
+export interface SimilarFile {
+  path: string;
+  name: string;
+  size: number;
+  modified: string;
+  parent_dir: string;
+  hash_hex: string;
+  thumbnail: string | null;
+}
+
+export interface SimilarGroup {
+  id: string;
+  representative_idx: number;
+  files: SimilarFile[];
+  avg_distance: number;
+  wasted_bytes: number;
+}
+
+export interface SimilarScanResult {
+  groups: SimilarGroup[];
+  total_similar_files: number;
+  total_wasted_bytes: number;
+  images_scanned: number;
+  images_skipped: number;
+  skipped_paths: string[];
+}
+
+export interface SimilarScanProgress {
+  images_processed: number;
+  total_images: number;
+  current_file: string;
+  phase: string;
 }
 
 // Memory analysis types

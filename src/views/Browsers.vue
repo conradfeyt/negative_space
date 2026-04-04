@@ -14,6 +14,38 @@ import {
 } from "../stores/scanStore";
 import type { BrowserInfo, BrowserDataCategory } from "../types";
 
+// ── Browser app icons via NSWorkspace ─────────────────────────────────
+const browserIcons = ref<Record<string, string>>({});
+
+const BROWSER_APP_PATHS: Record<string, string> = {
+  "chrome": "/Applications/Google Chrome.app",
+  "google_chrome": "/Applications/Google Chrome.app",
+  "edge": "/Applications/Microsoft Edge.app",
+  "microsoft_edge": "/Applications/Microsoft Edge.app",
+  "safari": "/Applications/Safari.app",
+  "firefox": "/Applications/Firefox.app",
+  "brave": "/Applications/Brave Browser.app",
+  "opera": "/Applications/Opera.app",
+  "vivaldi": "/Applications/Vivaldi.app",
+  "arc": "/Applications/Arc.app",
+};
+
+async function loadBrowserIcon(browserId: string) {
+  if (browserIcons.value[browserId] !== undefined) return;
+  browserIcons.value[browserId] = "";
+  const appPath = BROWSER_APP_PATHS[browserId.toLowerCase()];
+  if (!appPath) return;
+  try {
+    const b64 = await invoke<string>("render_sf_symbol", { name: appPath, size: 64, mode: "app", style: "plain" });
+    if (b64) browserIcons.value[browserId] = b64;
+  } catch { /* non-critical */ }
+}
+
+function getBrowserIcon(browserId: string): string {
+  if (browserIcons.value[browserId] === undefined) loadBrowserIcon(browserId);
+  return browserIcons.value[browserId] || "";
+}
+
 // Track which browser panels are expanded
 const expandedBrowsers = ref<Set<string>>(new Set());
 
@@ -304,6 +336,7 @@ function selectAllSafe(browser: BrowserInfo) {
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
+              <img v-if="getBrowserIcon(browser.id)" :src="getBrowserIcon(browser.id)" class="browser-icon" width="44" height="44" />
               <div class="browser-info">
                 <span class="browser-name">{{ browser.name }}</span>
                 <span class="browser-meta text-muted">
@@ -464,6 +497,11 @@ function selectAllSafe(browser: BrowserInfo) {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+}
+
+.browser-icon {
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .browser-info {

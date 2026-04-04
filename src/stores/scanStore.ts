@@ -42,6 +42,8 @@ import type {
   CompressionCandidate,
   CompressResult,
   RestoreResult,
+  SimilarScanResult,
+  SimilarScanProgress,
 } from "../types";
 import { getDisabledPaths } from "../composables/useScanSettings";
 
@@ -159,7 +161,7 @@ export async function restoreAllCaches() {
   const [
     cachedDisk, cachedLargeFiles, cachedCaches, cachedLogs, cachedApps,
     cachedTrash, cachedDocker, cachedSecurity, cachedBrowsers,
-    cachedDuplicates, cachedPackages,
+    cachedDuplicates, cachedPackages, cachedSimilar,
   ] = await Promise.all([
     loadCache<DiskUsage>("disk-usage"),
     loadCache<FileInfo[]>("large-files"),
@@ -172,6 +174,7 @@ export async function restoreAllCaches() {
     loadCache<BrowserScanResult>("browsers"),
     loadCache<DuplicateScanResult>("duplicates"),
     loadCache<PackageScanResult>("packages"),
+    loadCache<SimilarScanResult>("similar-images"),
   ]);
 
   if (cachedDisk) diskUsage.value = cachedDisk;
@@ -211,6 +214,7 @@ export async function restoreAllCaches() {
   }
   if (cachedDuplicates) { duplicateResult.value = cachedDuplicates; duplicateScanned.value = true; }
   if (cachedPackages) { packagesResult.value = cachedPackages; packagesScanned.value = true; }
+  if (cachedSimilar) { similarResult.value = cachedSimilar; similarScanned.value = true; }
 
   // Restore most recent disk map cache (for dashboard waffle chart)
   try {
@@ -288,6 +292,13 @@ export const duplicateResult = ref<DuplicateScanResult | null>(null);
 export const duplicateScanning = ref(false);
 export const duplicateScanned = ref(false);
 export const duplicateError = ref("");
+
+// Similar Images
+export const similarResult = ref<SimilarScanResult | null>(null);
+export const similarScanning = ref(false);
+export const similarScanned = ref(false);
+export const similarError = ref("");
+export const similarProgress = ref<SimilarScanProgress | null>(null);
 
 // Disk Map
 export const diskMapResult = ref<DiskMapResult | null>(null);
@@ -803,6 +814,41 @@ export async function scanDuplicates(path = "~", minSizeMb = 1) {
     duplicateError.value = String(e);
   } finally {
     duplicateScanning.value = false;
+  }
+}
+
+export async function scanSimilarImages(threshold = 10, minSizeMb = 0) {
+  if (similarScanning.value) return;
+  similarScanning.value = true;
+  similarError.value = "";
+  similarResult.value = null;
+  similarScanned.value = false;
+  similarProgress.value = null;
+
+  // Listen for progress events.
+  let unlisten: UnlistenFn | null = null;
+  try {
+    unlisten = await listen<SimilarScanProgress>("similar-scan-progress", (event) => {
+      similarProgress.value = event.payload;
+    });
+
+    similarResult.value = await invoke<SimilarScanResult>(
+      "scan_similar_images",
+      {
+        threshold,
+        minSizeMb,
+        hasFda: hasFullDiskAccess.value === true,
+        skipPaths: getDisabledPaths(),
+      }
+    );
+    similarScanned.value = true;
+    void saveCache("similar-images", similarResult.value);
+  } catch (e) {
+    similarError.value = String(e);
+  } finally {
+    similarScanning.value = false;
+    similarProgress.value = null;
+    if (unlisten) unlisten();
   }
 }
 

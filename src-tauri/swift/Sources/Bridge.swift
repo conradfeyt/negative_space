@@ -87,8 +87,10 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
     case "file":
         image = NSImage(contentsOfFile: params.name)
     case "uttype":
-        // Get icon for a file extension via UTType
+        // Get icon for a file extension or UTType identifier via UTType
         if let ut = UTType(filenameExtension: params.name) {
+            image = NSWorkspace.shared.icon(for: ut)
+        } else if let ut = UTType(params.name) {
             image = NSWorkspace.shared.icon(for: ut)
         }
     case "system":

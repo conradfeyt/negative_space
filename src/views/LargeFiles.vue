@@ -159,6 +159,13 @@ async function exportSelected() {
   }
 }
 
+function protectSelected() {
+  for (const path of selected.value) {
+    toggleProtected(path);
+  }
+  selected.value = new Set();
+}
+
 async function deleteSelected() {
   if (selected.value.size === 0) return;
   deleting.value = true;
@@ -242,6 +249,12 @@ function getFileIcon(name: string): string {
   if (!fileIconCache.value[ext] && ext) loadFileIcon(ext);
   return fileIconCache.value[ext] || "";
 }
+
+// Native macOS folder icon for reveal-in-finder buttons
+const nativeFolderIcon = ref("");
+invoke<string>("render_sf_symbol", { name: "public.folder", size: 32, mode: "uttype", style: "plain" })
+  .then(b64 => { if (b64) nativeFolderIcon.value = b64; })
+  .catch(() => {});
 
 // Preload common extensions on mount
 const commonExts = ["png", "jpg", "log", "dmg", "qcow2", "jar", "a", "rlib", "so", "dylib", "img", "raw", "db", "f3d", "zip", "zst", "bin", "dill", "fst", "dat", "pack", "idx"];
@@ -355,6 +368,29 @@ function parentFolder(path: string): string {
   const lastSlash = display.lastIndexOf("/");
   if (lastSlash <= 0) return display;
   return display.substring(0, lastSlash);
+}
+
+/** Format a timestamp string like "2025-01-14 22:27:26" as a friendly relative time. */
+function timeAgo(modified: string | null): string {
+  if (!modified) return "";
+  const date = new Date(modified.replace(" ", "T"));
+  if (isNaN(date.getTime())) return modified;
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return "a week ago";
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return "a month ago";
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "a year ago" : `${years} years ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -791,6 +827,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
             <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'safety' }" @click="sortMode = 'safety'" v-if="fileClassifications.size > 0">Safety</button>
             <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'type' }" @click="sortMode = 'type'">Type</button>
           </div>
+          <button class="btn-secondary protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Protect
+          </button>
           <button class="btn-secondary export-btn" :disabled="selected.size === 0" @click="exportSelected">Export</button>
           <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="deleteSelected">
             <span v-if="deleting" class="spinner-sm"></span>
@@ -822,21 +862,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
             <span class="vault-badge">Vaulted</span>
             <span class="vault-file-name">{{ vaultDisplayName(file.name) }}</span>
             <span class="vault-file-size mono">{{ formatSize(diskSize(file)) }}</span>
-            <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="isProtected(file.path) ? 'currentColor' : 'currentColor'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-              </svg>
-            </button>
-            <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-              </svg>
-            </button>
             <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                <circle cx="8" cy="9" r="2"/>
-              </svg>
+              <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
             </button>
           </div>
         </div>
@@ -879,14 +906,17 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               v-for="file in group.flatFiles"
               :key="file.path"
               class="file-row"
-              :class="{ 'file-row--selected': selected.has(file.path) }"
+              :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
               @click="toggleSelect(file.path)"
             >
-              <div class="file-row-check">
-                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+              <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <span v-if="isProtected(file.path)" class="icon-shield-badge" title="Click to unprotect" @click.stop="toggleProtected(file.path)">
+                  <svg class="shield-normal" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="#d94b4b" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="#d94b4b" stroke-width="2.5"/></svg>
+                </span>
               </div>
-              <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
-              <div v-else class="file-row-icon-placeholder"></div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
@@ -894,24 +924,19 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 </div>
                 <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :data-tooltip="getClassification(file.path)?.explanation || ''" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
               </div>
-              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
-              <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                </svg>
-              </button>
               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                  <circle cx="8" cy="9" r="2"/>
-                </svg>
+                <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
+              <div class="file-row-check">
+                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+              </div>
             </div>
           </div>
         </template>
@@ -1043,13 +1068,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           v-for="file in collectFiles(d3)"
                                           :key="file.path"
                                           class="file-row file-row--tree"
-                                          :class="{ 'file-row--selected': selected.has(file.path) }"
+                                          :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
                                           @click="toggleSelect(file.path)"
                                         >
                                           <div class="file-row-check">
                                             <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                                           </div>
-                                          <div class="file-row-info">
+                                          <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="file-row-info">
                                             <div class="file-row-name">
                                               <span class="file-name">{{ file.name }}</span>
                                               <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
@@ -1058,20 +1088,12 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           <div class="file-row-size mono">
                                             <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                             <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                                           </div>
                                           <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-                                          <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                                            </svg>
-                                          </button>
                                           <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                              <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                                              <circle cx="8" cy="9" r="2"/>
-                                            </svg>
+                                            <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                                           </button>
                                         </div>
                                       </div>
@@ -1084,13 +1106,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       v-for="file in d2.files"
                                       :key="file.path"
                                       class="file-row file-row--tree"
-                                      :class="{ 'file-row--selected': selected.has(file.path) }"
+                                      :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
                                       @click="toggleSelect(file.path)"
                                     >
                                       <div class="file-row-check">
                                         <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                                       </div>
-                                      <div class="file-row-info">
+                                      <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="file-row-info">
                                         <div class="file-row-name">
                                           <span class="file-name">{{ file.name }}</span>
                                           <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
@@ -1099,20 +1126,12 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       <div class="file-row-size mono">
                                         <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                                       </div>
                                       <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-                                      <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                                        </svg>
-                                      </button>
                                       <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                          <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                                          <circle cx="8" cy="9" r="2"/>
-                                        </svg>
+                                        <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                                       </button>
                                     </div>
                                   </div>
@@ -1127,13 +1146,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               v-for="file in d1.files"
                               :key="file.path"
                               class="file-row file-row--tree"
-                              :class="{ 'file-row--selected': selected.has(file.path) }"
+                              :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
                               @click="toggleSelect(file.path)"
                             >
                               <div class="file-row-check">
                                 <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                               </div>
-                              <div class="file-row-info">
+                              <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="file-row-info">
                                 <div class="file-row-name">
                                   <span class="file-name">{{ file.name }}</span>
                                   <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
@@ -1142,20 +1166,12 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               <div class="file-row-size mono">
                                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                               </div>
                               <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-                              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                                </svg>
-                              </button>
                               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                  <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                                  <circle cx="8" cy="9" r="2"/>
-                                </svg>
+                                <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                               </button>
                             </div>
                           </div>
@@ -1170,13 +1186,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       v-for="file in child.files"
                       :key="file.path"
                       class="file-row file-row--tree"
-                      :class="{ 'file-row--selected': selected.has(file.path) }"
+                      :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
                       @click="toggleSelect(file.path)"
                     >
                       <div class="file-row-check">
                         <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
                       </div>
-                      <div class="file-row-info">
+                      <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="file-row-info">
                         <div class="file-row-name">
                           <span class="file-name">{{ file.name }}</span>
                           <span v-if="isSparse(file)" class="badge badge-warning badge-pill sparse-badge">Sparse</span>
@@ -1185,20 +1206,12 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       <div class="file-row-size mono">
                         <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                       </div>
                       <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-                      <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                        </svg>
-                      </button>
                       <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                          <circle cx="8" cy="9" r="2"/>
-                        </svg>
+                        <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                       </button>
                     </div>
                   </div>
@@ -1213,14 +1226,17 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               v-for="file in group.tree.files"
               :key="file.path"
               class="file-row"
-              :class="{ 'file-row--selected': selected.has(file.path) }"
+              :class="{ 'file-row--selected': selected.has(file.path), 'file-row--protected': isProtected(file.path) }"
               @click="toggleSelect(file.path)"
             >
-              <div class="file-row-check">
-                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+              <div class="file-icon-wrap">
+                <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
+                <div v-else class="file-row-icon-placeholder"></div>
+                <span v-if="isProtected(file.path)" class="icon-shield-badge" title="Click to unprotect" @click.stop="toggleProtected(file.path)">
+                  <svg class="shield-normal" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="#d94b4b" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="#d94b4b" stroke-width="2.5"/></svg>
+                </span>
               </div>
-              <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="file-row-icon" width="32" height="32" />
-              <div v-else class="file-row-icon-placeholder"></div>
               <div class="file-row-info">
                 <div class="file-row-name">
                   <span class="file-name">{{ file.name }}</span>
@@ -1228,24 +1244,19 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 </div>
                 <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :data-tooltip="getClassification(file.path)?.explanation || ''" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
+                <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
               </div>
-              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
-              <span v-else class="safety-pill-placeholder"></span>
-              <div class="file-row-date text-muted">{{ file.modified }}</div>
-              <button class="protect-btn" :class="{ 'protect-btn--active': isProtected(file.path) }" :title="isProtected(file.path) ? 'Unprotect file' : 'Protect from deletion'" @click.stop="toggleProtected(file.path)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" :fill="isProtected(file.path) ? 'currentColor' : 'none'"/>
-                </svg>
-              </button>
               <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                  <circle cx="8" cy="9" r="2"/>
-                </svg>
+                <img v-if="nativeFolderIcon" :src="nativeFolderIcon" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
+              <div class="file-row-check">
+                <input v-if="!isLocked(file.path)" type="checkbox" :checked="selected.has(file.path)" @click.stop @change="toggleSelect(file.path)" />
+              </div>
             </div>
           </div>
         </template>
@@ -1475,20 +1486,36 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .dir-header-right {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 100px 24px 28px;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .dir-meta {
+  justify-self: end;
+}
+
+.dir-size {
+  justify-self: end;
+}
+
+.dir-header-right .group-check {
+  grid-column: 4;
+  justify-self: center;
+}
+
+.dir-meta {
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .dir-size {
   font-size: 12px;
   font-weight: 500;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .expand-chevron--sm svg {
@@ -1503,7 +1530,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px 1fr 160px 100px 24px 28px;
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
@@ -1517,7 +1545,34 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row--tree {
+  grid-template-columns: 32px 1fr 100px 24px 28px;
   padding-left: 24px;
+}
+
+.file-row--tree .file-icon-wrap {
+  grid-column: 1;
+}
+
+.file-row--tree .file-row-info {
+  grid-column: 2;
+}
+
+.file-row--tree .file-row-size {
+  grid-column: 3;
+}
+
+.file-row--tree .safety-pill,
+.file-row--tree .safety-pill-placeholder {
+  display: none;
+}
+
+.file-row--tree .reveal-btn {
+  grid-column: 4;
+}
+
+.file-row--tree .file-row-check {
+  grid-column: 5;
+  grid-row: 1;
 }
 
 .file-row:hover {
@@ -1536,23 +1591,83 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
-  order: 99;
+  grid-column: 6;
 }
 
 .file-row-info {
   min-width: 0;
-  flex: 1;
+  grid-column: 2;
+}
+
+.file-icon-wrap {
+  position: relative;
+  grid-column: 1;
+  width: 32px;
+  height: 32px;
 }
 
 .file-row-icon {
-  flex-shrink: 0;
   border-radius: 3px;
 }
 
 .file-row-icon-placeholder {
   width: 32px;
   height: 32px;
-  flex-shrink: 0;
+}
+
+.icon-shield-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.icon-shield-badge svg {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-shield-badge .shield-hover {
+  display: none;
+}
+
+.icon-shield-badge:hover {
+  transform: scale(1.3);
+}
+
+.icon-shield-badge:hover .shield-normal {
+  display: none;
+}
+
+.icon-shield-badge:hover .shield-hover {
+  display: block;
+}
+
+.file-row--protected > *:not(.file-icon-wrap) {
+  opacity: 0.4;
+}
+
+.file-row--protected .file-row-icon,
+.file-row--protected .file-row-icon-placeholder {
+  opacity: 0.4;
+}
+
+.file-row--protected .icon-shield-badge {
+  opacity: 1;
+}
+
+.protect-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.protect-action-btn svg {
+  color: hsla(145, 55%, 45%, 0.9);
 }
 
 .file-row-name {
@@ -1604,9 +1719,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* Vault section */
 .vault-group {
-  border: 1px solid hsla(280, 40%, 60%, 0.12);
+  border: 1px solid hsla(280, 40%, 60%, 0.15);
   border-radius: 12px;
-  background: hsla(280, 40%, 70%, 0.04);
+  background: rgba(255, 255, 255, 0.55);
   padding: 4px 0;
   margin-bottom: var(--sp-4);
 }
@@ -1674,7 +1789,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .safety-pill {
-  flex-shrink: 0;
+  grid-column: 3;
+  justify-self: end;
+  position: relative;
   font-size: 9px;
   font-weight: 600;
   padding: 2px 8px;
@@ -1686,9 +1803,53 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   cursor: default;
 }
 
+.safety-pill[data-tooltip]:not([data-tooltip=""])::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  color: rgba(0, 0, 0, 0.8);
+  font-size: 11px;
+  font-weight: 400;
+  padding: 8px 12px;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  white-space: normal;
+  min-width: 200px;
+  max-width: 320px;
+  line-height: 1.4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 100;
+}
+
+.safety-pill[data-tooltip]:not([data-tooltip=""]):hover::after {
+  opacity: 1;
+}
+
+.safety-pill[data-tooltip]:not([data-tooltip=""])::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: white;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 101;
+}
+
+.safety-pill[data-tooltip]:not([data-tooltip=""]):hover::before {
+  opacity: 1;
+}
+
 .safety-pill-placeholder {
-  width: 60px;
-  flex-shrink: 0;
+  grid-column: 3;
 }
 
 .file-row-explanation {
@@ -1708,10 +1869,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row-size {
+  grid-column: 4;
   text-align: right;
   white-space: nowrap;
   font-size: 13px;
-  flex-shrink: 0;
 }
 
 .size-value {
@@ -1726,26 +1887,25 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   margin-top: 1px;
 }
 
-.file-row-date {
-  font-size: 11px;
-  white-space: nowrap;
-  text-align: right;
-  color: rgba(0, 0, 0, 0.35);
-  flex-shrink: 0;
+.file-time-ago {
+  display: block;
+  font-size: 10px;
+  margin-top: 1px;
 }
 
 /* ---- Protect toggle button ---- */
 .protect-btn {
+  grid-column: 6;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--muted);
+  color: hsla(280, 40%, 55%, 0.7);
   opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
@@ -1753,21 +1913,21 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row:hover .protect-btn {
-  opacity: 0.25;
+  opacity: 0.7;
 }
 
 .protect-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
 
 .protect-btn:hover {
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .protect-btn--active {
   color: hsla(280, 40%, 50%, 0.85);
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 .protect-btn--active:hover {
@@ -1776,27 +1936,36 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* ---- Reveal in Finder button ---- */
 .reveal-btn {
+  grid-column: 5;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
   padding: 0;
+  border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
   opacity: 0;
+  cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, opacity 0.15s;
   flex-shrink: 0;
 }
 
+.reveal-btn svg,
+.reveal-btn img {
+  width: 16px;
+  height: 16px;
+}
+
 .file-row:hover .reveal-btn {
-  opacity: 0.5;
+  opacity: 0.8;
 }
 
 .reveal-btn:hover {
   background: rgba(255, 255, 255, 0.5);
-  color: var(--accent);
+  opacity: 1;
 }
 
 .reveal-btn:active {

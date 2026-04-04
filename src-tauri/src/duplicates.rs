@@ -26,6 +26,7 @@ use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 
 use crate::commands;
+use crate::image_utils;
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -58,6 +59,9 @@ pub struct DuplicateGroup {
     /// Total wasted space: (count - 1) * size
     /// (keeping one copy, the rest are "wasted")
     pub wasted_bytes: u64,
+    /// Base64-encoded JPEG thumbnail (140px max) for image groups.
+    /// Generated during scan via `sips`. None for non-image files.
+    pub thumbnail: Option<String>,
 }
 
 /// Result of a duplicate file scan.
@@ -392,6 +396,7 @@ pub fn run_duplicate_scan(
             size: *size,
             files: dup_files,
             wasted_bytes: wasted,
+            thumbnail: None,
         });
     }
 
@@ -400,6 +405,30 @@ pub fn run_duplicate_scan(
 
     // Truncate to avoid overwhelming the frontend.
     groups.truncate(MAX_GROUPS);
+
+    // Generate thumbnails for image groups (concurrent via threads).
+    // Only for the final truncated set — at most MAX_GROUPS (200) thumbnails.
+    let thumb_handles: Vec<_> = groups
+        .iter()
+        .enumerate()
+        .filter_map(|(i, g)| {
+            let path = std::path::Path::new(&g.files[0].path);
+            if image_utils::is_image_file(path) {
+                let file_path = g.files[0].path.clone();
+                Some((i, std::thread::spawn(move || {
+                    image_utils::generate_thumbnail(std::path::Path::new(&file_path), 140).ok()
+                })))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (idx, handle) in thumb_handles {
+        if let Ok(Some(b64)) = handle.join() {
+            groups[idx].thumbnail = Some(b64);
+        }
+    }
 
     let total_duplicate_files: u64 = groups.iter().map(|g| g.files.len() as u64).sum();
     let total_wasted_bytes: u64 = groups.iter().map(|g| g.wasted_bytes).sum();
@@ -566,6 +595,7 @@ mod tests {
                 DuplicateFile { path: "/c".into(), name: "c".into(), size: 1000, modified: "".into(), parent_dir: "/".into() },
             ],
             wasted_bytes: 2000,
+            thumbnail: None,
         };
         let expected = (group.files.len() as u64 - 1) * group.size;
         assert_eq!(group.wasted_bytes, expected);

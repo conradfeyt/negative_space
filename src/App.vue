@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import { BUILD_NUMBER } from "./buildNumber";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, availableMonitors } from "@tauri-apps/api/window";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -776,7 +777,7 @@ onUnmounted(() => {
       </nav>
 
       <div class="sidebar-footer">
-        <span class="version-tag">v0.1.0</span>
+        <span class="version-tag">v0.1.0 (build {{ BUILD_NUMBER }})</span>
       </div>
     </aside>
 
@@ -1135,9 +1136,9 @@ onUnmounted(() => {
 
 .version-tag {
   font-size: 11px;
-  color: #000000;
+  color: #ffffff;
   font-family: var(--font-mono);
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 /* ==========================================================================

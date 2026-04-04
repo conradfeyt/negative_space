@@ -62,6 +62,98 @@ function toggleAll() {
 
 const allSelected = computed(() => logs.value.length > 0 && selected.value.size === logs.value.length);
 const totalSelected = computed(() => logs.value.filter((l) => selected.value.has(l.path)).reduce((sum, l) => sum + l.size, 0));
+
+// ── Log file icon ─────────────────────────────────────────────────────
+const logIcon = ref("");
+invoke<string>("render_sf_symbol", { name: "log", size: 64, mode: "uttype", style: "plain" })
+  .then(b64 => { if (b64) logIcon.value = b64; })
+  .catch(() => {});
+
+// ── Friendly time ago ─────────────────────────────────────────────────
+function timeAgo(modified: string | null): string {
+  if (!modified) return "";
+  const date = new Date(modified.replace(" ", "T"));
+  if (isNaN(date.getTime())) return modified;
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return "a week ago";
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return "a month ago";
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "a year ago" : `${years} years ago`;
+}
+
+// ── Grouping by source ────────────────────────────────────────────────
+function getLogSource(path: string, _name: string): string {
+  const p = path.toLowerCase();
+  // /var/log/* → "System"
+  if (p.startsWith("/var/log")) return "System";
+  // ~/Library/Logs/<AppName>/... → AppName
+  const libMatch = path.match(/\/Library\/Logs\/([^/]+)/);
+  if (libMatch) return libMatch[1];
+  // Fallback to parent directory name
+  const parts = path.split("/");
+  if (parts.length >= 2) return parts[parts.length - 2];
+  return "Other";
+}
+
+interface LogGroup {
+  source: string;
+  entries: typeof logs.value;
+  totalSize: number;
+}
+
+const groupedLogs = computed<LogGroup[]>(() => {
+  const groups: Record<string, typeof logs.value> = {};
+  for (const log of logs.value) {
+    const source = getLogSource(log.path, log.name);
+    if (!groups[source]) groups[source] = [];
+    groups[source].push(log);
+  }
+  return Object.entries(groups)
+    .map(([source, entries]) => ({
+      source,
+      entries: entries.sort((a, b) => b.size - a.size),
+      totalSize: entries.reduce((s, e) => s + e.size, 0),
+    }))
+    .sort((a, b) => b.totalSize - a.totalSize);
+});
+
+const collapsedGroups = ref<Set<string>>(new Set());
+
+function toggleGroup(source: string) {
+  const next = new Set(collapsedGroups.value);
+  if (next.has(source)) next.delete(source); else next.add(source);
+  collapsedGroups.value = next;
+}
+
+function selectGroup(group: LogGroup) {
+  const next = new Set(selected.value);
+  for (const e of group.entries) next.add(e.path);
+  selected.value = next;
+}
+
+function deselectGroup(group: LogGroup) {
+  const next = new Set(selected.value);
+  for (const e of group.entries) next.delete(e.path);
+  selected.value = next;
+}
+
+function isGroupAllSelected(group: LogGroup): boolean {
+  return group.entries.every(e => selected.value.has(e.path));
+}
+
+function shortPath(path: string): string {
+  return path.replace(/^\/Users\/[^/]+/, "~");
+}
 </script>
 
 <template>
@@ -83,10 +175,7 @@ const totalSelected = computed(() => logs.value.filter((l) => selected.value.has
       <span class="fda-warning-dot"></span>
       <div class="fda-warning-body">
         <div class="fda-warning-title">Limited scan -- Full Disk Access required</div>
-        <div class="fda-warning-text">
-          Without Full Disk Access, only /var/log is scanned.
-          ~/Library/Logs is skipped.
-        </div>
+        <div class="fda-warning-text">Without Full Disk Access, only /var/log is scanned. ~/Library/Logs is skipped.</div>
         <div class="fda-warning-actions">
           <button class="btn-fda btn-fda-primary" @click="openFdaSettings">Open System Settings</button>
           <button class="btn-fda btn-fda-secondary" @click="recheckFda">Re-check</button>
@@ -108,43 +197,65 @@ const totalSelected = computed(() => logs.value.filter((l) => selected.value.has
     </div>
 
     <template v-else-if="logs.length > 0">
-      <div class="card-flush">
-        <div class="results-header">
-          <span class="results-count">
-            {{ logs.length }} log(s) -- {{ formatSize(totalLogSize) }} total
-          </span>
-          <div class="results-actions">
-            <span v-if="selected.size > 0" class="selected-info">
-              {{ selected.size }} selected ({{ formatSize(totalSelected) }})
-            </span>
-            <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="cleanSelected">
-              <span v-if="deleting" class="spinner-sm"></span>
-              {{ deleting ? "Cleaning..." : "Clean Selected" }}
-            </button>
-          </div>
+      <div class="results-bar">
+        <div class="results-bar-left">
+          <label class="select-all-label">
+            <input type="checkbox" :checked="allSelected" @change="toggleAll" />
+            Select all
+          </label>
+          <span class="results-count text-muted">{{ logs.length }} log(s) &mdash; {{ formatSize(totalLogSize) }} total</span>
         </div>
+        <div class="results-bar-right">
+          <span v-if="selected.size > 0" class="selected-info">{{ selected.size }} selected ({{ formatSize(totalSelected) }})</span>
+          <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="cleanSelected">
+            <span v-if="deleting" class="spinner-sm"></span>
+            {{ deleting ? "Cleaning..." : "Clean Selected" }}
+          </button>
+        </div>
+      </div>
 
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-check"><input type="checkbox" :checked="allSelected" @change="toggleAll" /></th>
-                <th>Name</th>
-                <th>Path</th>
-                <th class="col-size">Size</th>
-                <th class="col-date">Modified</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="log in logs" :key="log.path">
-                <td class="col-check"><input type="checkbox" :checked="selected.has(log.path)" @change="toggleSelect(log.path)" /></td>
-                <td class="cell-name truncate">{{ log.name }}</td>
-                <td class="cell-path mono truncate" :title="log.path">{{ log.path }}</td>
-                <td class="col-size mono">{{ formatSize(log.size) }}</td>
-                <td class="col-date text-muted">{{ log.modified }}</td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="log-groups">
+        <div v-for="group in groupedLogs" :key="group.source" class="log-category">
+          <div class="category-header" @click="toggleGroup(group.source)">
+            <div class="category-header-left">
+              <span class="category-chevron" :class="{ expanded: !collapsedGroups.has(group.source) }">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
+              </span>
+              <span class="category-label">{{ group.source }}</span>
+              <span class="category-count text-muted">{{ group.entries.length }}</span>
+            </div>
+            <div class="category-header-right">
+              <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
+              <button class="btn-sm btn-secondary" @click.stop="isGroupAllSelected(group) ? deselectGroup(group) : selectGroup(group)">
+                {{ isGroupAllSelected(group) ? 'Deselect' : 'Select all' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!collapsedGroups.has(group.source)" class="log-list">
+            <div
+              v-for="log in group.entries"
+              :key="log.path"
+              class="log-item"
+              :class="{ 'log-item--selected': selected.has(log.path) }"
+              @click="toggleSelect(log.path)"
+            >
+              <div class="log-icon">
+                <img v-if="logIcon" :src="logIcon" width="28" height="28" />
+              </div>
+              <div class="log-info">
+                <span class="log-name">{{ log.name }}</span>
+                <span class="log-path text-muted" :title="log.path">{{ shortPath(log.path) }}</span>
+              </div>
+              <div class="log-size-col">
+                <span class="log-size mono">{{ formatSize(log.size) }}</span>
+                <span v-if="log.modified" class="log-time text-muted">{{ timeAgo(log.modified) }}</span>
+              </div>
+              <div class="log-check" @click.stop>
+                <input type="checkbox" :checked="selected.has(log.path)" @change="toggleSelect(log.path)" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -153,6 +264,169 @@ const totalSelected = computed(() => logs.value.filter((l) => selected.value.has
 
 <style scoped>
 .logs-view { max-width: 1440px; }
-.cell-name { max-width: 200px; font-weight: 400; }
-.cell-path { max-width: 280px; }
+
+.results-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-3);
+}
+
+.results-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.results-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.results-count { font-size: 12px; }
+
+.log-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.log-category {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.category-header:hover { background: rgba(255, 255, 255, 0.3); }
+
+.category-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-chevron {
+  display: flex;
+  transition: transform 0.15s;
+  color: var(--muted);
+}
+
+.category-chevron.expanded { transform: rotate(90deg); }
+
+.category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.category-count {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.category-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-size {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.log-item {
+  display: grid;
+  grid-template-columns: 36px 1fr 90px 28px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.log-item:last-child { border-bottom: none; }
+.log-item:hover { background: rgba(255, 255, 255, 0.3); }
+.log-item--selected { background: rgba(59, 199, 232, 0.06); }
+
+.log-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.log-icon img { border-radius: 4px; }
+
+.log-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.log-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-path {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-size-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.log-size {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.log-time { font-size: 10px; }
+
+.log-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>

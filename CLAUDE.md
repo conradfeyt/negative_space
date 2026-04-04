@@ -14,21 +14,17 @@ macOS system cleaner and disk visualiser built with Tauri v2 (Rust backend + Vue
 
 ## Build workflow
 ```bash
-# Fast iteration (no-bundle — copies binary into existing .app):
-touch ~/projects/negativ_/src-tauri/src/lib.rs   # REQUIRED — forces Cargo to re-embed frontend assets
-cd ~/projects/negativ_ && npm run tauri build -- --no-bundle
-cp -f ~/projects/negativ_/src-tauri/target/release/negative-space "/Applications/Negativ_.app/Contents/MacOS/Negativ_"
-xattr -dr com.apple.quarantine /Applications/Negativ_.app
-open /Applications/Negativ_.app
+# PREFERRED: Use the rebuild script (bumps build number, kills app, full build, opens from dist)
+./rebuild.sh
 
-# Full bundle (for releases or when .app doesn't exist):
+# Manual full bundle:
 cd ~/projects/negativ_ && npm run tauri build
-cp -r ~/projects/negativ_/src-tauri/target/release/bundle/macos/Negativ_.app /Applications/
-xattr -dr com.apple.quarantine /Applications/Negativ_.app
-open /Applications/Negativ_.app
+open src-tauri/target/release/bundle/macos/Negativ_.app
 ```
 
-**IMPORTANT:** Always `touch src-tauri/src/lib.rs` before `--no-bundle` builds. Without it, Cargo uses cached artifacts and the old frontend JS is embedded — changes to `.vue` files won't appear.
+**IMPORTANT:** Always open the built app from `src-tauri/target/release/bundle/macos/Negativ_.app`, never from `/Applications`. The `/Applications` copy can be stale.
+
+**Build number:** `src/buildNumber.ts` contains an incrementing build number displayed in the sidebar footer (`v0.1.0 (build N)`). The `rebuild.sh` script auto-increments this. Use it to verify you're running the correct build.
 
 **Kill before rebuilding:** `pkill -x "Negativ_"` — macOS won't replace a running binary.
 
@@ -36,6 +32,7 @@ open /Applications/Negativ_.app
 - **Frontend:** Vue 3 + TypeScript + Vite + D3.js (`src/`)
 - **Backend:** Rust + Tauri v2 (`src-tauri/src/`)
 - **Native:** AppKit via objc2 — custom gradient layer, SMC sensor reading
+- **Image processing:** `image` crate (0.23) + `img_hash` (3.2) for perceptual hashing
 - **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance
 
 ## Architecture notes
@@ -55,6 +52,23 @@ Three modes switchable in-app:
 
 ### Vault
 Compressed file storage at `~/Documents/MyNegativeSpaceVault/`. Previously was at `~/Library/Application Support/MacSweep/vault` and `NegativeSpace/vault` — migration code exists in `vault.rs`.
+
+### Similar image detection
+`src-tauri/src/similar_images.rs` — perceptual hash-based (dHash 16x16 via `img_hash` crate). Deduplicates exact copies (BLAKE3 partial hash) before clustering by Hamming distance. Thumbnails generated during scan via `sips`. Results cached to disk.
+
+### Image utilities
+`src-tauri/src/image_utils.rs` — shared image loading (`image` crate), HEIC fallback via `sips`, thumbnail generation via `sips --resampleHeightWidthMax`.
+
+### Duplicate finder thumbnails
+Thumbnails are generated during the duplicate scan (one per group, since all files are byte-identical) and embedded as base64 JPEG in the scan result. This is a known performance issue — see `_private/PERFORMANCE_ROADMAP.md` item 4.3 for the planned file-based cache approach.
+
+### Native icon system (Swift bridge)
+`src-tauri/swift/Sources/Bridge.swift` `render_sf_symbol` supports multiple modes:
+- `mode: "sf"` — SF Symbols by name (e.g., `"folder"`)
+- `mode: "uttype"` — NSWorkspace icon for UTType identifier (e.g., `"public.folder"`) or file extension (e.g., `"png"`)
+- `mode: "app"` — NSWorkspace icon for app bundle path (e.g., `"/Applications/Google Chrome.app"`)
+- `mode: "file"` — NSImage from file path
+- `mode: "system"` — NSImage named system image
 
 ### Native gradient layer
 `src-tauri/src/gradient.rs` — receives JPEG from frontend, creates `NSImageView` behind WKWebView. Do NOT replace with CSS — it's there for zero-lag window drag tracking.
@@ -80,3 +94,6 @@ Compressed file storage at `~/Documents/MyNegativeSpaceVault/`. Previously was a
 - Don't change `gradient.rs` native layer to CSS
 - Don't skip `touch lib.rs` before `--no-bundle` builds
 - Don't use `--global` for git config — personal identity is local only
+- Don't open app from `/Applications` — always open from `src-tauri/target/release/bundle/macos/`
+- Don't generate thumbnails on the frontend — generate during Rust scan and include in results
+- Don't render all cards in duplicate groups — cap at 10 with overflow indicator (DOM performance)

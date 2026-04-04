@@ -8,15 +8,163 @@ import {
   duplicateScanned,
   duplicateError,
   scanDuplicates,
+  similarResult,
+  similarScanning,
+  similarScanned,
+  similarError,
+  similarProgress,
+  scanSimilarImages,
   deleteFiles,
   hasFullDiskAccess,
   checkFullDiskAccess,
   previewFile,
 } from "../stores/scanStore";
-import type { DuplicateGroup, FilePreview } from "../types";
+import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 
-// Track which groups are expanded
-const expandedGroups = ref<Set<string>>(new Set());
+// Tab state
+const activeTab = ref<"exact" | "similar">("exact");
+
+// Similar images state
+const similarThreshold = ref(10);
+const similarMinSizeMb = ref(0);
+const similarSelected = ref<Set<string>>(new Set());
+
+async function scanSimilar() {
+  similarSelected.value = new Set();
+  await scanSimilarImages(similarThreshold.value, similarMinSizeMb.value);
+}
+
+function toggleSimilarFile(path: string) {
+  const next = new Set(similarSelected.value);
+  if (next.has(path)) next.delete(path); else next.add(path);
+  similarSelected.value = next;
+}
+
+function selectSimilarDuplicates(group: SimilarGroup) {
+  const next = new Set(similarSelected.value);
+  group.files.forEach((f, i) => {
+    if (i !== group.representative_idx) next.add(f.path);
+  });
+  similarSelected.value = next;
+}
+
+async function deleteSimilarSelected() {
+  if (similarSelected.value.size === 0) return;
+  cleaning.value = true;
+  cleanError.value = "";
+  successMsg.value = "";
+  try {
+    const result = await deleteFiles(Array.from(similarSelected.value));
+    successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
+    similarSelected.value = new Set();
+    await scanSimilar();
+  } catch (e) {
+    cleanError.value = String(e);
+  } finally {
+    cleaning.value = false;
+  }
+}
+
+// ── File kind classification ───────────────────────────────────────────────
+type FileKind = "all" | "images" | "documents" | "audio" | "video" | "archives" | "code" | "other";
+
+const KIND_EXTENSIONS: Record<Exclude<FileKind, "all" | "other">, string[]> = {
+  images: ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "tiff", "tif", "bmp", "svg", "ico", "raw", "cr2", "nef", "arw", "dng", "psd", "ai"],
+  documents: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "csv", "pages", "numbers", "keynote", "odt", "ods", "odp", "epub", "md"],
+  audio: ["mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "aiff", "alac", "opus"],
+  video: ["mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v", "ts", "vob"],
+  archives: ["zip", "tar", "gz", "tgz", "rar", "7z", "dmg", "iso", "pkg", "deb", "bz2", "xz", "zst"],
+  code: ["js", "ts", "jsx", "tsx", "py", "rs", "go", "java", "c", "cpp", "h", "hpp", "swift", "rb", "php", "css", "scss", "html", "json", "xml", "yaml", "yml", "toml", "sh", "sql", "vue", "svelte"],
+};
+
+function getFileKind(name: string): FileKind {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  for (const [kind, exts] of Object.entries(KIND_EXTENSIONS)) {
+    if (exts.includes(ext)) return kind as FileKind;
+  }
+  return "other";
+}
+
+const activeKindFilter = ref<FileKind>("all");
+
+const kindCounts = computed(() => {
+  if (!duplicateResult.value) return {};
+  const counts: Record<string, { groups: number; wasted: number }> = {};
+  for (const group of duplicateResult.value.groups) {
+    const kind = getFileKind(group.files[0].name);
+    if (!counts[kind]) counts[kind] = { groups: 0, wasted: 0 };
+    counts[kind].groups++;
+    counts[kind].wasted += group.wasted_bytes;
+  }
+  return counts;
+});
+
+const filteredGroups = computed(() => {
+  if (!duplicateResult.value) return [];
+  if (activeKindFilter.value === "all") return duplicateResult.value.groups;
+  return duplicateResult.value.groups.filter(
+    (g) => getFileKind(g.files[0].name) === activeKindFilter.value
+  );
+});
+
+const KIND_LABELS: Record<FileKind, string> = {
+  all: "All",
+  images: "Images",
+  documents: "Documents",
+  audio: "Audio",
+  video: "Video",
+  archives: "Archives",
+  code: "Code",
+  other: "Other",
+};
+
+
+// File icon cache (same pattern as LargeFiles)
+const fileIconCache = ref<Record<string, string>>({});
+
+async function loadFileIcon(ext: string) {
+  if (fileIconCache.value[ext] || ext === "") return;
+  fileIconCache.value[ext] = "";
+  try {
+    const base64 = await invoke<string>("render_sf_symbol", { name: ext, size: 64, mode: "uttype", style: "plain" });
+    if (base64) fileIconCache.value[ext] = base64;
+  } catch { /* non-critical */ }
+}
+
+function getFileIcon(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (!fileIconCache.value[ext] && ext) loadFileIcon(ext);
+  return fileIconCache.value[ext] || "";
+}
+
+// Preload common icons
+for (const ext of ["png", "jpg", "pdf", "zip", "mp4", "mp3", "doc", "js", "py"]) loadFileIcon(ext);
+
+function isImageFile(name: string): boolean {
+  return getFileKind(name) === "images";
+}
+
+function extCardColor(name: string): string {
+  const kind = getFileKind(name);
+  switch (kind) {
+    case "documents": return "#E74C3C";
+    case "code": return "#3498DB";
+    case "archives": return "#F39C12";
+    case "audio": return "#9B59B6";
+    case "video": return "#27AE60";
+    default: return "#95A5A6";
+  }
+}
+
+function getExtLabel(name: string): string {
+  const ext = name.split(".").pop()?.toUpperCase() ?? "";
+  return ext ? `.${ext}` : "?";
+}
+
+
+// Group thumbnail cache: group hash -> base64 JPEG
+// Thumbnails are generated during the Rust scan and included in group.thumbnail.
+// No frontend async loading needed — just render what's already there.
 
 // Track selected files for deletion: Set of file paths
 const selected = ref<Set<string>>(new Set());
@@ -48,19 +196,10 @@ async function scan() {
   successMsg.value = "";
   cleanError.value = "";
   selected.value = new Set();
-  expandedGroups.value = new Set();
   await scanDuplicates("~", minSizeMb.value);
 }
 
-function toggleGroup(hash: string) {
-  const next = new Set(expandedGroups.value);
-  if (next.has(hash)) {
-    next.delete(hash);
-  } else {
-    next.add(hash);
-  }
-  expandedGroups.value = next;
-}
+
 
 function toggleFile(path: string) {
   const next = new Set(selected.value);
@@ -129,8 +268,7 @@ async function deleteSelected() {
     }
     // Re-scan to show updated results
     selected.value = new Set();
-    expandedGroups.value = new Set();
-    await scanDuplicates("~", minSizeMb.value);
+      await scanDuplicates("~", minSizeMb.value);
   } catch (e) {
     cleanError.value = String(e);
   } finally {
@@ -189,10 +327,14 @@ function shortPath(p: string): string {
         <div>
           <h2>Duplicate Finder</h2>
           <p class="text-muted">
-            Find identical files wasting disk space
+            {{ activeTab === 'exact' ? 'Find identical files wasting disk space' : 'Find visually similar images' }}
           </p>
         </div>
-        <div class="scan-controls">
+        <div class="tab-switcher">
+          <button class="tab-btn" :class="{ active: activeTab === 'exact' }" @click="activeTab = 'exact'">Exact Duplicates</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'similar' }" @click="activeTab = 'similar'">Similar Images</button>
+        </div>
+        <div v-if="activeTab === 'exact'" class="scan-controls">
           <div class="min-size-control">
             <label class="text-muted">Min size</label>
             <select v-model.number="minSizeMb" class="size-select">
@@ -211,6 +353,25 @@ function shortPath(p: string): string {
           >
             <span v-if="duplicateScanning" class="spinner spinner-sm"></span>
             {{ duplicateScanning ? "Scanning..." : "Find Duplicates" }}
+          </button>
+        </div>
+        <div v-if="activeTab === 'similar'" class="scan-controls">
+          <div class="min-size-control">
+            <label class="text-muted">Threshold</label>
+            <select v-model.number="similarThreshold" class="size-select">
+              <option :value="5">Strict (5)</option>
+              <option :value="10">Normal (10)</option>
+              <option :value="15">Loose (15)</option>
+              <option :value="20">Very loose (20)</option>
+            </select>
+          </div>
+          <button
+            class="btn-primary scan-btn"
+            :disabled="similarScanning"
+            @click="scanSimilar"
+          >
+            <span v-if="similarScanning" class="spinner spinner-sm"></span>
+            {{ similarScanning ? "Scanning..." : "Find Similar" }}
           </button>
         </div>
       </div>
@@ -238,6 +399,9 @@ function shortPath(p: string): string {
         </div>
       </div>
     </div>
+
+    <!-- ══════ EXACT DUPLICATES TAB ══════ -->
+    <template v-if="activeTab === 'exact'">
 
     <!-- Messages -->
     <div v-if="duplicateError" class="error-message">{{ duplicateError }}</div>
@@ -300,6 +464,22 @@ function shortPath(p: string): string {
         {{ duplicateResult.skipped_paths.join(", ") }}
       </div>
 
+      <!-- Kind filter pills -->
+      <div class="kind-filter-bar">
+        <button
+          v-for="kind in (['all', 'images', 'documents', 'audio', 'video', 'archives', 'code', 'other'] as FileKind[])"
+          :key="kind"
+          class="kind-pill"
+          :class="{ active: activeKindFilter === kind, empty: kind !== 'all' && !kindCounts[kind] }"
+          @click="activeKindFilter = kind"
+          :disabled="kind !== 'all' && !kindCounts[kind]"
+        >
+          {{ KIND_LABELS[kind] }}
+          <span v-if="kind !== 'all' && kindCounts[kind]" class="kind-count">{{ kindCounts[kind].groups }}</span>
+          <span v-if="kind === 'all'" class="kind-count">{{ duplicateResult!.groups.length }}</span>
+        </button>
+      </div>
+
       <!-- Action bar -->
       <div class="summary-bar">
         <div class="results-actions">
@@ -317,178 +497,406 @@ function shortPath(p: string): string {
         </div>
       </div>
 
-      <!-- Duplicate groups -->
+      <!-- Duplicate groups — card gallery layout -->
       <div class="group-list">
         <div
-          v-for="group in duplicateResult.groups"
+          v-for="group in filteredGroups"
           :key="group.hash"
-          class="card-flush group-card"
+          class="group-card"
         >
           <!-- Group header -->
-          <div class="group-header" @click="toggleGroup(group.hash)">
-            <div class="group-header-left">
-              <span
-                class="expand-chevron"
-                :class="{ expanded: expandedGroups.has(group.hash) }"
-              ><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg></span>
-              <div class="group-info">
-                <span class="group-name">
-                  {{ group.files[0].name }}
-                  <span class="text-muted group-count">
-                    ({{ group.files.length }} copies)
-                  </span>
-                </span>
-                <span class="group-meta text-muted">
-                  {{ formatSize(group.size) }} each --
-                  {{ formatSize(group.wasted_bytes) }} wasted
-                </span>
-              </div>
+          <div class="group-header">
+            <div class="group-info">
+              <span class="group-name">
+                {{ group.files[0].name }}
+                <span class="text-muted group-count">({{ group.files.length }} copies)</span>
+              </span>
+              <span class="group-meta text-muted">
+                {{ formatSize(group.size) }} each &mdash; {{ formatSize(group.wasted_bytes) }} wasted
+              </span>
             </div>
-            <div class="group-header-right" @click.stop>
-              <button
-                v-if="!allDuplicatesSelected(group)"
-                class="btn-sm btn-secondary"
-                @click="selectDuplicates(group)"
-                title="Select all copies except the first (keeps one)"
+            <button
+              v-if="!allDuplicatesSelected(group)"
+              class="btn-sm btn-secondary"
+              @click="selectDuplicates(group)"
+            >Select duplicates</button>
+            <button v-else class="btn-sm btn-secondary" @click="deselectGroup(group)">Deselect all</button>
+          </div>
+
+          <!-- Card strip (max 10 visible cards to keep DOM light) -->
+          <div class="card-strip-container">
+            <div class="card-strip">
+              <div
+                v-for="(file, idx) in group.files.slice(0, 10)"
+                :key="file.path"
+                class="file-card"
+                :class="{
+                  'file-card--selected': selected.has(file.path),
+                  'file-card--keep': idx === 0,
+                }"
+                @click="loadPreview(file.path, $event)"
               >
-                Select duplicates
-              </button>
-              <button
-                v-else
-                class="btn-sm btn-secondary"
-                @click="deselectGroup(group)"
-              >
-                Deselect all
-              </button>
+                <label class="card-checkbox" @click.stop>
+                  <input type="checkbox" :checked="selected.has(file.path)" @change="toggleFile(file.path)" />
+                </label>
+                <span v-if="idx === 0" class="card-badge-keep">Keep</span>
+
+                <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
+                  <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" class="card-thumb-img" />
+                  <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="card-placeholder-icon" />
+                  <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
+                </div>
+
+                <div v-else class="card-face card-face--ext" :style="{ background: `linear-gradient(135deg, ${extCardColor(file.name)}, color-mix(in srgb, ${extCardColor(file.name)} 80%, black))` }">
+                  <span class="card-ext-label">{{ getExtLabel(file.name) }}</span>
+                </div>
+
+                <div class="card-meta">
+                  <div class="card-filename" :title="file.name">{{ file.name }}</div>
+                  <div class="card-dir text-muted" :title="file.parent_dir">{{ shortPath(file.parent_dir) }}</div>
+                  <div class="card-date text-muted mono">{{ file.modified }}</div>
+                </div>
+              </div>
+
+              <!-- Overflow indicator -->
+              <div v-if="group.files.length > 10" class="card-overflow" @click="selectDuplicates(group)">
+                <span class="card-overflow-count">+{{ group.files.length - 10 }}</span>
+                <span class="card-overflow-label">more copies</span>
+                <span class="card-overflow-action">Select all duplicates</span>
+              </div>
             </div>
           </div>
 
-          <!-- File list (expanded) -->
-          <div v-if="expandedGroups.has(group.hash)" class="group-files">
-            <div
-              v-for="(file, idx) in group.files"
-              :key="file.path"
-              :class="[
-                'file-row',
-                { selected: selected.has(file.path), 'is-original': idx === 0 },
-              ]"
-              @click="toggleFile(file.path)"
-            >
-              <div class="file-row-left">
-                <input
-                  type="checkbox"
-                  :checked="selected.has(file.path)"
-                  @change.stop="toggleFile(file.path)"
-                  @click.stop
-                />
-                <div class="file-info">
-                  <div class="file-name-row">
-                    <span class="file-name">{{ file.name }}</span>
-                    <span v-if="idx === 0" class="badge badge-accent">
-                      Keep
-                    </span>
-                  </div>
-                  <span class="file-path mono truncate" :title="file.path">
-                    {{ shortPath(file.parent_dir) }}
-                  </span>
-                </div>
-              </div>
-              <div class="file-row-right">
-                <button
-                  :class="['btn-preview', { active: previewPath === file.path }]"
-                  @click="loadPreview(file.path, $event)"
-                  title="Preview this file"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </button>
-                <span class="file-modified text-muted">{{ file.modified }}</span>
+          <!-- Inline preview panel -->
+          <div v-if="previewPath && group.files.some(f => f.path === previewPath)" class="preview-panel">
+            <div class="preview-header">
+              <span class="preview-title">{{ (previewData as any)?.file_name || '...' }}</span>
+              <button class="btn-preview-close" @click="closePreview">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div v-if="previewLoading" class="preview-loading"><span class="spinner"></span><span>Generating preview...</span></div>
+            <div v-else-if="previewData?.kind === 'Image'" class="preview-body preview-image">
+              <img :src="'data:image/png;base64,' + (previewData as any).data" :alt="(previewData as any).file_name" class="preview-thumb" />
+              <div class="preview-meta">
+                <span>{{ (previewData as any).file_type.toUpperCase() }}</span>
+                <span>{{ (previewData as any).width }} x {{ (previewData as any).height }}</span>
+                <span>{{ formatSize((previewData as any).file_size) }}</span>
               </div>
             </div>
-
-            <!-- Inline preview panel (shows below the file list within the group) -->
-            <div
-              v-if="previewPath && group.files.some(f => f.path === previewPath)"
-              class="preview-panel"
-            >
-              <div class="preview-header">
-                <span class="preview-title">
-                  {{ previewData?.kind !== 'Error' ? (previewData as any)?.file_name || '...' : (previewData as any)?.file_name || '...' }}
-                </span>
-                <button class="btn-preview-close" @click="closePreview">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                  </svg>
-                </button>
+            <div v-else-if="previewData?.kind === 'Text'" class="preview-body preview-text">
+              <div class="preview-text-meta">
+                <span class="badge badge-accent" v-if="(previewData as any).file_type">{{ extLabel((previewData as any).file_type) }}</span>
+                <span class="text-muted">{{ (previewData as any).total_lines }} lines<template v-if="(previewData as any).truncated"> (first 100)</template></span>
+                <span class="text-muted">{{ formatSize((previewData as any).file_size) }}</span>
               </div>
-
-              <!-- Loading state -->
-              <div v-if="previewLoading" class="preview-loading">
-                <span class="spinner"></span>
-                <span>Generating preview...</span>
+              <pre class="preview-code"><code>{{ (previewData as any).content }}</code></pre>
+            </div>
+            <div v-else-if="previewData?.kind === 'Metadata'" class="preview-body preview-metadata">
+              <div class="metadata-info">
+                <span class="metadata-type">{{ (previewData as any).file_type }}</span>
+                <span class="metadata-size">{{ formatSize((previewData as any).file_size) }}</span>
+                <span class="metadata-mime text-muted">{{ (previewData as any).mime_guess }}</span>
               </div>
-
-              <!-- Image preview -->
-              <div v-else-if="previewData?.kind === 'Image'" class="preview-body preview-image">
-                <img
-                  :src="'data:image/png;base64,' + (previewData as any).data"
-                  :alt="(previewData as any).file_name"
-                  class="preview-thumb"
-                />
-                <div class="preview-meta">
-                  <span>{{ (previewData as any).file_type.toUpperCase() }}</span>
-                  <span>{{ (previewData as any).width }} x {{ (previewData as any).height }}</span>
-                  <span>{{ formatSize((previewData as any).file_size) }}</span>
-                </div>
-              </div>
-
-              <!-- Text preview -->
-              <div v-else-if="previewData?.kind === 'Text'" class="preview-body preview-text">
-                <div class="preview-text-meta">
-                  <span class="badge badge-accent" v-if="(previewData as any).file_type">
-                    {{ extLabel((previewData as any).file_type) }}
-                  </span>
-                  <span class="text-muted">
-                    {{ (previewData as any).total_lines }} lines
-                    <template v-if="(previewData as any).truncated"> (showing first 100)</template>
-                  </span>
-                  <span class="text-muted">{{ formatSize((previewData as any).file_size) }}</span>
-                </div>
-                <pre class="preview-code"><code>{{ (previewData as any).content }}</code></pre>
-              </div>
-
-              <!-- Metadata only -->
-              <div v-else-if="previewData?.kind === 'Metadata'" class="preview-body preview-metadata">
-                <div class="metadata-icon">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                  </svg>
-                </div>
-                <div class="metadata-info">
-                  <span class="metadata-type">{{ (previewData as any).file_type }}</span>
-                  <span class="metadata-size">{{ formatSize((previewData as any).file_size) }}</span>
-                  <span class="metadata-mime text-muted">{{ (previewData as any).mime_guess }}</span>
-                </div>
-              </div>
-
-              <!-- Error -->
-              <div v-else-if="previewData?.kind === 'Error'" class="preview-body preview-error">
-                <span class="text-muted">{{ (previewData as any).message }}</span>
-              </div>
+            </div>
+            <div v-else-if="previewData?.kind === 'Error'" class="preview-body preview-error">
+              <span class="text-muted">{{ (previewData as any).message }}</span>
             </div>
           </div>
         </div>
       </div>
     </template>
+    </template><!-- /exact tab -->
+
+    <!-- ══════ SIMILAR IMAGES TAB ══════ -->
+    <template v-if="activeTab === 'similar'">
+
+      <!-- Messages -->
+      <div v-if="similarError" class="error-message">{{ similarError }}</div>
+      <div v-if="cleanError" class="error-message">{{ cleanError }}</div>
+      <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
+
+      <!-- Progress -->
+      <div v-if="similarScanning" class="similar-progress">
+        <div class="similar-progress-header">
+          <span class="spinner"></span>
+          <span v-if="!similarProgress || similarProgress.phase === 'discovery'">
+            Discovering images…
+          </span>
+          <span v-else-if="similarProgress.phase === 'hashing'">
+            Hashing images — {{ similarProgress.images_processed }} / {{ similarProgress.total_images }}
+          </span>
+          <span v-else-if="similarProgress.phase === 'thumbnails'">
+            Generating thumbnails…
+          </span>
+          <span v-else>
+            Comparing hashes…
+          </span>
+        </div>
+        <div v-if="similarProgress && similarProgress.phase === 'hashing' && similarProgress.total_images > 0" class="similar-progress-bar-wrap">
+          <div class="similar-progress-bar">
+            <div class="similar-progress-fill" :style="{ width: Math.round(similarProgress.images_processed / similarProgress.total_images * 100) + '%' }"></div>
+          </div>
+          <span class="similar-progress-pct text-muted">{{ Math.round(similarProgress.images_processed / similarProgress.total_images * 100) }}%</span>
+        </div>
+        <div v-if="similarProgress && similarProgress.current_file" class="similar-progress-file text-muted">
+          {{ shortPath(similarProgress.current_file) }}
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="similarScanned && (!similarResult || similarResult.groups.length === 0)" class="card empty-state">
+        <p class="text-muted">No similar images found</p>
+        <p v-if="similarResult" class="text-muted scan-stats">
+          Scanned {{ similarResult.images_scanned.toLocaleString() }} images
+          <template v-if="similarResult.images_skipped > 0">
+            ({{ similarResult.images_skipped }} skipped)
+          </template>
+        </p>
+      </div>
+
+      <!-- Results -->
+      <template v-else-if="similarResult && similarResult.groups.length > 0">
+        <div class="stats-bar">
+          <div class="stat">
+            <span class="stat-value">{{ similarResult.images_scanned.toLocaleString() }}</span>
+            <span class="stat-label">images scanned</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ similarResult.groups.length }}</span>
+            <span class="stat-label">similar groups</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ similarResult.total_similar_files }}</span>
+            <span class="stat-label">similar files</span>
+          </div>
+          <div class="stat stat-highlight">
+            <span class="stat-value">{{ formatSize(similarResult.total_wasted_bytes) }}</span>
+            <span class="stat-label">reclaimable</span>
+          </div>
+        </div>
+
+        <!-- Batch actions -->
+        <div class="batch-bar" v-if="similarResult.groups.length > 0">
+          <button class="btn-secondary" @click="similarResult.groups.forEach(g => selectSimilarDuplicates(g))">
+            Select all duplicates
+          </button>
+          <button
+            class="btn-danger"
+            :disabled="similarSelected.size === 0 || cleaning"
+            @click="deleteSimilarSelected"
+          >
+            {{ cleaning ? "Deleting..." : `Delete ${similarSelected.size} selected` }}
+          </button>
+        </div>
+
+        <!-- Groups — card gallery (same layout as exact duplicates) -->
+        <div class="group-list">
+          <div v-for="group in similarResult.groups" :key="group.id" class="group-card">
+            <div class="group-header">
+              <div class="group-info">
+                <span class="group-name">
+                  {{ group.files.length }} similar images
+                  <span class="text-muted group-count">(distance {{ group.avg_distance.toFixed(1) }})</span>
+                </span>
+                <span class="group-meta text-muted">{{ formatSize(group.wasted_bytes) }} reclaimable</span>
+              </div>
+              <button class="btn-sm btn-secondary" @click="selectSimilarDuplicates(group)">Select duplicates</button>
+            </div>
+
+            <div class="card-strip-container">
+              <div class="card-strip">
+                <div
+                  v-for="(file, idx) in group.files.slice(0, 10)"
+                  :key="file.path"
+                  class="file-card"
+                  :class="{
+                    'file-card--selected': similarSelected.has(file.path),
+                    'file-card--keep': idx === group.representative_idx,
+                  }"
+                  @click="toggleSimilarFile(file.path)"
+                >
+                  <label class="card-checkbox" @click.stop>
+                    <input type="checkbox" :checked="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
+                  </label>
+                  <span v-if="idx === group.representative_idx" class="card-badge-keep">Keep</span>
+
+                  <div class="card-face card-face--thumb">
+                    <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" class="card-thumb-img" />
+                    <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="card-placeholder-icon" />
+                    <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
+                  </div>
+
+                  <div class="card-meta">
+                    <div class="card-filename" :title="file.name">{{ file.name }}</div>
+                    <div class="card-dir text-muted" :title="file.parent_dir">{{ shortPath(file.parent_dir) }}</div>
+                    <div class="card-date text-muted mono">{{ file.modified }}</div>
+                  </div>
+                </div>
+
+                <div v-if="group.files.length > 10" class="card-overflow" @click="selectSimilarDuplicates(group)">
+                  <span class="card-overflow-count">+{{ group.files.length - 10 }}</span>
+                  <span class="card-overflow-label">more images</span>
+                  <span class="card-overflow-action">Select all duplicates</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+    </template><!-- /similar tab -->
   </div>
 </template>
 
 <style scoped>
 .duplicates-view {
   max-width: 1440px;
+}
+
+.tab-switcher {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.tab-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--text);
+}
+
+.badge-keep {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(59, 199, 232, 0.15);
+  color: rgba(59, 199, 232, 1);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.similar-progress {
+  padding: var(--sp-4);
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--sp-3);
+}
+
+.similar-progress-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: var(--sp-2);
+}
+
+.similar-progress-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.similar-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.similar-progress-fill {
+  height: 100%;
+  background: var(--accent, rgba(59, 199, 232, 0.8));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.similar-progress-pct {
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 30px;
+  text-align: right;
+}
+
+.similar-progress-file {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 500px;
+}
+
+.kind-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--sp-3);
+}
+
+.kind-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.kind-pill:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.kind-pill.active {
+  background: rgba(59, 199, 232, 0.15);
+  color: rgba(40, 160, 200, 1);
+}
+
+.kind-pill.empty {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.kind-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--muted);
+}
+
+.kind-pill.active .kind-count {
+  background: rgba(59, 199, 232, 0.2);
+  color: rgba(40, 160, 200, 1);
 }
 
 .scan-controls {
@@ -572,28 +980,21 @@ function shortPath(p: string): string {
 .group-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
+}
+
+.group-card {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
 .group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px var(--sp-5);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.group-header:hover {
-  background: var(--surface-alt);
-}
-
-.group-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-  flex: 1;
+  padding: 12px 16px;
 }
 
 .group-info {
@@ -604,128 +1005,224 @@ function shortPath(p: string): string {
 }
 
 .group-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
 
 .group-count {
   font-weight: 400;
-  font-size: 13px;
-}
-
-.group-meta {
   font-size: 12px;
 }
 
-.group-header-right {
-  flex-shrink: 0;
-  margin-left: var(--sp-3);
+.group-meta {
+  font-size: 11px;
 }
 
-/* File rows */
-.group-files {
-  border-top: 1px solid var(--border-divider);
+/* ── Card strip ────────────────────────────────────────── */
+
+.card-strip-container {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px 14px;
 }
 
-.file-row {
+.card-strip-container::-webkit-scrollbar {
+  height: 4px;
+}
+.card-strip-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-strip-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+}
+
+.card-strip {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--sp-3) var(--sp-5) var(--sp-3) 44px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* ── File card ─────────────────────────────────────────── */
+
+.file-card {
+  position: relative;
+  flex-shrink: 0;
+  width: 140px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid transparent;
   cursor: pointer;
-  transition: background 0.1s;
-  border-bottom: 1px solid var(--border-divider);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  scroll-snap-align: start;
+  overflow: hidden;
 }
 
-.file-row:last-child {
-  border-bottom: none;
+.file-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.file-row:hover {
-  background: var(--surface-alt);
+.file-card--keep {
+  border-color: rgba(59, 199, 232, 0.5);
+  box-shadow: 0 0 0 1px rgba(59, 199, 232, 0.15);
 }
 
-.file-row.selected {
-  background: rgba(255, 69, 58, 0.12);
+.file-card--selected {
+  border-color: rgba(217, 75, 75, 0.6);
+  box-shadow: 0 0 0 2px rgba(217, 75, 75, 0.15);
 }
 
-.file-row.is-original {
-  background: rgba(0, 180, 216, 0.10);
-}
-
-.file-row-left {
+/* Checkbox overlay */
+.card-checkbox {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-  flex: 1;
-}
-
-.file-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.file-name-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.file-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.file-path {
-  font-size: 11px;
-  color: var(--muted);
-  max-width: 400px;
-}
-
-.file-row-right {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-shrink: 0;
-  margin-left: var(--sp-3);
-}
-
-.file-modified {
-  font-size: 11px;
-}
-
-/* Preview button */
-.btn-preview {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid transparent;
-  padding: 0;
+  width: 22px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 5px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.card-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Keep badge */
+.card-badge-keep {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(59, 199, 232, 0.85);
+  color: white;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(4px);
+}
+
+/* ── Card face (thumbnail/icon area) ───────────────────── */
+
+.card-face {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-face--thumb {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.card-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-placeholder-icon {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.card-loading-dot {
+  opacity: 0.3;
+}
+
+.card-face--ext {
+  border-radius: 0;
+}
+
+/* Overflow indicator */
+.card-overflow {
   flex-shrink: 0;
+  width: 140px;
+  min-height: 200px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 2px dashed rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.btn-preview:hover {
-  background: var(--accent-light);
-  color: var(--accent);
-  border-color: var(--accent);
+.card-overflow:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(59, 199, 232, 0.4);
 }
 
-.btn-preview.active {
-  background: var(--accent);
-  color: #ffffff;
-  border-color: var(--accent);
+.card-overflow-count {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  opacity: 0.5;
+}
+
+.card-overflow-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.card-overflow-action {
+  font-size: 10px;
+  color: var(--accent, rgba(59, 199, 232, 1));
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.card-ext-label {
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Card meta ─────────────────────────────────────────── */
+
+.card-meta {
+  padding: 8px 10px;
+}
+
+.card-filename {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-dir {
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.card-date {
+  font-size: 10px;
+  margin-top: 2px;
 }
 
 /* Preview panel */

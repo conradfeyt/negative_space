@@ -60,6 +60,14 @@ mod vault;
 mod intelligence;
 mod spotlight;
 
+// Shared image utilities (loading, HEIC conversion) for similar image detection
+// and content classification.
+mod image_utils;
+
+// Perceptual hash-based similar image detection — finds visually similar images
+// even when they differ in resolution, compression, or format.
+mod similar_images;
+
 // Bring standard-library and crate items into scope.
 use commands::{
     AppInfo, CacheEntry, CleanResult, DiskUsage, DockerInfo, DockerItem, FileInfo,
@@ -2055,6 +2063,62 @@ async fn scan_duplicates(
 }
 
 // ---------------------------------------------------------------------------
+// Command: generate_thumbnails_batch
+// ---------------------------------------------------------------------------
+
+/// Generate small JPEG thumbnails for multiple files in one call.
+/// Takes a list of (key, path) pairs. Returns a map of key -> base64 JPEG.
+/// Keys are typically group hashes. Uses threads for concurrent generation.
+#[tauri::command]
+async fn generate_thumbnails_batch(
+    items: Vec<(String, String)>,
+    max_dim: Option<u32>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let dim = max_dim.unwrap_or(140);
+    // Spawn each thumbnail on a thread to avoid sequential blocking
+    let handles: Vec<_> = items.into_iter().map(|(key, path)| {
+        std::thread::spawn(move || {
+            match image_utils::generate_thumbnail(std::path::Path::new(&path), dim) {
+                Ok(b64) => Some((key, b64)),
+                Err(_) => None,
+            }
+        })
+    }).collect();
+
+    let mut results = std::collections::HashMap::new();
+    for handle in handles {
+        if let Ok(Some((key, b64))) = handle.join() {
+            results.insert(key, b64);
+        }
+    }
+    Ok(results)
+}
+
+// ---------------------------------------------------------------------------
+// Command: scan_similar_images
+// ---------------------------------------------------------------------------
+
+/// Scan for visually similar images using perceptual hashing.
+///
+/// Unlike `scan_duplicates` which finds byte-identical files, this finds images
+/// that look similar even if they differ in resolution, compression, or format.
+/// Uses dHash (gradient) perceptual hashing with configurable Hamming distance
+/// threshold.
+#[tauri::command]
+async fn scan_similar_images(
+    app: tauri::AppHandle,
+    threshold: Option<u32>,
+    min_size_mb: u64,
+    has_fda: Option<bool>,
+    skip_paths: Option<Vec<String>>,
+) -> Result<similar_images::SimilarScanResult, String> {
+    let fda = has_fda.unwrap_or(false);
+    let skips = skip_paths.unwrap_or_default();
+    let min_bytes = if min_size_mb > 0 { min_size_mb * 1024 * 1024 } else { 10 * 1024 }; // default 10KB min
+    Ok(similar_images::run_similar_scan(&app, threshold, min_bytes, fda, &skips))
+}
+
+// ---------------------------------------------------------------------------
 // Command 23: get_disk_map
 // ---------------------------------------------------------------------------
 
@@ -2683,6 +2747,8 @@ pub fn run() {
             scan_browsers,
             clean_browser_data,
             scan_duplicates,
+            scan_similar_images,
+            generate_thumbnails_batch,
             get_disk_map,
             expand_disk_node,
             enrich_disk_nodes,
