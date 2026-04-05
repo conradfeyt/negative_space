@@ -1,402 +1,301 @@
 # Refactoring Plan
 
-> Based on: AUDIT_REPORT.md
+> Based on: AUDIT_REPORT.md (V2 — adversarial review)
 > Standards: CODING_STANDARDS.md
-> Generated: 2026-04-04
-
-> **Status: COMPLETE** — 34/35 items done, 1 deferred (2.10). Executed 2026-04-05.
+> Generated: 2026-04-05
 
 ---
 
 ## Prioritisation Strategy
 
-All work ranked by:
-1. **HIGH severity first** — correctness, data integrity, crash risks
-2. **Impact radius** — how many files/features benefit from the fix
-3. **Effort** — quick wins before large rewrites
-4. **Dependencies** — foundational changes before dependent ones
+Rank by:
+1. **HIGH severity first** — correctness, data integrity, accessibility
+2. **CONFIRMED confidence first** — both Auditor and Challenger agree
+3. **Impact radius** — how many files/features benefit
+4. **Effort** — quick wins before large rewrites
+5. **Dependencies** — foundational changes before dependent ones
+
+UNCERTAIN items go into "Pending Human Review" and are not scheduled.
 
 ---
 
-## Phase 1 — Critical Fixes (HIGH severity)
+## Phase 1 — Critical Fixes (HIGH severity, CONFIRMED)
 
-### 1.1 — Add 404 catch-all route [S16]
-- [x] Add `{ path: '/:pathMatch(.*)*', redirect: '/dashboard' }` to router.ts
-- Files: `src/router.ts`
+### 1.1 — Fix keyboard accessibility regression in LargeFiles.vue [S12]
+- [ ] Add `tabindex="0"` `role="button"` `:aria-expanded` `@keydown.enter` `@keydown.space.prevent` to 6 clickable div headers:
+  - Line 801: vault-header (`toggleGroup('vaulted')`)
+  - Line 833: group-header (`toggleGroup(group.id)`)
+  - Lines 908, 939, 969, 998: dir-header at depths 0-3 (`toggleDir()`)
+- [ ] Add same to Cpu.vue line 203: hog-header (`toggleGroup(group.name)`)
+- [ ] Add `:focus-visible` CSS for `.group-header`, `.dir-header`, `.vault-header`, `.hog-header`
+- [ ] Use Logs.vue:186 as reference implementation (correct pattern exists there)
+- Files: `src/views/LargeFiles.vue`, `src/views/Cpu.vue`
 - Complexity: **SMALL**
+- Confidence: **CONFIRMED** — both Auditor and Challenger verified missing handlers
+- Risk: None — additive change, no behavior modification
 - Dependencies: None
 
-### 1.2 — Add scroll behavior to router [S16]
-- [x] Add `scrollBehavior` option to `createRouter()` that restores saved position or scrolls to top
-- Files: `src/router.ts`
+### 1.2 — Fix direct store mutations in LargeFiles.vue [S10]
+- [ ] Create `removeDeletedFiles(paths: string[])` action in `largeFilesStore.ts`
+- [ ] Create `setVaultEntries(entries: VaultEntry[])` action in `vaultStore.ts`
+- [ ] Replace `largeFiles.value = largeFiles.value.filter(...)` at line 169 with store action call
+- [ ] Replace `vaultEntries.value = entries` at line 253 with store action call
+- Files: `src/views/LargeFiles.vue`, `src/stores/largeFilesStore.ts`, `src/stores/vaultStore.ts`
 - Complexity: **SMALL**
+- Confidence: **CONFIRMED** — both Auditor and Challenger agreed this violates one-direction flow
+- Risk: Low — mutation logic stays the same, just moves to store layer
 - Dependencies: None
 
-### 1.3 — Lazy-load all view routes [S14]
-- [x] Convert all 20 static imports in router.ts to `() => import('./views/X.vue')`
-- [x] Verify KeepAlive still works with async components
-- Files: `src/router.ts`
+### 1.3 — Fix compress_directory duplicate state in vault.rs [S2]
+- [ ] Extract `build_vault_entry_for_directory()` helper (lines 831-855) to consolidate metadata extraction
+- [ ] Consolidate duplicate state assignments in success/error branches (lines 863-876)
+- Files: `src-tauri/src/vault.rs`
 - Complexity: **SMALL**
-- Dependencies: None
-
-### 1.4 — Fix unwrap() in Tauri app setup [S5]
-- [x] Replace `app.get_webview_window("main").unwrap()` with `.expect("main window must exist per tauri.conf.json")`
-- Files: `src-tauri/src/lib.rs:2692`
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.5 — Fix vault manifest corruption swallowing [S5]
-- [x] Change `load_manifest()` to return `Result<VaultManifest, String>`
-- [x] Log and surface parse errors instead of silently returning empty
-- [x] Add fallback: if corrupt, back up corrupt file and start fresh with warning
-- Files: `src-tauri/src/vault.rs:152`
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.6 — Fix vault silent cleanup failures [S5]
-- [x] Replace `let _ = fs::remove_file()` with logging: `if let Err(e) = fs::remove_file(...) { eprintln!("[vault] cleanup failed: {}", e); }`
-- [x] In restore path, append warning to `errors` vec
-- Files: `src-tauri/src/vault.rs` (lines 429, 439, 444, 562, 572, 584, 592)
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.7 — Add app uninstall confirmation dialog [S13]
-- [x] Add confirmation step before `storeUninstallApp` call (modal or inline confirm/cancel)
-- [x] Model after Trash.vue's `confirmEmpty` pattern
-- Files: `src/views/Apps.vue:63-79`
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.8 — Remove ~60 RUST CONCEPT tutorial comments [S4]
-- [x] Remove all "RUST CONCEPT:" comments across the Rust codebase
-- [x] Preserve any comments that explain *why* (not *what*)
-- Files: `commands.rs`, `lib.rs`, `security.rs`, `duplicates.rs`, `thermal.rs`, `memory.rs`, `maintenance.rs`, `browser.rs`, `diskmap.rs`
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.9 — Extract shared Rust utilities into commands.rs [S6]
-- [x] Move `get_du_size` to `pub fn` in commands.rs; update lib.rs, browser.rs, packages.rs to use `crate::commands::get_du_size`
-- [x] Move `run_cmd` and `run_cmd_ok` to commands.rs; update security.rs, packages.rs
-- [x] Remove duplicate `home_dir` from packages.rs; use `crate::commands::home_dir()`
-- Files: `src-tauri/src/commands.rs`, `lib.rs`, `browser.rs`, `packages.rs`, `security.rs`
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 1.10 — Extract shared scan config (skip prefixes, safe dirs) [S6]
-- [x] Create `ScanConfig` struct and `build_scan_config(home, fda, skip_paths)` in commands.rs
-- [x] Refactor `scan_large_files_stream`, `run_duplicate_scan`, `run_similar_scan`, `scan_candidates` to use it
-- [x] Document which safe_dirs differences between scanners are intentional vs accidental drift
-- Files: `src-tauri/src/commands.rs`, `lib.rs`, `duplicates.rs`, `similar_images.rs`, `vault.rs`
-- Complexity: **MEDIUM**
-- Dependencies: 1.9 (commands.rs is the shared location)
-
-### 1.11 — Deduplicate process dictionaries [S6]
-- [x] Create `src-tauri/src/process_info.rs` with single canonical `get_process_dictionary()` and `get_app_bundle_mappings()`
-- [x] Merge the more detailed memory.rs version with any unique entries from vitals.rs
-- [x] Update both memory.rs and vitals.rs to import from process_info.rs
-- Files: new `process_info.rs`, `memory.rs`, `vitals.rs`, `lib.rs` (add `mod process_info`)
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 1.12 — Remove dead `scan_large_files` function [S3/S8]
-- [x] Remove non-streaming `scan_large_files` (lines 101-339 of lib.rs)
-- [x] Remove its `#[tauri::command]` registration from invoke_handler
-- [x] Verify no frontend code references it
-- Files: `src-tauri/src/lib.rs`
-- Complexity: **SMALL**
-- Dependencies: 1.10 (extract shared config first, then remove)
-
-### 1.13 — Extract shared temperature thresholds [S4]
-- [x] Create shared constants: `TEMP_CRITICAL = 95`, `TEMP_HOT = 80`, `TEMP_WARM = 65`, `TEMP_COOL = 45`
-- [x] Update Dashboard.vue `tempToColor` and Thermal.vue `tempColor` to use shared constants
-- [x] Reconcile the inconsistency (Thermal.vue missing the 45° threshold)
-- Files: `src/views/Dashboard.vue`, `src/views/Thermal.vue`, new shared location (utils.ts or composable)
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 1.14 — Export `fileDiskSize()` as shared utility [S10]
-- [x] Export the existing private `fileDiskSize` from scanStore.ts (or move to utils.ts)
-- [x] Replace all 5 inline sparse-file calculations across scanStore, LargeFiles, Dashboard
-- Files: `src/stores/scanStore.ts`, `src/views/LargeFiles.vue`, `src/views/Dashboard.vue`
-- Complexity: **SMALL**
+- Confidence: **CONFIRMED** — Auditor identified, Challenger agreed with reframing
+- Risk: Low — internal refactor, no API change
 - Dependencies: None
 
 ---
 
 ## Phase 2 — Structural Improvements (MEDIUM severity)
 
-### 2.1 — Split scanStore.ts into domain stores [S3/S10]
-- [x] Create domain-specific store files (e.g., `stores/useLargeFilesStore.ts`, `stores/useDiskMapStore.ts`, etc.)
-- [x] Each store owns its state refs, actions, and computed properties
-- [x] Extract generic `runDomainScan<T>()` helper to eliminate boilerplate
-- [x] Make data refs `readonly` at export boundary
-- [x] Create thin `stores/index.ts` re-exporting for convenience
-- [x] Update all view imports
-- Files: `src/stores/scanStore.ts` → split into ~8-10 domain stores + index
-- Complexity: **LARGE**
-- Dependencies: 1.14 (shared utilities extracted first)
+### 2.1 — Add focus-visible styles to keyboard-accessible elements [S12]
+- [ ] Add `:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }` for:
+  - Dashboard.vue stat-card elements (lines 380, 395, 424, 436)
+  - Duplicates.vue kind-pill filter buttons
+  - All expandable section headers with `tabindex="0"` across views
+- Files: `src/views/Dashboard.vue`, `src/views/Duplicates.vue`, `src/style.css` (global rule for `[tabindex="0"]:focus-visible`)
+- Complexity: **SMALL**
+- Dependencies: 1.1 (new keyboard elements need focus styles too)
 
-### 2.2 — Extract inline commands from lib.rs into domain modules [S3]
-- [x] Create `src-tauri/src/large_files.rs` (scan_large_files_stream + helpers)
-- [x] Create `src-tauri/src/caches.rs` (scan_caches, scan_logs)
-- [x] Create `src-tauri/src/docker.rs` (is_docker_installed, get_docker_info, clean_docker)
-- [x] Create `src-tauri/src/apps.rs` (scan_apps, uninstall_app, find_leftover_paths)
-- [x] Update lib.rs to only declare modules + register commands
-- Files: `src-tauri/src/lib.rs` → 4-5 new modules
-- Complexity: **LARGE**
-- Dependencies: 1.9, 1.10, 1.12 (shared utilities and dead code removed first)
-
-### 2.3 — Extract reusable health card components [S9]
-- [x] Create `src/components/ThermalCard.vue` (tempToColor, thermal strip, label)
-- [x] Create `src/components/FanCard.vue` (fan gauge SVG, arc, needle)
-- [x] Create `src/components/BatteryCard.vue` (dual rings, condition badge)
-- [x] Create `src/components/CpuCard.vue` (heatmap grid)
-- [x] Create `src/components/MemoryCard.vue` (ring gauge, segments)
-- [x] Update Dashboard.vue and SystemVitals.vue to use shared components
-- Files: 5 new components, `Dashboard.vue`, `SystemVitals.vue`
-- Complexity: **MEDIUM**
-- Dependencies: 1.13 (shared temperature thresholds)
-
-### 2.4 — Extract FDA warning into shared component [S9/S5]
-- [x] Create `src/components/FdaWarningBanner.vue` encapsulating warning UI, open-settings action, re-check action
-- [x] Add error feedback on open-settings failure (toast or inline message)
-- [x] Replace duplicated FDA code across 7+ views
-- Files: new component + 7 view files
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 2.5 — Extract shared frontend utilities [S9/S6]
-- [x] Move `timeAgo()` to `src/utils.ts` with unified signature
-- [x] Move `revealInFinder()` to `src/utils.ts`
-- [x] Move `openFdaSettings()` to composable (or handled by 2.4)
-- [x] Extract `KIND_COLORS` map from Duplicates.vue into shared location
-- Files: `src/utils.ts`, `LargeFiles.vue`, `Logs.vue`, `Memory.vue`, `Dashboard.vue`, `Duplicates.vue`
+### 2.2 — Fix direct store mutation in Vault.vue [S10]
+- [ ] Create `removeCandidates(paths: string[])` action in `vaultStore.ts`
+- [ ] Replace `vaultCandidates.value = vaultCandidates.value.filter(...)` at line 185 with action call
+- Files: `src/views/Vault.vue`, `src/stores/vaultStore.ts`
 - Complexity: **SMALL**
 - Dependencies: None
+
+### 2.3 — Replace D3 wildcard import with targeted imports [S14]
+- [ ] Replace `import * as d3 from "d3"` with named imports from D3 submodules
+- [ ] Identify all d3.* usages in SpaceMap.vue and map to subpackages:
+  - `d3-hierarchy`: partition, hierarchy
+  - `d3-scale`: scaleLinear
+  - `d3-shape`: arc
+  - `d3-selection`: select
+  - `d3-zoom`: zoom, zoomIdentity
+  - `d3-transition`: transition
+  - `d3-ease`: easeCubicInOut
+  - `d3-interpolate`: interpolateRgb
+- [ ] Update type annotations if needed (d3.HierarchyRectangularNode etc.)
+- Files: `src/views/SpaceMap.vue`
+- Complexity: **MEDIUM** — requires updating ~15+ type annotations per V1 deferral note
+- Dependencies: None
+- Risk note: Challenger confirmed this is still present. V1 deferred due to type annotation complexity.
+
+### 2.4 — Reconcile temperature thresholds [S4]
+- [ ] Import TEMP_CRITICAL/HOT/WARM/COOL from utils.ts into ChipSchematic.vue
+- [ ] Optionally add 2 intermediate levels (TEMP_VERY_HOT=90, TEMP_MILD=55) to utils.ts if finer granularity is needed for die visualization
+- [ ] Replace hardcoded thresholds (100/90/80/70/55/40) in `tempHSL()` with shared constants
+- Files: `src/components/ChipSchematic.vue`, `src/utils.ts`
+- Complexity: **SMALL**
+- Confidence: Confirmed as oversight — reconcile to shared constants
+
+### 2.5 — Consolidate SpaceMap overviewColors with SPACEMAP_CATEGORY_FILLS [S4/S11]
+- [ ] Merge `overviewColors` (SpaceMap.vue:61-83) into the existing `SPACEMAP_CATEGORY_FILLS` map in utils.ts, or create a shared `OVERVIEW_CATEGORY_COLORS` alongside it
+- [ ] Replace hardcoded HSLA strings with `cssVar()` pattern from utils.ts
+- [ ] Define corresponding `--overview-*` CSS custom properties in `style.css`
+- Files: `src/views/SpaceMap.vue`, `src/utils.ts`, `src/style.css`
+- Complexity: **SMALL**
+- Confidence: Confirmed as oversight — consolidate into design token system
 
 ### 2.6 — Break down long Rust functions [S2]
-- [x] Split `run_similar_scan` (290 lines) into `discover_images()`, `hash_images()`, `deduplicate_by_content()`, `build_groups()`, `generate_thumbnails()`
-- [x] Split `run_duplicate_scan` (330 lines) into stage 0-3 helpers
-- [x] Split `compress_files` (150 lines): extract `compress_single_file()` loop body
-- [x] Split `scan_launch_items` (180 lines): extract `analyze_launch_item()` helper
-- [x] Group 4+ param functions into option structs (`ScanOptions`, `VaultScanOptions`, etc.)
-- Files: `similar_images.rs`, `duplicates.rs`, `vault.rs`, `security.rs`
+- [ ] `scan_large_files_stream` (185 lines) in large_files.rs: extract `process_file_entry()` helper
+- [ ] `scan_candidates` (132 lines) in vault.rs: extract `should_skip_candidate()` filter helper
+- [ ] `run_browser_scan` (160 lines) in browser.rs: extract `scan_browser_category()` helper
+- [ ] `scan_vitals` (112 lines) in vitals.rs: extract `build_vitals_group()` helper
+- Files: `src-tauri/src/large_files.rs`, `vault.rs`, `browser.rs`, `vitals.rs`
 - Complexity: **MEDIUM**
-- Dependencies: 1.10 (scan config extraction)
+- Dependencies: 1.3 (vault.rs compress_directory first)
 
-### 2.7 — Fix silent error swallowing in frontend [S5/S13]
-- [x] Replace `catch (_) {}` on user-initiated actions with toast/console.warn
-- [x] Add error state for `loadDiskUsage` failure
-- [x] Add error state for `scanAll` top-level catch
-- [x] Fix Settings.vue access check failures to show inline error
-- [x] Add spinner to Duplicates similar-images delete button
-- [x] Add per-item try/catch in Vault `compressQueue` loop
-- Files: ~10 view files + `scanStore.ts`
+### 2.7 — Consolidate safe_dirs across scan modules [S6]
+- [ ] Create `pub fn base_scan_safe_dirs(home: &str) -> Vec<String>` in commands.rs with the ~20 shared entries from large_files/duplicates
+- [ ] Add `/var/tmp` to the shared list (currently only in large_files — accidental omission from duplicates)
+- [ ] Add `~/node_modules` to the shared list (currently only in large_files — likely should also exclude from duplicates)
+- [ ] Have large_files.rs and duplicates.rs call the shared function instead of building inline vectors
+- [ ] Keep similar_images.rs separate — its 4-entry media-only list (Pictures/Downloads/Documents/Desktop) is intentionally different
+- Files: `src-tauri/src/commands.rs`, `large_files.rs`, `duplicates.rs`
+- Complexity: **MEDIUM**
+
+### 2.8 — Split boolean flag functions [S2]
+- [ ] `uninstall_app(path, remove_leftovers: bool)` in apps.rs -> `uninstall_app()` + `uninstall_app_with_cleanup()`
+- [ ] `clean_docker(prune_all: bool)` in docker.rs -> `clean_docker_dangling()` + `clean_docker_all()`
+- [ ] Update frontend callers to use the appropriate variant
+- Files: `src-tauri/src/apps.rs`, `docker.rs`, `lib.rs`, frontend callers
 - Complexity: **MEDIUM**
 - Dependencies: None
+- Risk note: Challenger flagged that `fda: bool` in diskmap.rs is a capability toggle (NOT a flag violation). Only split the two behavior switches.
 
-### 2.8 — Consolidate duplicated domain status state [S10]
-- [x] Remove individual `*Scanning`/`*Scanned`/`*Error` refs
-- [x] Derive scanning/scanned/error state from `domainStatus` record
-- [x] Update all view imports
-- Files: `scanStore.ts` (or domain stores if 2.1 is done first)
-- Complexity: **MEDIUM**
-- Dependencies: Best done as part of 2.1
+### 2.9 — Expand test coverage [S7]
+- [ ] Add Pinia store tests for at least: largeFilesStore, vaultStore, domainStatusStore (mutation patterns)
+- [ ] Add Vue component test for at least one complex component (e.g., Dashboard computed properties)
+- [ ] Target: 50+ tests covering critical paths
+- Files: New test files in `src/__tests__/`
+- Complexity: **MEDIUM-LARGE**
+- Dependencies: 1.2 (store mutations fixed first makes testing cleaner)
 
-### 2.9 — Hardcoded colors → design tokens [S11]
-- [x] Define visualization color tokens in `style.css` (category fills, temperature scales)
-- [x] Create shared `thermal-palette.ts` for temperature/gauge HSLA
-- [x] Update JS color objects in Memory, SpaceMap, Dashboard, Duplicates to reference tokens
-- [x] Replace hardcoded hex in scoped styles with CSS variables
-- Files: `style.css`, `Memory.vue`, `SpaceMap.vue`, `Dashboard.vue`, `Duplicates.vue`, `Packages.vue`, `Vault.vue`, `LargeFiles.vue`
-- Complexity: **MEDIUM**
-- Dependencies: 2.3 (health cards extracted first avoids double-work)
-
-### 2.10 — Use targeted D3 imports [S14/S17] — DEFERRED
-- [ ] Deferred — switching `import * as d3` to named imports requires updating ~15+ type annotations per file. Better done when visualization components are further refactored.
-- Files: `SpaceMap.vue`, `VoronoiViz.vue`
-- Complexity: **SMALL**
-- Dependencies: None
-
-### 2.11 — Fix router scroll behavior [S16]
-- [x] Already covered in 1.2
-- Dependencies: Done in Phase 1
+### 2.10 — Extract composables from oversized views [S9]
+- [ ] LargeFiles.vue: extract `useFileGrouping()` composable (sorting, grouping, categorization logic)
+- [ ] SpaceMap.vue: extract `useSunburstViz()` composable (D3 sunburst setup, zoom, arc rendering)
+- [ ] Duplicates.vue: extract `useDuplicateFilters()` composable (kind filtering, selection state)
+- [ ] Vault.vue: extract `useCompressionQueue()` composable (queue state, size calculation, progress)
+- Files: New composables + corresponding view files
+- Complexity: **LARGE**
+- Dependencies: 2.3 (D3 imports resolved before extracting sunburst composable)
 
 ---
 
 ## Phase 3 — Polish & Consistency (LOW severity)
 
-### 3.1 — Rename single-letter variables [S1]
-- [x] Rename `s`/`t`/`c`/`h` to descriptive names across Dashboard, Memory, SystemVitals, SpaceMap
-- [x] Rename Rust single-letter vars in vitals.rs, similar_images.rs, duplicates.rs, vault.rs, thermal.rs
-- Files: ~10 files
+### 3.1 — Extract display limit constants [S4]
+- [ ] CpuCard.vue: `const MAX_DISPLAYED_CORES = 24`
+- [ ] VoronoiViz.vue: `const MAX_TOP_CHILDREN = 18`, `const MAX_CLUSTER_CHILDREN = 20`
+- [ ] GalacticViz.vue: `const MAX_PLANETS = 15`, `const MAX_MOONS = 5`
+- [ ] Duplicates.vue: `const PREVIEW_FILES_PER_GROUP = 10`
+- [ ] Dashboard.vue: `const TOP_FILES_COUNT = 5`, `const TOP_MEMORY_COUNT = 3`
+- Files: 5 component/view files
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.2 — Replace inline styles with scoped CSS classes [S11]
-- [x] Replace static inline styles in Docker, Settings, IconTest, Dashboard, Memory, App, LargeFiles
-- [x] Use spacing tokens (`var(--sp-N)`) for margin/padding values
-- [x] Snap arbitrary px values to 4/8px grid where possible
-- Files: ~8 view files
+### 3.2 — Extract getFileExtension utility [S6]
+- [ ] Add `export function getFileExtension(name: string): string` to utils.ts
+- [ ] Replace 8+ inline `.split(".").pop()?.toLowerCase()` occurrences
+- Files: `src/utils.ts`, Dashboard.vue, Duplicates.vue, LargeFiles.vue
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.3 — Add alt text to images [S12]
-- [x] Add `alt=""` for decorative icons (file type icons next to labeled text)
-- [x] Add descriptive `:alt` for informative images (browser icons, app icons)
-- Files: Caches, Logs, LargeFiles, Browsers, Duplicates, SpaceMap, IconTest
+### 3.3 — Wrap store exports in readonly() [S10]
+- [ ] Add `readonly()` wrapper to exported refs in all domain stores
+- [ ] Expose mutation functions as the only way to modify state
+- Files: All files in `src/stores/`
+- Complexity: **SMALL-MEDIUM**
+- Dependencies: 1.2, 2.2 (store actions created first)
+
+### 3.4 — Add debug logging to remaining silent catches [S5]
+- [ ] Add `console.debug()` to FDA settings catches in App.vue and Dashboard.vue
+- [ ] Add `console.debug()` to cache save failure in domainStatusStore.ts
+- Files: `src/App.vue`, `src/views/Dashboard.vue`, `src/stores/domainStatusStore.ts`
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.4 — Add keyboard accessibility to clickable divs [S12]
-- [x] Convert primary navigation elements (Dashboard stat cards) to `<button>` or `<router-link>`
-- [x] Add `tabindex="0"`, `role="button"`, `@keydown.enter`/`.space` to expandable headers
-- Files: Dashboard, Caches, Security, Packages, Logs, Memory, Browsers, Duplicates
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 3.5 — Add ARIA attributes incrementally [S12]
-- [x] Tab switcher in Duplicates: `role="tablist"`, `role="tab"`, `aria-selected`
-- [x] Expandable sections: `aria-expanded`
-- [x] Progress bars: `role="progressbar"`, `aria-valuenow/min/max`
-- [x] Modal in Browsers: `role="dialog"`, `aria-modal`, `aria-labelledby`
-- Files: Duplicates, Caches, Logs, Security, Packages, Browsers, SpaceMap
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 3.6 — Adopt semantic HTML [S11]
-- [x] Replace view root `<div>` with `<section>`
-- [x] Use `<ul>/<li>` for list structures
-- [x] Use `<dl>/<dt>/<dd>` for stat label-value pairs
-- Files: All views
-- Complexity: **MEDIUM**
-- Dependencies: None
-
-### 3.7 — Add vitest and initial frontend tests [S7]
-- [x] Install vitest
-- [x] Write tests for `formatSize` in utils.ts
-- [x] Write tests for `fileDiskSize`, `timeAgo` utilities
-- [x] Write tests for pure computed properties after store split (2.1)
-- Files: new test files, `package.json`
-- Complexity: **MEDIUM**
-- Dependencies: 2.1 (store split makes testing practical), 2.5 (shared utilities extracted)
-
-### 3.8 — Gate IconTest route behind dev flag [S8]
-- [x] Conditionally register `/icon-test` route only in development builds
-- Files: `src/router.ts`
+### 3.5 — Hardcoded fallback colors to design tokens [S11]
+- [ ] Memory.vue: replace `"#94a3b8"` fallback with token constant
+- [ ] MemoryCard.vue: replace inline HSLA values with token references
+- Files: `src/views/Memory.vue`, `src/components/MemoryCard.vue`
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.9 — Minor Rust error handling improvements [S5]
-- [x] Use `.filter_map(|e| e.ok())` instead of `.filter(is_ok).unwrap()` in vitals.rs
-- [x] Use `.unwrap_or_else(|e| e.into_inner())` for gradient.rs mutex
-- [x] Log emit failures for "done" events in streaming scan
-- [x] Log preview.rs temp directory failures
-- Files: `vitals.rs`, `gradient.rs`, `lib.rs`, `preview.rs`
+### 3.6 — Add aria-labels to gauge components [S12]
+- [ ] ThermalCard.vue: add `aria-label` to thermal strip (e.g., "Temperature: 78 degrees")
+- [ ] FanCard.vue: add `aria-label` to fan gauge (e.g., "Fan speed: 2100 RPM")
+- Files: `src/components/ThermalCard.vue`, `src/components/FanCard.vue`
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.10 — Add color-alongside-text for status indicators [S12]
-- [x] Add text label next to thermal dot in Dashboard
-- [x] Add icon/text for live/paused state in Memory
-- [x] Ensure CPU heatmap has accessible tooltip with temperature numbers
-- Files: `Dashboard.vue`, `Memory.vue`
-- Complexity: **SMALL**
-- Dependencies: 2.3 (if health cards extracted first)
-
-### 3.11 — Form validation improvements [S15]
-- [x] Add blur validation on LargeFiles minSize input
-- [x] Add `<label>` elements associated with scan config inputs
-- Files: `LargeFiles.vue`, `Duplicates.vue`
+### 3.7 — Snap non-standard pixel values to spacing tokens [S11]
+- [ ] Review style.css button/badge padding values (9px, 7px, 6px, 3px)
+- [ ] Snap to nearest token or document as intentional visual refinement
+- Files: `src/style.css`, `src/components/Toast.vue`
 - Complexity: **SMALL**
 - Dependencies: None
 
-### 3.12 — Extract zoom/pan composable from visualizations [S9]
-- [x] Create `src/composables/useZoomPan.ts` with shared wheel/drag handlers
-- [x] Refactor VoronoiViz and GalacticViz to use it
-- Files: new composable, `VoronoiViz.vue`, `GalacticViz.vue`
-- Complexity: **MEDIUM**
+### 3.8 — Extract scan_thermal assessment helper [S2]
+- [ ] Extract `generate_assessment(hottest_temp)` from scan_thermal (102 lines) in thermal.rs
+- Files: `src-tauri/src/thermal.rs`
+- Complexity: **SMALL**
 - Dependencies: None
+
+### 3.9 — Add debounce to Apps search [S14]
+- [ ] Add 200ms debounce to `searchQuery` in Apps.vue
+- Files: `src/views/Apps.vue`
+- Complexity: **SMALL**
+- Dependencies: None
+
+---
+
+## Pending Human Review
+
+All three uncertain items have been resolved:
+
+| # | Item | Decision | Action |
+|---|------|----------|--------|
+| ~~U1~~ | ChipSchematic vs utils.ts temperature thresholds | **Reconcile** — oversight, not intentional | See item 2.4 |
+| ~~U2~~ | safe_dirs differences between scan modules | **Consolidate** — `/var/tmp` and `~/node_modules` omissions are accidental. similar_images stays separate (intentionally media-only) | See item 2.7 |
+| ~~U3~~ | SpaceMap overviewColors vs SPACEMAP_CATEGORY_FILLS | **Consolidate** — confirmed oversight | See item 2.5 |
 
 ---
 
 ## Recommended Order of Execution
 
-**Quick wins (do first, ~1-2 hours total):**
-1. 1.1 — Add 404 catch-all route
-2. 1.2 — Add scroll behavior
-3. 1.3 — Lazy-load routes
-4. 1.4 — Fix unwrap() in setup
-5. 1.5 — Fix vault manifest corruption
-6. 1.6 — Fix vault silent cleanup
-7. 1.7 — Add uninstall confirmation
-8. 1.14 — Export fileDiskSize utility
+**Quick wins (do first, ~1-2 hours):**
+1. **1.1** — Fix keyboard accessibility regression (7 divs)
+2. **1.2** — Fix store mutations in LargeFiles.vue (create 2 store actions)
+3. **2.1** — Add focus-visible styles
+4. **2.2** — Fix store mutation in Vault.vue
+5. **3.4** — Add debug logging to silent catches
+6. **3.6** — Add aria-labels to gauges
 
-**Rust backend cleanup (do together, ~2-3 hours):**
-9. 1.8 — Remove RUST CONCEPT comments
-10. 1.9 — Extract shared Rust utilities (get_du_size, run_cmd, home_dir)
-11. 1.10 — Extract shared scan config
-12. 1.12 — Remove dead scan_large_files
-13. 1.11 — Deduplicate process dictionaries
-14. 1.13 — Extract shared temperature thresholds
+**Rust backend cleanup (~2 hours):**
+7. **1.3** — Fix compress_directory duplicate state
+8. **2.6** — Break down 4 long Rust functions
+9. **2.8** — Split boolean flag functions (2 instances)
+10. **3.8** — Extract scan_thermal helper
 
-**Rust function structure (~2 hours):**
-15. 2.6 — Break down long Rust functions + option structs
+**Frontend utilities and tokens (~1-2 hours):**
+11. **3.1** — Extract display limit constants
+12. **3.2** — Extract getFileExtension utility
+13. **3.5** — Hardcoded fallback colors to tokens
+14. **3.7** — Snap non-standard pixels
+15. **2.5** — SpaceMap overviewColors to tokens (after human decision)
 
-**Frontend utilities and shared components (~2-3 hours):**
-16. 2.5 — Extract shared frontend utilities
-17. 2.4 — Extract FDA warning component
-18. 2.3 — Extract reusable health card components
-19. 2.10 — Targeted D3 imports
+**Structural refactoring (~3-4 hours):**
+16. **2.3** — D3 targeted imports
+17. **2.10** — Extract composables from oversized views
+18. **2.7** — Consolidate safe_dirs (after human decision)
 
-**Major frontend restructure (~4-6 hours):**
-20. 2.1 — Split scanStore.ts (includes 2.8 — consolidate domain status)
-21. 2.2 — Extract lib.rs inline commands into modules
+**Testing (~2-3 hours):**
+19. **3.3** — Wrap store exports in readonly()
+20. **2.9** — Expand test coverage
 
-**Error handling and design tokens (~2 hours):**
-22. 2.7 — Fix silent error swallowing
-23. 2.9 — Hardcoded colors → design tokens
-
-**Polish pass (~3-4 hours):**
-24. 3.1 — Rename single-letter variables
-25. 3.2 — Replace inline styles
-26. 3.3 — Add alt text
-27. 3.4 — Add keyboard accessibility
-28. 3.5 — Add ARIA attributes
-29. 3.6 — Semantic HTML
-30. 3.9 — Minor Rust error handling
-31. 3.10 — Color-alongside-text
-32. 3.11 — Form validation
-33. 3.8 — Gate IconTest
-34. 3.12 — Extract zoom/pan composable
-
-**Final:**
-35. 3.7 — Add vitest (depends on store split being complete)
+**After human decisions:**
+21. **2.4** — Reconcile temperature thresholds
 
 ---
 
 ## Rules of Engagement
 
 - Each fix should be a single, reviewable commit
-- Run `npm run tauri build` after every structural change — never break the build
-- Do not change behaviour while refactoring — refactoring is structure-only
-- If a fix requires behaviour changes (e.g., reconciling inconsistent thresholds), flag it separately
+- Run existing tests after every change (`npm run test`)
+- Run `npm run tauri build` after structural Rust changes
+- Do not change behaviour while refactoring
+- If a fix requires behaviour changes, flag it separately
+- Where Challenger proposed an alternative fix, prefer the simpler option unless the risk note justifies complexity
 - Open the built app from `src-tauri/target/release/bundle/macos/Negativ_.app` to verify after major changes
 - Use `./rebuild.sh` which auto-increments build number for verification
 
 ---
 
-## Completion Log
+## Comparison with V1 Refactoring Plan
 
-**Executed:** 2026-04-05
-**Commits:** 25 commits across 3 phases
-**Build verified:** Build 43 — app opens and runs from dist
+| Metric | V1 Plan | V2 Plan |
+|--------|---------|---------|
+| Total items | 35 | 21 (+ 3 pending human review) |
+| Phase 1 (Critical) | 14 items | 3 items |
+| Phase 2 (Structural) | 10 items | 10 items |
+| Phase 3 (Polish) | 12 items | 9 items |
+| Estimated effort | ~16-20 hours | ~10-14 hours |
 
-### Phase 1 — 14/14 items complete
-All critical fixes implemented: routing (404, scroll, lazy-load), error handling (vault manifest, cleanup logging, unwrap), uninstall confirmation, RUST CONCEPT removal, shared Rust utilities, scan config extraction, process dictionary dedup, dead code removal, temperature thresholds, fileDiskSize utility.
-
-### Phase 2 — 9/10 items complete (1 deferred)
-Structural improvements: scanStore split into 17 domain stores, lib.rs split into 4 domain modules (43% reduction), 5 health card components extracted, FDA warning component, shared frontend utilities, Rust function breakdown (18 helpers + 3 option structs), silent error swallowing fixed, ~60 CSS design tokens added. Item 2.10 (targeted D3 imports) deferred.
-
-### Phase 3 — 12/12 items complete
-Polish: single-letter variable renames, inline styles → scoped CSS, alt text on all images, keyboard accessibility on 15 clickable elements, ARIA attributes across 7 views, semantic HTML in 12 views, form validation, IconTest dev-gated, Rust error handling improvements, zoom/pan composable, vitest with 21 tests.
+The V2 plan is significantly smaller because the V1 refactoring resolved the majority of issues. Remaining work focuses on:
+- **Accessibility regression** from new code (Phase 1)
+- **State management discipline** introduced by the store split (Phase 1-2)
+- **Continuing size reduction** of large components via composables (Phase 2)
+- **Testing foundation** to prevent future regressions (Phase 2)

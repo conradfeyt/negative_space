@@ -166,6 +166,58 @@ use crate::process_info::{get_app_bundle_mappings, get_process_dictionary};
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Build a single [`VitalsGroup`] from its constituent processes and metadata.
+fn build_vitals_group(
+    name: String,
+    category: String,
+    description: String,
+    mut procs: Vec<VitalsProcess>,
+    thermal_state: &ThermalState,
+    load: &SystemLoad,
+) -> VitalsGroup {
+    procs.sort_by(|a, b| {
+        b.cpu_percent
+            .partial_cmp(&a.cpu_percent)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let total_cpu_percent: f64 = procs.iter().map(|p| p.cpu_percent).sum();
+    let total_rss_bytes: u64 = procs.iter().map(|p| p.rss_bytes).sum();
+    let process_count = procs.len() as u32;
+
+    // Idle detection: high memory (>200MB) but barely using CPU (<1%)
+    let likely_idle = total_rss_bytes > 200 * 1024 * 1024 && total_cpu_percent < 1.0;
+
+    // Can the user quit this? Not for core system processes.
+    let can_quit = category != "system" && name != "Negative _";
+
+    // Generate smart remediation suggestion
+    let (suggestion, suggestion_severity) = generate_suggestion(
+        &name,
+        &category,
+        total_cpu_percent,
+        total_rss_bytes,
+        process_count,
+        likely_idle,
+        thermal_state,
+        load,
+    );
+
+    VitalsGroup {
+        name,
+        category,
+        description,
+        total_cpu_percent,
+        total_rss_bytes,
+        process_count,
+        likely_idle,
+        suggestion,
+        suggestion_severity,
+        can_quit,
+        processes: procs,
+    }
+}
+
 /// Scan system vitals: thermal state, CPU hogs, memory, load, and generate
 /// actionable insights.
 pub fn scan_vitals() -> VitalsResult {
@@ -206,50 +258,11 @@ pub fn scan_vitals() -> VitalsResult {
     let mut groups: Vec<VitalsGroup> = Vec::new();
     let total_cpu: f64 = processes.iter().map(|p| p.cpu_percent).sum();
 
-    for (key, mut procs) in group_map {
+    for (key, procs) in group_map {
         let (name, category, description) = group_meta.remove(&key).unwrap_or_default();
-
-        procs.sort_by(|a, b| {
-            b.cpu_percent
-                .partial_cmp(&a.cpu_percent)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        let total_group_cpu: f64 = procs.iter().map(|p| p.cpu_percent).sum();
-        let total_group_rss: u64 = procs.iter().map(|p| p.rss_bytes).sum();
-        let process_count = procs.len() as u32;
-
-        // Idle detection: high memory (>200MB) but barely using CPU (<1%)
-        let likely_idle = total_group_rss > 200 * 1024 * 1024 && total_group_cpu < 1.0;
-
-        // Can the user quit this? Not for core system processes.
-        let can_quit = category != "system" && name != "Negative _";
-
-        // Generate smart remediation suggestion
-        let (suggestion, severity) = generate_suggestion(
-            &name,
-            &category,
-            total_group_cpu,
-            total_group_rss,
-            process_count,
-            likely_idle,
-            &thermal_state,
-            &load,
-        );
-
-        groups.push(VitalsGroup {
-            name,
-            category,
-            description,
-            total_cpu_percent: total_group_cpu,
-            total_rss_bytes: total_group_rss,
-            process_count,
-            likely_idle,
-            suggestion,
-            suggestion_severity: severity,
-            can_quit,
-            processes: procs,
-        });
+        groups.push(build_vitals_group(
+            name, category, description, procs, &thermal_state, &load,
+        ));
     }
 
     // Sort by CPU descending

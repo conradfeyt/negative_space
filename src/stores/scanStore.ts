@@ -72,6 +72,7 @@ export {
   largeFilesCurrentDir,
   totalLargeFileSize,
   scanLargeFiles,
+  removeDeletedFiles,
 } from "./largeFilesStore";
 // (restoreLargeFilesCache is internal — called from restoreAllCaches)
 
@@ -260,6 +261,8 @@ export {
   compressDirectoryToVault,
   collectVaultDirectory,
   deleteVaultEntry,
+  setVaultEntries,
+  removeCandidates,
 } from "./vaultStore";
 
 // ---------------------------------------------------------------------------

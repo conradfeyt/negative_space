@@ -298,6 +298,38 @@ pub struct ScanConfig {
     pub scan_roots: Vec<String>,
 }
 
+/// Base set of directories to skip during file scanning.
+/// Covers developer tools, package caches, system dirs, and temp paths.
+///
+/// Used by large_files.rs and duplicates.rs as their safe-dir list.
+/// (similar_images.rs uses a separate, smaller media-focused list.)
+pub fn base_scan_safe_dirs(home: &str) -> Vec<String> {
+    vec![
+        format!("{}/Library/Developer", home),
+        "/usr/local".to_string(),
+        "/opt/homebrew".to_string(),
+        format!("{}/Projects", home),
+        format!("{}/projects", home),
+        format!("{}/src", home),
+        format!("{}/dev", home),
+        format!("{}/code", home),
+        format!("{}/workspace", home),
+        format!("{}/go", home),
+        format!("{}/node_modules", home),
+        format!("{}/.cargo", home),
+        format!("{}/.rustup", home),
+        format!("{}/.npm", home),
+        format!("{}/.gradle", home),
+        format!("{}/.m2", home),
+        format!("{}/.docker", home),
+        format!("{}/.local", home),
+        format!("{}/.cache", home),
+        "/tmp".to_string(),
+        "/var/tmp".to_string(),
+        "/Applications".to_string(),
+    ]
+}
+
 /// System paths that every scanner should skip.
 const SYSTEM_SKIP_PREFIXES: &[&str] = &[
     "/System",

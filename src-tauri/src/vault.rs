@@ -438,20 +438,10 @@ fn compress_single_file(
 ) -> Result<(VaultEntry, u64, u64), String> {
     let path = Path::new(path_str);
 
-    // Read metadata before compression
-    let meta = fs::metadata(path)
-        .map_err(|e| format!("{}: {}", path_str, e))?;
-
-    let original_size = meta.len();
-    let permissions = meta.mode();
-
-    let modified = meta.modified()
-        .map(commands::format_system_time)
-        .unwrap_or_else(|_| "unknown".to_string());
-
-    let accessed = meta.accessed()
-        .map(commands::format_system_time)
-        .unwrap_or_else(|_| "unknown".to_string());
+    // Read original size before compression (metadata for dates/permissions read later by build_vault_entry)
+    let original_size = fs::metadata(path)
+        .map_err(|e| format!("{}: {}", path_str, e))?
+        .len();
 
     // Hash the original
     let hash = blake3_hash_file(path_str)?;
@@ -496,22 +486,7 @@ fn compress_single_file(
         .to_string_lossy()
         .to_lowercase();
 
-    let now = chrono_now();
-
-    let entry = VaultEntry {
-        id: uuid::Uuid::new_v4().to_string(),
-        original_path: path_str.to_string(),
-        original_size,
-        compressed_size,
-        compression_ratio: ratio,
-        blake3_hash: hash,
-        vault_filename,
-        archived_at: now,
-        original_modified: modified,
-        original_accessed: accessed,
-        permissions,
-        file_type,
-    };
+    let entry = build_vault_entry(path_str, original_size, compressed_size, ratio, hash, vault_filename, &file_type);
 
     Ok((entry, original_size, compressed_size))
 }
@@ -769,6 +744,44 @@ fn verify_compressed(vault_path: &str, expected_hash: &str) -> Result<bool, Stri
     Ok(hash == expected_hash)
 }
 
+/// Build a VaultEntry from compression results and filesystem metadata.
+fn build_vault_entry(
+    original_path: &str,
+    original_size: u64,
+    compressed_size: u64,
+    compression_ratio: f64,
+    blake3_hash: String,
+    vault_filename: String,
+    file_type: &str,
+) -> VaultEntry {
+    let path = Path::new(original_path);
+    let meta = fs::metadata(path).ok();
+    let permissions = meta.as_ref().map(|m| m.mode()).unwrap_or(0o755);
+    let modified = meta.as_ref()
+        .and_then(|m| m.modified().ok())
+        .map(commands::format_system_time)
+        .unwrap_or_else(|| "unknown".to_string());
+    let accessed = meta.as_ref()
+        .and_then(|m| m.accessed().ok())
+        .map(commands::format_system_time)
+        .unwrap_or_else(|| "unknown".to_string());
+
+    VaultEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        original_path: original_path.to_string(),
+        original_size,
+        compressed_size,
+        compression_ratio,
+        blake3_hash,
+        vault_filename,
+        archived_at: chrono_now(),
+        original_modified: modified,
+        original_accessed: accessed,
+        permissions,
+        file_type: file_type.to_string(),
+    }
+}
+
 /// Compress an entire directory into a single vault entry (tar.zst).
 /// The whole directory tree is archived as one blob and the original is removed.
 pub fn compress_directory(dir_path: &str) -> CompressResult {
@@ -828,53 +841,22 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
     let compressed_size = fs::metadata(&vault_path).map(|m| m.len()).unwrap_or(0);
     let ratio = if original_size > 0 { compressed_size as f64 / original_size as f64 } else { 1.0 };
 
-    let meta = fs::metadata(path).ok();
-    let permissions = meta.as_ref().map(|m| m.mode()).unwrap_or(0o755);
-    let modified = meta.as_ref()
-        .and_then(|m| m.modified().ok())
-        .map(commands::format_system_time)
-        .unwrap_or_else(|| "unknown".to_string());
-    let accessed = meta.as_ref()
-        .and_then(|m| m.accessed().ok())
-        .map(commands::format_system_time)
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let entry = VaultEntry {
-        id: uuid::Uuid::new_v4().to_string(),
-        original_path: dir_path.to_string(),
-        original_size,
-        compressed_size,
-        compression_ratio: ratio,
-        blake3_hash: hash_hex,
-        vault_filename,
-        archived_at: chrono_now(),
-        original_modified: modified,
-        original_accessed: accessed,
-        permissions,
-        file_type: "directory".to_string(),
-    };
+    let entry = build_vault_entry(dir_path, original_size, compressed_size, ratio, hash_hex, vault_filename, "directory");
 
     let mut manifest = load_manifest();
     crate::spotlight::index_vault_entry(&entry);
     manifest.entries.push(entry);
 
+    // Compression succeeded — set result regardless of deletion outcome
+    result.success = true;
+    result.files_compressed = 1;
+    result.total_original_size = original_size;
+    result.total_compressed_size = compressed_size;
+    result.total_savings = original_size.saturating_sub(compressed_size);
+
     // Remove the original directory
-    match fs::remove_dir_all(path) {
-        Ok(_) => {
-            result.success = true;
-            result.files_compressed = 1;
-            result.total_original_size = original_size;
-            result.total_compressed_size = compressed_size;
-            result.total_savings = original_size.saturating_sub(compressed_size);
-        }
-        Err(e) => {
-            result.errors.push(format!("Compressed but failed to delete original: {}", e));
-            result.success = true; // Compression succeeded, deletion failed
-            result.files_compressed = 1;
-            result.total_original_size = original_size;
-            result.total_compressed_size = compressed_size;
-            result.total_savings = original_size.saturating_sub(compressed_size);
-        }
+    if let Err(e) = fs::remove_dir_all(path) {
+        result.errors.push(format!("Compressed but failed to delete original: {}", e));
     }
 
     if let Err(e) = save_manifest(&manifest) {

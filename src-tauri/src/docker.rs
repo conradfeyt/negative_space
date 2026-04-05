@@ -129,16 +129,19 @@ pub async fn get_docker_info() -> Result<DockerInfo, String> {
     })
 }
 
-/// Run `docker system prune` to free unused Docker resources.
-/// If `prune_all` is true, also removes all unused images (not just dangling ones).
-#[tauri::command]
-pub async fn clean_docker(prune_all: bool) -> CleanResult {
-    let mut args = vec!["system", "prune", "-f"];
-    if prune_all {
-        args.push("-a");
-    }
+/// Run `docker system prune -f` (dangling resources only).
+fn run_docker_prune_dangling() -> CleanResult {
+    run_docker_prune(&["system", "prune", "-f"])
+}
 
-    let output = std::process::Command::new("docker").args(&args).output();
+/// Run `docker system prune -f -a` (all unused resources, including images).
+fn run_docker_prune_all() -> CleanResult {
+    run_docker_prune(&["system", "prune", "-f", "-a"])
+}
+
+/// Shared implementation: run a `docker` prune command with the given args.
+fn run_docker_prune(args: &[&str]) -> CleanResult {
+    let output = std::process::Command::new("docker").args(args).output();
 
     match output {
         Ok(o) if o.status.success() => {
@@ -174,5 +177,16 @@ pub async fn clean_docker(prune_all: bool) -> CleanResult {
             deleted_count: 0,
             errors: vec![format!("Failed to run docker: {}", e)],
         },
+    }
+}
+
+/// Run `docker system prune` to free unused Docker resources.
+/// If `prune_all` is true, also removes all unused images (not just dangling ones).
+#[tauri::command]
+pub async fn clean_docker(prune_all: bool) -> CleanResult {
+    if prune_all {
+        run_docker_prune_all()
+    } else {
+        run_docker_prune_dangling()
     }
 }

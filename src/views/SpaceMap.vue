@@ -12,8 +12,17 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import * as d3 from "d3";
-import { formatSize, revealInFinder, SPACEMAP_CATEGORY_FILLS } from "../utils";
+import { hierarchy, partition } from "d3-hierarchy";
+import type { HierarchyRectangularNode } from "d3-hierarchy";
+import { scaleLinear } from "d3-scale";
+import { arc } from "d3-shape";
+import { select } from "d3-selection";
+import { zoom, zoomIdentity } from "d3-zoom";
+import type { ZoomBehavior } from "d3-zoom";
+import { interpolateRgb } from "d3-interpolate";
+import { easeCubicInOut } from "d3-ease";
+import "d3-transition";
+import { formatSize, revealInFinder, SPACEMAP_CATEGORY_FILLS, OVERVIEW_CATEGORY_COLORS } from "../utils";
 import {
   diskMapResult,
   diskMapLoading,
@@ -58,29 +67,7 @@ const categoryFills = SPACEMAP_CATEGORY_FILLS;
 // Overview mode — macOS-style stacked bar + category list
 // ---------------------------------------------------------------------------
 // macOS-style category colors (matched to System Settings > Storage)
-const overviewColors: Record<string, string> = {
-  applications: "hsla(0, 65%, 58%, 0.9)",        // Red
-  documents:    "hsla(30, 75%, 55%, 0.9)",       // Orange
-  developer:    "hsla(210, 15%, 55%, 0.85)",     // Blue-gray
-  books:        "hsla(25, 75%, 55%, 0.9)",       // Orange
-  icloud:       "hsla(210, 70%, 55%, 0.9)",       // iCloud blue
-  ios_files:    "hsla(220, 8%, 55%, 0.7)",        // Gray
-  mail:         "hsla(215, 60%, 55%, 0.9)",      // Blue
-  messages:     "hsla(145, 55%, 45%, 0.9)",      // Green
-  music:        "hsla(0, 65%, 55%, 0.9)",        // Red
-  music_creation: "hsla(220, 8%, 55%, 0.7)",     // Gray
-  photos:       "hsla(340, 55%, 55%, 0.9)",      // Pink/multicolor
-  media:        "hsla(280, 40%, 55%, 0.85)",     // Purple
-  bin:          "hsla(220, 8%, 60%, 0.7)",       // Gray
-  podcasts:     "hsla(280, 50%, 50%, 0.9)",      // Purple
-  docker:       "hsla(195, 55%, 48%, 0.85)",     // Cyan
-  caches:       "hsla(35, 50%, 50%, 0.8)",       // Tan
-  other_users:  "hsla(220, 8%, 55%, 0.7)",       // Gray
-  macos:        "hsla(220, 10%, 50%, 0.75)",     // Gray
-  system_data:  "hsla(220, 8%, 48%, 0.7)",       // Dark gray
-  other:        "hsla(220, 8%, 58%, 0.6)",       // Light gray
-  free:         "hsla(0, 0%, 85%, 0.3)",         // Almost white
-};
+const overviewColors = OVERVIEW_CATEGORY_COLORS;
 
 const overviewLabels: Record<string, string> = {
   applications: "Applications",
@@ -243,7 +230,7 @@ const overviewBarSegments = computed(() => {
 });
 
 
-function getFill(d: d3.HierarchyRectangularNode<DiskNode>): string {
+function getFill(d: HierarchyRectangularNode<DiskNode>): string {
   if (d.data.name === "Free Space") return "rgba(255,255,255,0.06)";
   if (colorMode.value === "recency") {
     return recencyColor(d.data.modified);
@@ -273,7 +260,7 @@ function recencyColor(modified: number | null | undefined): string {
   // pow(0.7) pushes midpoint toward old (t=0.5 input → ~0.62 output).
   const normalizedAge = Math.pow(raw, 0.7);
   // Recent = cool blue, Old = warm amber
-  const interp = d3.interpolateRgb(RECENCY_RECENT, RECENCY_OLD);
+  const interp = interpolateRgb(RECENCY_RECENT, RECENCY_OLD);
   return interp(normalizedAge);
 }
 
@@ -299,7 +286,7 @@ const sunburstContainerRef = ref<HTMLDivElement | null>(null);
 
 // Persistent d3.zoom instance — lives outside renderSunburst() so it
 // survives re-renders. The zoom handler dynamically selects the current <g>.
-let sunburstZoom: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
+let sunburstZoom: ZoomBehavior<SVGSVGElement, unknown> | null = null;
 const sunburstHeight = computed(() => (vizExpanded.value ? expandedChartHeight.value : 520));
 
 // Hover / center info
@@ -316,7 +303,7 @@ const tooltipY = ref(0);
 const tooltipVisible = ref(false);
 
 // Track current zoom root for zoom-out
-let zoomCurrent: d3.HierarchyRectangularNode<DiskNode> | null = null;
+let zoomCurrent: HierarchyRectangularNode<DiskNode> | null = null;
 
 // Reactive zoom state for the dir list — tracks which node is "zoomed into"
 const zoomNode = ref<DiskNode | null>(null);
@@ -476,27 +463,25 @@ function renderSunburst() {
   const radius = Math.min(width, height) / 2;
 
   // Build hierarchy — sum leaf sizes, sort largest first
-  const root = d3
-    .hierarchy<DiskNode>(data)
+  const root = hierarchy<DiskNode>(data)
     .sum((d) => (d.children.length === 0 ? d.size : 0))
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
   // Partition: full circle [0, 2*PI], full radius [0, radius]
-  d3.partition<DiskNode>().size([2 * Math.PI, radius]).padding(0)(root);
+  partition<DiskNode>().size([2 * Math.PI, radius]).padding(0)(root);
 
-  const partitioned = root as d3.HierarchyRectangularNode<DiskNode>;
+  const partitioned = root as HierarchyRectangularNode<DiskNode>;
   zoomCurrent = partitioned;
   zoomNode.value = partitioned.data;
 
   // Scales for zoom animation — retargeted on click.
   // Initial domain = full partition range (identity mapping).
   // On zoom, the domain shrinks to the clicked node's extent.
-  const xScale = d3.scaleLinear().domain([0, 2 * Math.PI]).range([0, 2 * Math.PI]);
-  const yScale = d3.scaleLinear().domain([0, radius]).range([0, radius]);
+  const xScale = scaleLinear().domain([0, 2 * Math.PI]).range([0, 2 * Math.PI]);
+  const yScale = scaleLinear().domain([0, radius]).range([0, radius]);
 
   // Arc generator — reads through scales so transitions "just work"
-  const arc = d3
-    .arc<d3.HierarchyRectangularNode<DiskNode>>()
+  const sunburstArc = arc<HierarchyRectangularNode<DiskNode>>()
     .startAngle((d) => Math.max(0, Math.min(2 * Math.PI, xScale(d.x0))))
     .endAngle((d) => Math.max(0, Math.min(2 * Math.PI, xScale(d.x1))))
     .padAngle((d) => {
@@ -511,7 +496,7 @@ function renderSunburst() {
     .outerRadius((d) => Math.max(yScale(d.y0), yScale(d.y1) - 2));
 
   // Visibility: is this arc visible in the current zoom window?
-  function arcVisible(d: d3.HierarchyRectangularNode<DiskNode>): boolean {
+  function arcVisible(d: HierarchyRectangularNode<DiskNode>): boolean {
     const a0 = xScale(d.x0);
     const a1 = xScale(d.x1);
     // Must have some angular extent and be within visible radius
@@ -520,7 +505,7 @@ function renderSunburst() {
 
   // Label visibility: strict. A label shows only if the node is a proper
   // descendant of the zoom target AND its arc has enough visual space.
-  function labelVisible(d: d3.HierarchyRectangularNode<DiskNode>): boolean {
+  function labelVisible(d: HierarchyRectangularNode<DiskNode>): boolean {
     // Must be strictly deeper than the zoom target
     if (zoomCurrent && d.depth <= zoomCurrent.depth) return false;
     // Must actually be within the zoom target's angular range (descendant)
@@ -532,7 +517,7 @@ function renderSunburst() {
   }
 
   // Clear previous render
-  const svg = d3.select(el);
+  const svg = select(el);
   svg.selectAll("*").remove();
   svg.attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`);
 
@@ -551,7 +536,7 @@ function renderSunburst() {
   // dynamically queries the current <g> child so it always works
   // even after renderSunburst() clears and re-creates children.
   if (!sunburstZoom) {
-    sunburstZoom = d3.zoom<SVGSVGElement, unknown>()
+    sunburstZoom = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 8])
       .filter((event: any) => {
         if (event.type === 'wheel') return vizExpanded.value;
@@ -562,7 +547,7 @@ function renderSunburst() {
       .on("zoom", (event: any) => {
         // Always select the live <g> element, not a stale closure
         if (!svgRef.value) return;
-        const liveG = d3.select(svgRef.value).select("g");
+        const liveG = select(svgRef.value).select("g");
         liveG.attr("transform", event.transform.toString());
         const centerEl = sunburstContainerRef.value?.querySelector('.sunburst-center') as HTMLElement | null;
         if (centerEl) {
@@ -573,7 +558,7 @@ function renderSunburst() {
   }
   svg.call(sunburstZoom);
   // Reset transform to identity on each re-render (new content starts centered)
-  svg.call(sunburstZoom.transform, d3.zoomIdentity);
+  svg.call(sunburstZoom.transform, zoomIdentity);
   const centerEl = sunburstContainerRef.value?.querySelector('.sunburst-center') as HTMLElement | null;
   if (centerEl) centerEl.style.transform = 'translate(-50%, -50%)';
 
@@ -597,10 +582,10 @@ function renderSunburst() {
 
   // ---- Arcs for all child nodes ----
   const path = chartGroup
-    .selectAll<SVGPathElement, d3.HierarchyRectangularNode<DiskNode>>("path")
+    .selectAll<SVGPathElement, HierarchyRectangularNode<DiskNode>>("path")
     .data(descendants)
     .join("path")
-    .attr("d", (d) => arc(d) || "")
+    .attr("d", (d) => sunburstArc(d) || "")
     .attr("fill", (d) => getFill(d))
     .attr("fill-opacity", (d) => arcVisible(d) ? 1 : 0)
     .attr("stroke", (d) => arcVisible(d) ? "rgba(12, 16, 42, 0.82)" : "none")
@@ -648,7 +633,7 @@ function renderSunburst() {
 
   // ---- Text labels (only on large, prominent arcs) ----
   const label = chartGroup
-    .selectAll<SVGTextElement, d3.HierarchyRectangularNode<DiskNode>>("text")
+    .selectAll<SVGTextElement, HierarchyRectangularNode<DiskNode>>("text")
     .data(descendants)
     .join("text")
     .attr("pointer-events", "none")
@@ -672,7 +657,7 @@ function renderSunburst() {
     });
 
   // ---- Zoom handler (click any arc, or click center to zoom out) ----
-  function clicked(p: d3.HierarchyRectangularNode<DiskNode>) {
+  function clicked(p: HierarchyRectangularNode<DiskNode>) {
     // Click current root → zoom out to parent
     const target = p === zoomCurrent && p.parent ? p.parent : p;
     zoomCurrent = target;
@@ -682,7 +667,7 @@ function renderSunburst() {
     xScale.domain([target.x0, target.x1]);
     yScale.domain([target.y0, radius]);
 
-    const zoomTransition = chartGroup.transition().duration(650).ease(d3.easeCubicInOut);
+    const zoomTransition = chartGroup.transition().duration(650).ease(easeCubicInOut);
 
     // Update center disc radius
     chartGroup.select("circle")
@@ -692,7 +677,7 @@ function renderSunburst() {
     // Transition arcs
     path
       .transition(zoomTransition as any)
-      .attrTween("d", (d: any) => () => arc(d) || "")
+      .attrTween("d", (d: any) => () => sunburstArc(d) || "")
       .attr("fill-opacity", (d: any) => arcVisible(d) ? 1 : 0)
       .attr("stroke", (d: any) => arcVisible(d) ? "rgba(12, 16, 42, 0.82)" : "none")
       .attr("stroke-width", (d: any) => {
@@ -718,13 +703,13 @@ function renderSunburst() {
 
     // Reset zoom/pan when drilling so the user starts centered
     if (sunburstZoom) {
-      svg.transition().duration(650).call(sunburstZoom.transform, d3.zoomIdentity);
+      svg.transition().duration(650).call(sunburstZoom.transform, zoomIdentity);
       const centerEl = sunburstContainerRef.value?.querySelector('.sunburst-center') as HTMLElement | null;
       if (centerEl) centerEl.style.transform = 'translate(-50%, -50%)';
     }
   }
 
-  function labelTransform(d: d3.HierarchyRectangularNode<DiskNode>): string {
+  function labelTransform(d: HierarchyRectangularNode<DiskNode>): string {
     const midAngle = (xScale(d.x0) + xScale(d.x1)) / 2;
     const midRadius = (yScale(d.y0) + yScale(d.y1)) / 2;
     const angleDeg = midAngle * (180 / Math.PI) - 90;

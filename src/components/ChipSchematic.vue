@@ -73,6 +73,7 @@
  * =========================================================================
  */
 import { computed } from "vue";
+import { TEMP_HOT, TEMP_COOL } from "../utils";
 import type { ThermalSensor } from "../types";
 
 const props = defineProps<{
@@ -94,13 +95,21 @@ const W = computed(() => props.width ?? 340);
 // ---------------------------------------------------------------------------
 interface HSL { h: number; s: number; l: number; }
 
+// Schematic-specific thresholds for finer die-shot thermal granularity.
+// TEMP_HOT (80) and TEMP_COOL (45) come from shared constants; the rest
+// are intermediate bands needed only for the chip visualization.
+const CHIP_TEMP_EXTREME = 100;
+const CHIP_TEMP_VERY_HOT = 90;
+const CHIP_TEMP_WARM = 70;
+const CHIP_TEMP_MILD = 55;
+
 function tempHSL(t: number): HSL {
-  if (t >= 100) return { h: 5, s: 55, l: 55 };
-  if (t >= 90) return { h: 20, s: 50, l: 52 };
-  if (t >= 80) return { h: 35, s: 45, l: 50 };
-  if (t >= 70) return { h: 170, s: 40, l: 50 };
-  if (t >= 55) return { h: 185, s: 42, l: 50 };
-  if (t >= 40) return { h: 195, s: 45, l: 52 };
+  if (t >= CHIP_TEMP_EXTREME) return { h: 5, s: 55, l: 55 };
+  if (t >= CHIP_TEMP_VERY_HOT) return { h: 20, s: 50, l: 52 };
+  if (t >= TEMP_HOT) return { h: 35, s: 45, l: 50 };
+  if (t >= CHIP_TEMP_WARM) return { h: 170, s: 40, l: 50 };
+  if (t >= CHIP_TEMP_MILD) return { h: 185, s: 42, l: 50 };
+  if (t >= TEMP_COOL) return { h: 195, s: 45, l: 52 };
   return { h: 210, s: 48, l: 55 };
 }
 

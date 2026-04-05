@@ -200,7 +200,7 @@ function fmtCpu(pct: number): string {
             :key="group.name"
             class="hog-card"
           >
-            <div class="hog-header" @click="toggleGroup(group.name)">
+            <div class="hog-header" tabindex="0" role="button" :aria-expanded="expandedGroups.has(group.name)" @click="toggleGroup(group.name)" @keydown.enter="toggleGroup(group.name)" @keydown.space.prevent="toggleGroup(group.name)">
               <div class="hog-left">
                 <div class="hog-name-row">
                   <span class="hog-name">{{ group.name }}</span>

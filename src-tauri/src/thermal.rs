@@ -281,6 +281,28 @@ fn get_known_temperature_keys() -> Vec<String> {
     keys
 }
 
+/// Generate a human-readable thermal assessment string based on the hottest sensor.
+fn generate_assessment(hottest: &ThermalSensor) -> String {
+    let temp = hottest.temp_celsius;
+    if temp >= 100.0 {
+        format!(
+            "{} is critically hot at {}C. Thermal throttling likely active.",
+            hottest.name, temp
+        )
+    } else if temp >= 90.0 {
+        format!(
+            "{} is running very hot at {}C. Consider reducing workload.",
+            hottest.name, temp
+        )
+    } else if temp >= 80.0 {
+        format!("{} is warm at {}C. Normal under heavy load.", hottest.name, temp)
+    } else if temp >= 60.0 {
+        "Temperatures are normal. System is running well.".to_string()
+    } else {
+        "System is cool. All sensors within comfortable range.".to_string()
+    }
+}
+
 /// Read all temperature sensors and fans from the SMC.
 ///
 /// IMPLEMENTATION NOTE: In a bundled .app, the SMC driver's GetKeyFromIndex
@@ -347,24 +369,7 @@ pub fn scan_thermal() -> Result<ThermalScanResult, String> {
 
     // --- Generate assessment ---
     let assessment = if let Some(ref hot) = hottest_sensor {
-        let hottest_temp = hot.temp_celsius;
-        if hottest_temp >= 100.0 {
-            format!(
-                "{} is critically hot at {}C. Thermal throttling likely active.",
-                hot.name, hottest_temp
-            )
-        } else if hottest_temp >= 90.0 {
-            format!(
-                "{} is running very hot at {}C. Consider reducing workload.",
-                hot.name, hottest_temp
-            )
-        } else if hottest_temp >= 80.0 {
-            format!("{} is warm at {}C. Normal under heavy load.", hot.name, hottest_temp)
-        } else if hottest_temp >= 60.0 {
-            "Temperatures are normal. System is running well.".to_string()
-        } else {
-            "System is cool. All sensors within comfortable range.".to_string()
-        }
+        generate_assessment(hot)
     } else {
         "No temperature sensors found.".to_string()
     };

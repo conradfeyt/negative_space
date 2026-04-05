@@ -24,6 +24,18 @@ export const vaultCompressing = ref(false);
 export const vaultError = ref("");
 
 // ---------------------------------------------------------------------------
+// Mutations (store-only — views should call these, not mutate refs directly)
+// ---------------------------------------------------------------------------
+
+export function setVaultEntries(entries: VaultEntry[]) {
+  vaultEntries.value = entries;
+}
+
+export function removeCandidates(paths: string[]) {
+  vaultCandidates.value = vaultCandidates.value.filter(c => !paths.includes(c.path));
+}
+
+// ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 

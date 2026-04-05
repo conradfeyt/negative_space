@@ -3,7 +3,7 @@ import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
-import { formatSize, fileDiskSize, timeAgo, revealInFinder } from "../utils";
+import { formatSize, fileDiskSize, timeAgo, revealInFinder, getFileExtension } from "../utils";
 import {
   largeFiles,
   largeFilesScanning,
@@ -11,14 +11,21 @@ import {
   largeFilesError,
   largeFilesCurrentDir,
   scanLargeFiles,
+  removeDeletedFiles,
   deleteFiles,
   fileClassifications,
   classifyFiles,
   vaultEntries,
+  setVaultEntries,
   toggleProtected,
   isProtected,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import {
+  useFileGrouping,
+  collectFiles,
+  parentFolder,
+} from "../composables/useFileGrouping";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
@@ -29,8 +36,18 @@ const scanPath = ref("~");
 /** Track which groups are collapsed */
 const collapsedGroups = ref<Set<string>>(new Set());
 
-type SortMode = "size" | "directory" | "safety" | "type";
-const sortMode = ref<SortMode>("size");
+// File grouping composable — sortMode, activeGroups, vaultedFiles, etc.
+const {
+  sortMode,
+  activeGroups,
+  vaultedFiles,
+  vaultedTotalSize,
+  totalLargeFileSize,
+} = useFileGrouping({
+  files: largeFiles,
+  getClassification: (path: string) => fileClassifications.value.get(path),
+  isVaulted,
+});
 
 async function scan() {
   successMsg.value = "";
@@ -46,7 +63,7 @@ watch(largeFilesScanned, (scanned) => {
       path: f.path,
       name: f.name,
       size: f.apparent_size,
-      file_type: f.name.split(".").pop()?.toLowerCase() ?? "",
+      file_type: getFileExtension(f.name),
     }));
     classifyFiles(files);
   }
@@ -59,7 +76,7 @@ try {
       path: f.path,
       name: f.name,
       size: f.apparent_size,
-      file_type: f.name.split(".").pop()?.toLowerCase() ?? "",
+      file_type: getFileExtension(f.name),
       modified: f.modified || null,
     }));
     classifyFiles(files);
@@ -166,7 +183,7 @@ async function deleteSelected() {
     const result = await deleteFiles(paths);
     if (result.success) {
       successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
-      largeFiles.value = largeFiles.value.filter((f) => !selected.value.has(f.path));
+      removeDeletedFiles(selected.value);
       // Update the on-disk cache so deleted files don't reappear on next launch
       invoke("save_scan_cache", { domain: "large-files", data: JSON.stringify(largeFiles.value) }).catch(e => console.warn('[large-files] cache save failed:', e));
       selected.value = new Set();
@@ -233,7 +250,7 @@ async function loadFileIcon(ext: string) {
 }
 
 function getFileIcon(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const ext = getFileExtension(name);
   if (!fileIconCache.value[ext] && ext) loadFileIcon(ext);
   return fileIconCache.value[ext] || "";
 }
@@ -250,7 +267,7 @@ for (const ext of commonExts) loadFileIcon(ext);
 
 // Load vault manifest for name resolution
 invoke<any[]>("get_vault_entries").then((entries) => {
-  vaultEntries.value = entries;
+  setVaultEntries(entries);
 }).catch(e => console.warn('[large-files] vault entries load failed:', e));
 
 function toggleSelect(path: string) {
@@ -303,411 +320,9 @@ function isSparse(file: FileInfo): boolean {
 
 const diskSize = fileDiskSize;
 
-// ---------------------------------------------------------------------------
-// File categorization
-// ---------------------------------------------------------------------------
+// File categorization, path helpers, directory tree builder, grouping computeds,
+// and collectFiles are all in useFileGrouping composable.
 
-const USER_PATH_PATTERNS = [
-  "/Documents/", "/Downloads/", "/Desktop/", "/Movies/",
-  "/Music/", "/Pictures/", "/Photos/", "/Public/", "/iCloud/",
-];
-
-const DEV_EXTENSIONS = new Set([
-  ".hprof", ".pack", ".idx", ".jar", ".war", ".class", ".dSYM",
-  ".o", ".a", ".dylib", ".so", ".wasm", ".ipa", ".xcarchive",
-  ".vmdk", ".qcow2", ".vdi", ".gguf", ".bin", ".safetensors",
-  ".onnx", ".pt", ".pth",
-]);
-
-type FileCategory = "user" | "system";
-
-function hasHiddenPathComponent(path: string): boolean {
-  return /\/\.[a-zA-Z0-9]/.test(path);
-}
-
-function categorize(file: FileInfo): FileCategory {
-  const path = file.path;
-  if (hasHiddenPathComponent(path)) return "system";
-  const lastDot = file.name.lastIndexOf(".");
-  if (lastDot > 0) {
-    const ext = file.name.substring(lastDot).toLowerCase();
-    if (DEV_EXTENSIONS.has(ext)) return "system";
-  }
-  for (const pattern of USER_PATH_PATTERNS) {
-    if (path.includes(pattern)) return "user";
-  }
-  return "system";
-}
-
-// ---------------------------------------------------------------------------
-// Path helpers
-// ---------------------------------------------------------------------------
-
-function displayPath(path: string): string {
-  const home = path.match(/^\/Users\/[^/]+/);
-  if (home) return path.replace(home[0], "~");
-  return path;
-}
-
-function parentFolder(path: string): string {
-  const display = displayPath(path);
-  const lastSlash = display.lastIndexOf("/");
-  if (lastSlash <= 0) return display;
-  return display.substring(0, lastSlash);
-}
-
-/** Format a timestamp string like "2025-01-14 22:27:26" as a friendly relative time. */
-
-// ---------------------------------------------------------------------------
-// Directory tree data structure
-// ---------------------------------------------------------------------------
-
-/** A node in the directory tree. Internal nodes have children and/or files. */
-interface DirNode {
-  /** Display name for this segment (e.g. "Application Support") */
-  name: string;
-  /** Full display path from root (e.g. "~/Library/Application Support") */
-  path: string;
-  /** Unique key for collapse state */
-  key: string;
-  /** Child directories (sorted by totalSize desc) */
-  children: DirNode[];
-  /** Files directly in this directory (sorted by size desc) */
-  files: FileInfo[];
-  /** Aggregate size of ALL files in this subtree */
-  totalSize: number;
-  /** Total count of ALL files in this subtree */
-  totalFiles: number;
-}
-
-/**
- * Build a directory tree from a flat list of files.
- *
- * 1. Insert each file into a trie based on its display path segments
- * 2. Compute aggregate sizes bottom-up
- * 3. Collapse single-child chains (~/a/b/c where b has only child c → "b/c")
- * 4. Sort children by totalSize desc at each level
- */
-function buildDirTree(files: FileInfo[], keyPrefix: string): DirNode {
-  // Root node represents the common ancestor
-  const root: DirNode = {
-    name: "",
-    path: "",
-    key: keyPrefix,
-    children: [],
-    files: [],
-    totalSize: 0,
-    totalFiles: 0,
-  };
-
-  // Build a map of path → DirNode for fast lookup during insertion
-  const nodeMap = new Map<string, DirNode>();
-  nodeMap.set("", root);
-
-  function getOrCreateNode(dirPath: string): DirNode {
-    if (nodeMap.has(dirPath)) return nodeMap.get(dirPath)!;
-
-    // Find parent path
-    const lastSlash = dirPath.lastIndexOf("/");
-    const parentPath = lastSlash > 0 ? dirPath.substring(0, lastSlash) : "";
-    const segmentName = lastSlash >= 0 ? dirPath.substring(lastSlash + 1) : dirPath;
-
-    const parent = getOrCreateNode(parentPath);
-    const node: DirNode = {
-      name: segmentName,
-      path: dirPath,
-      key: keyPrefix + ":" + dirPath,
-      children: [],
-      files: [],
-      totalSize: 0,
-      totalFiles: 0,
-    };
-    parent.children.push(node);
-    nodeMap.set(dirPath, node);
-    return node;
-  }
-
-  // Insert files
-  for (const file of files) {
-    const fileDirPath = parentFolder(file.path);
-    const dirNode = getOrCreateNode(fileDirPath);
-    dirNode.files.push(file);
-  }
-
-  // Compute aggregate sizes bottom-up (post-order traversal)
-  function computeSizes(node: DirNode): void {
-    let size = 0;
-    let count = 0;
-
-    for (const child of node.children) {
-      computeSizes(child);
-      size += child.totalSize;
-      count += child.totalFiles;
-    }
-
-    for (const file of node.files) {
-      size += diskSize(file);
-      count += 1;
-    }
-
-    // Sort files within node by size desc
-    node.files.sort((a, b) => diskSize(b) - diskSize(a));
-
-    node.totalSize = size;
-    node.totalFiles = count;
-  }
-  computeSizes(root);
-
-  // Collapse single-child directory chains to reduce excessive nesting.
-  // E.g. if ~/Library only has one child "Application Support", merge them
-  // into a single node "~/Library/Application Support".
-  function collapse(node: DirNode): void {
-    // First collapse children recursively
-    for (const child of node.children) {
-      collapse(child);
-    }
-
-    // If this node has exactly one child and no files of its own,
-    // merge the child into this node
-    while (node.children.length === 1 && node.files.length === 0) {
-      const onlyChild = node.children[0];
-      // Merge: absorb child's name into ours
-      if (node.name) {
-        node.name = node.name + "/" + onlyChild.name;
-      } else {
-        node.name = onlyChild.name;
-      }
-      node.path = onlyChild.path;
-      node.key = onlyChild.key;
-      node.children = onlyChild.children;
-      node.files = onlyChild.files;
-      // totalSize and totalFiles stay the same (already computed)
-    }
-
-    // Sort children by totalSize desc
-    node.children.sort((a, b) => b.totalSize - a.totalSize);
-  }
-  collapse(root);
-
-  return root;
-}
-
-/** Collect all FileInfo objects from a DirNode subtree */
-function collectFiles(node: DirNode): FileInfo[] {
-  const result: FileInfo[] = [...node.files];
-  for (const child of node.children) {
-    result.push(...collectFiles(child));
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Top-level grouping (User / System)
-// ---------------------------------------------------------------------------
-
-interface CategoryGroup {
-  id: string;
-  label: string;
-  description: string;
-  totalSize: number;
-  totalFiles: number;
-  /** Size mode: flat sorted list */
-  flatFiles: FileInfo[];
-  /** Directory mode: tree root */
-  tree: DirNode;
-}
-
-const groupedFiles = computed<CategoryGroup[]>(() => {
-  const userFiles: FileInfo[] = [];
-  const systemFiles: FileInfo[] = [];
-
-  for (const file of largeFiles.value) {
-    if (categorize(file) === "user") {
-      userFiles.push(file);
-    } else {
-      systemFiles.push(file);
-    }
-  }
-
-  const bySize = (a: FileInfo, b: FileInfo) => diskSize(b) - diskSize(a);
-  const groups: CategoryGroup[] = [];
-
-  if (userFiles.length > 0) {
-    const sorted = [...userFiles].sort(bySize);
-    groups.push({
-      id: "user",
-      label: "User Files",
-      description: "Documents, Downloads, Desktop, and personal files",
-      totalSize: userFiles.reduce((s, f) => s + diskSize(f), 0),
-      totalFiles: userFiles.length,
-      flatFiles: sorted,
-      tree: buildDirTree(userFiles, "user"),
-    });
-  }
-
-  if (systemFiles.length > 0) {
-    const sorted = [...systemFiles].sort(bySize);
-    groups.push({
-      id: "system",
-      label: "System & Development",
-      description: "Libraries, caches, build artifacts, SDK data, and dev tools",
-      totalSize: systemFiles.reduce((s, f) => s + diskSize(f), 0),
-      totalFiles: systemFiles.length,
-      flatFiles: sorted,
-      tree: buildDirTree(systemFiles, "system"),
-    });
-  }
-
-  return groups;
-});
-
-const safetyGroupOrder = ["safe", "safe_stale", "safe_rebuild", "probably_safe", "unknown", "risky"] as const;
-
-const safetyGroupMeta: Record<string, { label: string; description: string }> = {
-  safe: { label: "Safe to Delete", description: "Logs, temporary files, and cached installers that regenerate automatically" },
-  safe_stale: { label: "Safe — Older than 90 Days", description: "Caches and build artifacts not modified in 90+ days. Deleting is safe — your next build may need to re-download them." },
-  safe_rebuild: { label: "Safe — Recently Modified", description: "Caches and build artifacts modified in the last 90 days. Still safe to delete but will need to rebuild or re-download." },
-  probably_safe: { label: "Likely Safe", description: "Review recommended — these are usually safe but may be needed by some apps" },
-  unknown: { label: "Unknown", description: "No classification available — check before deleting" },
-  risky: { label: "Caution", description: "May contain user-created content or important application data" },
-  vaulted: { label: "Vaulted Archives", description: "Files archived by Negativ_ Vault. Manage these from the Vault view — do not delete directly." },
-};
-
-const safetyGroupedFiles = computed<CategoryGroup[]>(() => {
-  const buckets: Record<string, FileInfo[]> = { safe: [], safe_stale: [], safe_rebuild: [], probably_safe: [], unknown: [], risky: [], vaulted: [] };
-
-  for (const file of largeFiles.value) {
-    const c = getClassification(file.path);
-    const safety = c?.safety ?? "unknown";
-    (buckets[safety] ?? buckets.unknown).push(file);
-  }
-
-  const bySize = (a: FileInfo, b: FileInfo) => diskSize(b) - diskSize(a);
-  const groups: CategoryGroup[] = [];
-
-  for (const key of safetyGroupOrder) {
-    const files = buckets[key] ?? [];
-    if (files.length === 0) continue;
-    const sorted = [...files].sort(bySize);
-    const meta = safetyGroupMeta[key];
-    groups.push({
-      id: `safety-${key}`,
-      label: meta.label,
-      description: meta.description,
-      totalSize: files.reduce((s, f) => s + diskSize(f), 0),
-      totalFiles: files.length,
-      flatFiles: sorted,
-      tree: buildDirTree(files, `safety-${key}`),
-    });
-  }
-
-  return groups;
-});
-
-// Separate vaulted files from everything else
-const vaultedFiles = computed(() =>
-  largeFiles.value.filter(f => isVaulted(f.path)).sort((a, b) => diskSize(b) - diskSize(a))
-);
-
-const vaultedTotalSize = computed(() =>
-  vaultedFiles.value.reduce((s, f) => s + diskSize(f), 0)
-);
-
-// Filter vaulted files out of groups
-const typeLabels: Record<string, string> = {
-  // Libraries & compiled
-  a: "Libraries", rlib: "Libraries", dylib: "Libraries", so: "Libraries", framework: "Frameworks",
-  jar: "Java / Gradle", dex: "Java / Gradle",
-  // Logs
-  log: "Log Files",
-  // Disk & VM images
-  dmg: "Disk Images", iso: "Disk Images", img: "Disk Images", qcow2: "Virtual Disks", raw: "Virtual Disks", vmdk: "Virtual Disks",
-  // Archives
-  zst: "Compressed Archives", gz: "Compressed Archives", zip: "Compressed Archives", tar: "Archives", xz: "Compressed Archives",
-  // Git
-  pack: "Git Data", idx: "Git Data",
-  // Binary / data
-  bin: "Binary Data", dat: "Data Files", values: "Data Files",
-  // Databases
-  db: "Databases", sqlite: "Databases", sql: "Databases", vscdb: "Databases",
-  // App data
-  autosave: "Autosaves", backup: "Backups",
-  // Simulator / mobile
-  fst: "Simulator Data", adat: "Simulator Data", apk: "Android Packages", dill: "Flutter Data",
-  // Media
-  dash: "Audio / Media", mp4: "Audio / Media", mov: "Audio / Media", mp3: "Audio / Media",
-  png: "Images", jpg: "Images", jpeg: "Images", heic: "Images", tiff: "Images",
-  // Design / CAD
-  f3d: "CAD / Design", propcol: "CAD / Design",
-  // Dev tools
-  ort: "ML Models",
-};
-
-// Known binary names that don't have extensions
-const knownBinaries = new Set([
-  "node", "claude", "opencode", "clang-18", "clang-check", "clang-scan-deps",
-  "rust-lld", "lld", "trufflehog", "Flutter", "FlutterMacOS",
-  "Electron Framework", "Microsoft Edge Framework", "QtWebEngineCore",
-]);
-
-function fileTypeGroup(name: string): string {
-  // Check compound extensions first
-  if (name.endsWith(".tar.zst")) return "Compressed Archives";
-  // Known binaries without extensions
-  if (knownBinaries.has(name)) return "Developer Tools";
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  // If "extension" looks like a hash, version number, or is very long — it's not a real extension
-  if (!ext || ext.length > 10 || /^[0-9a-f]{8,}$/.test(ext) || /^\d+$/.test(ext)) return "Other";
-  return typeLabels[ext] ?? "Other";
-}
-
-const typeGroupedFiles = computed<CategoryGroup[]>(() => {
-  const buckets: Record<string, FileInfo[]> = {};
-  for (const file of largeFiles.value) {
-    if (isVaulted(file.path)) continue;
-    const group = fileTypeGroup(file.name);
-    if (!buckets[group]) buckets[group] = [];
-    buckets[group].push(file);
-  }
-
-  const bySize = (a: FileInfo, b: FileInfo) => diskSize(b) - diskSize(a);
-  return Object.entries(buckets)
-    .map(([label, files]) => {
-      const sorted = [...files].sort(bySize);
-      return {
-        id: `type-${label}`,
-        label,
-        description: `${files.length} file(s)`,
-        totalSize: files.reduce((s, f) => s + diskSize(f), 0),
-        totalFiles: files.length,
-        flatFiles: sorted,
-        tree: buildDirTree(sorted, `type-${label}`),
-      };
-    })
-    .sort((a, b) => b.totalSize - a.totalSize);
-});
-
-const activeGroups = computed(() => {
-  const base = sortMode.value === "safety" ? safetyGroupedFiles.value
-    : sortMode.value === "type" ? typeGroupedFiles.value
-    : groupedFiles.value;
-  return base
-    .map(g => {
-      const filtered = g.flatFiles.filter(f => !isVaulted(f.path));
-      return {
-        ...g,
-        flatFiles: filtered,
-        totalFiles: filtered.length,
-        totalSize: filtered.reduce((s, f) => s + diskSize(f), 0),
-        tree: buildDirTree(filtered, g.id),
-      };
-    })
-    .filter(g => g.flatFiles.length > 0);
-});
-
-const totalLargeFileSize = computed(() =>
-  largeFiles.value.reduce((sum, f) => sum + diskSize(f), 0)
-);
 
 function isGroupAllSelected(files: FileInfo[]): boolean {
   return files.length > 0 && files.every((f) => selected.value.has(f.path));
@@ -798,7 +413,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
       <!-- Vaulted archives — locked section at top -->
       <div v-if="vaultedFiles.length > 0" class="file-group vault-group">
-        <div class="group-header vault-header" @click="toggleGroup('vaulted')">
+        <div class="group-header vault-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has('vaulted')" @click="toggleGroup('vaulted')" @keydown.enter="toggleGroup('vaulted')" @keydown.space.prevent="toggleGroup('vaulted')">
           <div class="group-header-left">
             <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has('vaulted') }">
               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
@@ -830,7 +445,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       <div v-for="group in activeGroups" :key="group.id" class="file-group">
 
         <!-- Category header -->
-        <div class="group-header" @click="toggleGroup(group.id)">
+        <div class="group-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.id)" @click="toggleGroup(group.id)" @keydown.enter="toggleGroup(group.id)" @keydown.space.prevent="toggleGroup(group.id)">
           <div class="group-header-left">
             <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has(group.id) }">
               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
@@ -905,7 +520,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
             <div class="dir-tree" :style="{ '--depth': 0 }">
               <!-- Recursive directory node rendering -->
               <div class="dir-node">
-                <div class="dir-header" @click="toggleGroup(child.key)">
+                <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(child.key)" @click="toggleGroup(child.key)" @keydown.enter="toggleGroup(child.key)" @keydown.space.prevent="toggleGroup(child.key)">
                   <div class="dir-header-left">
                     <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(child.key) }">
                       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
@@ -936,7 +551,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                   <template v-for="d1 in child.children" :key="d1.key">
                     <div class="dir-tree" :style="{ '--depth': 1 }">
                       <div class="dir-node">
-                        <div class="dir-header" @click="toggleGroup(d1.key)">
+                        <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d1.key)" @click="toggleGroup(d1.key)" @keydown.enter="toggleGroup(d1.key)" @keydown.space.prevent="toggleGroup(d1.key)">
                           <div class="dir-header-left">
                             <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d1.key) }">
                               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
@@ -966,7 +581,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                           <template v-for="d2 in d1.children" :key="d2.key">
                             <div class="dir-tree" :style="{ '--depth': 2 }">
                               <div class="dir-node">
-                                <div class="dir-header" @click="toggleGroup(d2.key)">
+                                <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d2.key)" @click="toggleGroup(d2.key)" @keydown.enter="toggleGroup(d2.key)" @keydown.space.prevent="toggleGroup(d2.key)">
                                   <div class="dir-header-left">
                                     <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d2.key) }">
                                       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
@@ -995,7 +610,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                   <!-- Deeper levels: just show files flat -->
                                   <template v-for="d3 in d2.children" :key="d3.key">
                                     <div class="dir-tree" :style="{ '--depth': 3 }">
-                                      <div class="dir-header" @click="toggleGroup(d3.key)">
+                                      <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d3.key)" @click="toggleGroup(d3.key)" @keydown.enter="toggleGroup(d3.key)" @keydown.space.prevent="toggleGroup(d3.key)">
                                         <div class="dir-header-left">
                                           <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d3.key) }">
                                             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>

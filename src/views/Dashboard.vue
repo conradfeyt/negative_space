@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize, fileDiskSize, tempToColor, revealInFinder, DASHBOARD_CATEGORY_COLORS } from "../utils";
+import { formatSize, fileDiskSize, tempToColor, revealInFinder, getFileExtension, DASHBOARD_CATEGORY_COLORS } from "../utils";
 import ThermalCard from "../components/ThermalCard.vue";
 import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
@@ -43,8 +43,11 @@ import {
   diskMapResult,
 } from "../stores/scanStore";
 
+const TOP_FILES_COUNT = 5;
+const TOP_MEMORY_COUNT = 3;
+
 async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (_) {}
+  try { await invoke("open_full_disk_access_settings"); } catch (e) { console.debug('[settings] FDA settings open failed:', e); }
 }
 
 
@@ -127,11 +130,11 @@ const topFiles = computed(() =>
       const sizeB = fileDiskSize(b);
       return sizeB - sizeA;
     })
-    .slice(0, 5)
+    .slice(0, TOP_FILES_COUNT)
 );
 
 function fileIcon(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const ext = getFileExtension(name);
   const map: Record<string, string> = {
     mov: "\uD83C\uDFAC", mp4: "\uD83C\uDFAC", mkv: "\uD83C\uDFAC", avi: "\uD83C\uDFAC",
     dmg: "\uD83D\uDCBF", iso: "\uD83D\uDCBF", pkg: "\uD83D\uDCBF",
@@ -311,7 +314,7 @@ const topMemConsumers = computed(() => {
   if (!memoryResult.value?.groups) return [];
   return [...memoryResult.value.groups]
     .sort((a, b) => b.total_rss_bytes - a.total_rss_bytes)
-    .slice(0, 3);
+    .slice(0, TOP_MEMORY_COUNT);
 });
 
 // ---------------------------------------------------------------------------

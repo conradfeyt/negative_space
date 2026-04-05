@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatSize, fileDiskSize, timeAgo, tempToColor } from '../utils'
+import { formatSize, fileDiskSize, timeAgo, tempToColor, getFileExtension, OVERVIEW_CATEGORY_COLORS } from '../utils'
 
 describe('formatSize', () => {
   it('returns "0 B" for 0 bytes', () => {
@@ -77,5 +77,38 @@ describe('tempToColor', () => {
   })
   it('returns cold color for < 45', () => {
     expect(tempToColor(30)).toBe('hsla(195, 35%, 42%, 0.85)')
+  })
+})
+
+describe('getFileExtension', () => {
+  it('returns extension for normal filename', () => {
+    expect(getFileExtension('photo.jpg')).toBe('jpg')
+  })
+  it('returns empty string for no extension', () => {
+    expect(getFileExtension('README')).toBe('readme')
+  })
+  it('returns extension for dotfile', () => {
+    expect(getFileExtension('.gitignore')).toBe('gitignore')
+  })
+  it('returns last extension for multiple dots', () => {
+    expect(getFileExtension('archive.tar.gz')).toBe('gz')
+  })
+  it('returns empty string for empty input', () => {
+    expect(getFileExtension('')).toBe('')
+  })
+  it('returns extension from full path', () => {
+    expect(getFileExtension('/path/to/file.txt')).toBe('txt')
+  })
+  it('returns lowercase for uppercase extension', () => {
+    expect(getFileExtension('PHOTO.PNG')).toBe('png')
+  })
+})
+
+describe('OVERVIEW_CATEGORY_COLORS', () => {
+  it('is a non-empty record', () => {
+    expect(Object.keys(OVERVIEW_CATEGORY_COLORS).length).toBeGreaterThan(0)
+  })
+  it('has "applications" key with an hsla string', () => {
+    expect(OVERVIEW_CATEGORY_COLORS.applications).toMatch(/^hsla\(/)
   })
 })

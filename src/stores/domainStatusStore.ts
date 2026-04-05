@@ -79,9 +79,7 @@ export async function saveCache(domain: string, data: unknown) {
     const wrapped: CachedResult<unknown> = { data, timestamp: Date.now() };
     await invoke("save_scan_cache", { domain, data: JSON.stringify(wrapped) });
     lastScanned.value = { ...lastScanned.value, [domain]: wrapped.timestamp };
-  } catch {
-    // Cache save failures are non-critical
-  }
+  } catch (e) { console.debug(`[cache] save failed for ${domain}:`, e); }
 }
 
 export async function loadCache<T>(domain: string): Promise<T | null> {

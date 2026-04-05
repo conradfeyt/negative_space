@@ -145,30 +145,8 @@ pub fn run_duplicate_scan(opts: DuplicateScanOptions<'_>) -> DuplicateScanResult
     // Build skip prefixes via shared helper.
     let skip_prefixes = commands::build_skip_prefixes(&home, skip_paths, &[]);
 
-    // Safe dirs for duplicate scanner — same as large-file scanner but without
-    // /var/tmp (intentional: duplicates scan focuses on user-owned content).
-    let safe_dirs = vec![
-        format!("{}/Library/Developer", home),
-        "/usr/local".to_string(),
-        "/opt/homebrew".to_string(),
-        format!("{}/Projects", home),
-        format!("{}/projects", home),
-        format!("{}/src", home),
-        format!("{}/dev", home),
-        format!("{}/code", home),
-        format!("{}/workspace", home),
-        format!("{}/go", home),
-        format!("{}/.cargo", home),
-        format!("{}/.rustup", home),
-        format!("{}/.npm", home),
-        format!("{}/.gradle", home),
-        format!("{}/.m2", home),
-        format!("{}/.docker", home),
-        format!("{}/.local", home),
-        format!("{}/.cache", home),
-        "/tmp".to_string(),
-        "/Applications".to_string(),
-    ];
+    // Safe dirs for duplicate scanner — shared base set from commands.rs.
+    let safe_dirs = commands::base_scan_safe_dirs(&home);
     let scan_roots = commands::build_scan_roots(&home, scan_path, fda, &safe_dirs);
 
     let skipped_paths: Vec<String> = if fda {

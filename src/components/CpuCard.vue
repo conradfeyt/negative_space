@@ -9,6 +9,8 @@ import { computed } from "vue";
 import { tempToColor } from "../utils";
 import type { ThermalSensor } from "../types";
 
+const MAX_DISPLAYED_CORES = 24;
+
 const props = defineProps<{
   sensors: ThermalSensor[];
 }>();
@@ -23,7 +25,7 @@ const coreTempStrip = computed(() => {
     cores = props.sensors
       .filter(s => s.category === "cpu")
       .sort((a, b) => a.key.localeCompare(b.key))
-      .slice(0, 24)
+      .slice(0, MAX_DISPLAYED_CORES)
       .map(s => ({ key: s.key, temp: s.temp_celsius, color: tempToColor(s.temp_celsius) }));
   }
   return cores;

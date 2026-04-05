@@ -46,7 +46,7 @@ const thermalBars = computed<ThermalBar[]>(() => {
 </script>
 
 <template>
-  <div class="thermal-strips" v-if="thermalBars.length">
+  <div class="thermal-strips" v-if="thermalBars.length" aria-label="Thermal temperature bars by component category">
     <div v-for="bar in thermalBars" :key="bar.category" class="tstrip-row">
       <span class="tstrip-label">{{ bar.label }}</span>
       <div class="tstrip-track">

@@ -8,6 +8,41 @@ use crate::commands::{
 };
 use std::os::unix::fs::MetadataExt;
 
+/// Build a [`FileInfo`] from a walkdir entry if it meets the minimum size threshold.
+/// Returns `None` if the entry should be skipped (metadata failure, not a regular file,
+/// or below `min_bytes`).
+fn build_file_info(entry: &walkdir::DirEntry, min_bytes: u64) -> Option<FileInfo> {
+    let metadata = entry.metadata().ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+
+    let apparent_size = metadata.len();
+    if apparent_size < min_bytes {
+        return None;
+    }
+
+    let actual_size = metadata.blocks() * 512;
+    let is_sparse = (actual_size as f64) < (apparent_size as f64 * 0.8);
+
+    let modified = metadata
+        .modified()
+        .map(commands::format_system_time)
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    let file_path = entry.path().to_string_lossy().to_string();
+    let file_name = entry.file_name().to_string_lossy().to_string();
+
+    Some(FileInfo {
+        path: file_path,
+        name: file_name,
+        apparent_size,
+        actual_size,
+        modified,
+        is_sparse,
+    })
+}
+
 /// Streaming variant of large file scanning. Emits Tauri events as it walks:
 ///
 /// - `"large-file-found"` — emitted each time a qualifying file is discovered.
@@ -38,31 +73,8 @@ pub async fn scan_large_files_stream(
     let user_skips = skip_paths.unwrap_or_default();
     let skip_prefixes = commands::build_skip_prefixes(&home, &user_skips, &[]);
 
-    // Safe dirs for large-file scanner (same list as non-streaming variant).
-    let safe_dirs = vec![
-        format!("{}/Library/Developer", home),
-        "/usr/local".to_string(),
-        "/opt/homebrew".to_string(),
-        format!("{}/Projects", home),
-        format!("{}/projects", home),
-        format!("{}/src", home),
-        format!("{}/dev", home),
-        format!("{}/code", home),
-        format!("{}/workspace", home),
-        format!("{}/go", home),
-        format!("{}/node_modules", home),
-        format!("{}/.cargo", home),
-        format!("{}/.rustup", home),
-        format!("{}/.npm", home),
-        format!("{}/.gradle", home),
-        format!("{}/.m2", home),
-        format!("{}/.docker", home),
-        format!("{}/.local", home),
-        format!("{}/.cache", home),
-        "/tmp".to_string(),
-        "/var/tmp".to_string(),
-        "/Applications".to_string(),
-    ];
+    // Safe dirs for large-file scanner — shared with other scanners.
+    let safe_dirs = commands::base_scan_safe_dirs(&home);
     let scan_roots = commands::build_scan_roots(&home, &path, fda, &safe_dirs);
 
     let skipped_paths: Vec<String> = if fda {
@@ -139,37 +151,9 @@ pub async fn scan_large_files_stream(
                 continue;
             }
 
-            let metadata = match entry.metadata() {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if !metadata.is_file() {
-                continue;
-            }
-
-            let apparent_size = metadata.len();
-            if apparent_size < min_bytes {
-                continue;
-            }
-
-            let actual_size = metadata.blocks() * 512;
-            let is_sparse = (actual_size as f64) < (apparent_size as f64 * 0.8);
-
-            let modified = metadata
-                .modified()
-                .map(commands::format_system_time)
-                .unwrap_or_else(|_| "unknown".to_string());
-
-            let file_path = entry.path().to_string_lossy().to_string();
-            let file_name = entry.file_name().to_string_lossy().to_string();
-
-            let file_info = FileInfo {
-                path: file_path,
-                name: file_name,
-                apparent_size,
-                actual_size,
-                modified,
-                is_sparse,
+            let file_info = match build_file_info(&entry, min_bytes) {
+                Some(fi) => fi,
+                None => continue,
             };
 
             // Emit the found file immediately so the UI can display it.

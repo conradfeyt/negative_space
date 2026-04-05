@@ -70,6 +70,7 @@ const expandedGroups = ref<Set<string>>(new Set());
 
 // Category colors for the memory bar and group badges (from shared tokens)
 const categoryColors = MEMORY_CATEGORY_COLORS;
+const FALLBACK_MUTED_COLOR = "hsla(215, 15%, 62%, 0.85)"; // matches --muted
 
 function toggleGroup(groupKey: string) {
   const next = new Set(expandedGroups.value);
@@ -82,7 +83,7 @@ function toggleGroup(groupKey: string) {
 }
 
 function getCategoryColor(category: string): string {
-  return categoryColors[category] || "#94a3b8";
+  return categoryColors[category] || FALLBACK_MUTED_COLOR;
 }
 
 function formatPercent(pct: number): string {

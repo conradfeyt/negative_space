@@ -121,6 +121,31 @@ export const SPACEMAP_CATEGORY_FILLS: Record<string, string> = {
   other:          cssVar("--space-other",          "#78909c"),
 };
 
+/** SpaceMap overview-mode category colors (macOS-style stacked bar). */
+export const OVERVIEW_CATEGORY_COLORS: Record<string, string> = {
+  applications: "hsla(0, 65%, 58%, 0.9)",
+  documents:    "hsla(30, 75%, 55%, 0.9)",
+  developer:    "hsla(210, 15%, 55%, 0.85)",
+  books:        "hsla(25, 75%, 55%, 0.9)",
+  icloud:       "hsla(210, 70%, 55%, 0.9)",
+  ios_files:    "hsla(220, 8%, 55%, 0.7)",
+  mail:         "hsla(215, 60%, 55%, 0.9)",
+  messages:     "hsla(145, 55%, 45%, 0.9)",
+  music:        "hsla(0, 65%, 55%, 0.9)",
+  music_creation: "hsla(220, 8%, 55%, 0.7)",
+  photos:       "hsla(340, 55%, 55%, 0.9)",
+  media:        "hsla(280, 40%, 55%, 0.85)",
+  bin:          "hsla(220, 8%, 60%, 0.7)",
+  podcasts:     "hsla(280, 50%, 50%, 0.9)",
+  docker:       "hsla(195, 55%, 48%, 0.85)",
+  caches:       "hsla(35, 50%, 50%, 0.8)",
+  other_users:  "hsla(220, 8%, 55%, 0.7)",
+  macos:        "hsla(220, 10%, 50%, 0.75)",
+  system_data:  "hsla(220, 8%, 48%, 0.7)",
+  other:        "hsla(220, 8%, 58%, 0.6)",
+  free:         "hsla(0, 0%, 85%, 0.3)",
+};
+
 /** Dashboard waffle chart category colors (HSLA, opacity-tuned for waffle). */
 export const DASHBOARD_CATEGORY_COLORS: Record<string, string> = {
   applications: "hsla(0, 65%, 55%, 0.8)",
@@ -144,6 +169,11 @@ export const DASHBOARD_CATEGORY_COLORS: Record<string, string> = {
 /** Open a path in Finder. Silently catches errors (best-effort). */
 export async function revealInFinder(path: string): Promise<void> {
   try { await invoke("reveal_in_finder", { path }); } catch (_) {}
+}
+
+/** Extract lowercase file extension from a filename. */
+export function getFileExtension(name: string): string {
+  return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
 export function formatSize(bytes: number): string {

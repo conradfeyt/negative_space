@@ -143,7 +143,7 @@ function navigateTo(navId: string) {
 async function openSystemSettings() {
   try {
     await invoke("open_full_disk_access_settings");
-  } catch (_) {}
+  } catch (e) { console.debug('[settings] FDA settings open failed:', e); }
 }
 
 async function recheckFda() {

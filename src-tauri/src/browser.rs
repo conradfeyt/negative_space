@@ -646,6 +646,64 @@ fn is_app_installed(app_path: &str) -> bool {
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Scan a single browser data category, resolving paths and computing sizes.
+///
+/// Returns `Some((category, size, has_nonzero_data))` if the category should be
+/// included in the result, or `None` if it should be skipped (no paths exist and
+/// not TCC-protected).
+fn scan_browser_category(cat_def: &CategoryDef, fda: bool) -> Option<(BrowserDataCategory, u64, bool)> {
+    // For TCC-protected paths: skip sizing if we don't have FDA.
+    if cat_def.tcc_protected && !fda {
+        let category = BrowserDataCategory {
+            id: cat_def.id.to_string(),
+            label: cat_def.label.to_string(),
+            paths: cat_def.paths.clone(),
+            size: 0,
+            safe_to_clean: cat_def.safe_to_clean,
+            warning: cat_def.warning.to_string(),
+            tcc_protected: true,
+        };
+        return Some((category, 0, false));
+    }
+
+    // Sum up sizes of all paths in this category.
+    let mut cat_size: u64 = 0;
+    let mut existing_paths: Vec<String> = Vec::new();
+    let mut has_nonzero_data = false;
+
+    for path in &cat_def.paths {
+        if path_exists(path) {
+            let size = get_du_size(path);
+            cat_size += size;
+            existing_paths.push(path.clone());
+            if size > 0 {
+                has_nonzero_data = true;
+            }
+        }
+    }
+
+    // Only include the category if at least one path exists or it's TCC-protected.
+    if existing_paths.is_empty() && !cat_def.tcc_protected {
+        return None;
+    }
+
+    let category = BrowserDataCategory {
+        id: cat_def.id.to_string(),
+        label: cat_def.label.to_string(),
+        paths: if existing_paths.is_empty() {
+            cat_def.paths.clone()
+        } else {
+            existing_paths
+        },
+        size: cat_size,
+        safe_to_clean: cat_def.safe_to_clean,
+        warning: cat_def.warning.to_string(),
+        tcc_protected: cat_def.tcc_protected,
+    };
+
+    Some((category, cat_size, has_nonzero_data))
+}
+
 /// Run a full browser scan — detect installed browsers and enumerate their data.
 ///
 /// The `fda` parameter indicates whether we have Full Disk Access. This affects
@@ -728,57 +786,12 @@ pub fn run_browser_scan(fda: bool) -> BrowserScanResult {
         let mut has_any_data = false;
 
         for cat_def in cat_defs {
-            // For TCC-protected paths: skip entirely if we don't have FDA.
-            // We can't even get the size — `du` returns 0 and we'd show
-            // misleading "0 B" entries.
-            if cat_def.tcc_protected && !fda {
-                // Still include the category but mark it as 0 with a note
-                // that FDA is needed. The UI will show "Requires Full Disk Access".
-                data_categories.push(BrowserDataCategory {
-                    id: cat_def.id.to_string(),
-                    label: cat_def.label.to_string(),
-                    paths: cat_def.paths.clone(),
-                    size: 0,
-                    safe_to_clean: cat_def.safe_to_clean,
-                    warning: cat_def.warning.to_string(),
-                    tcc_protected: true,
-                });
-                continue;
-            }
-
-            // Sum up sizes of all paths in this category.
-            let mut cat_size: u64 = 0;
-            let mut existing_paths: Vec<String> = Vec::new();
-
-            for path in &cat_def.paths {
-                if path_exists(path) {
-                    let size = get_du_size(path);
-                    cat_size += size;
-                    existing_paths.push(path.clone());
-                    if size > 0 {
-                        has_any_data = true;
-                    }
+            if let Some((category, cat_size, cat_has_data)) = scan_browser_category(&cat_def, fda) {
+                if cat_has_data {
+                    has_any_data = true;
                 }
-            }
-
-            browser_total += cat_size;
-
-            // Only include the category if at least one path exists
-            // (or if it's TCC-protected — we show those regardless).
-            if !existing_paths.is_empty() || cat_def.tcc_protected {
-                data_categories.push(BrowserDataCategory {
-                    id: cat_def.id.to_string(),
-                    label: cat_def.label.to_string(),
-                    paths: if existing_paths.is_empty() {
-                        cat_def.paths.clone()
-                    } else {
-                        existing_paths
-                    },
-                    size: cat_size,
-                    safe_to_clean: cat_def.safe_to_clean,
-                    warning: cat_def.warning.to_string(),
-                    tcc_protected: cat_def.tcc_protected,
-                });
+                browser_total += cat_size;
+                data_categories.push(category);
             }
         }
 

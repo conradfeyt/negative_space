@@ -99,6 +99,14 @@ export async function scanLargeFiles(path = "~", minSizeMb = 100) {
 }
 
 // ---------------------------------------------------------------------------
+// Mutations (store-only — views should call these, not mutate refs directly)
+// ---------------------------------------------------------------------------
+
+export function removeDeletedFiles(paths: Set<string>) {
+  largeFiles.value = largeFiles.value.filter((f) => !paths.has(f.path));
+}
+
+// ---------------------------------------------------------------------------
 // Cache restore
 // ---------------------------------------------------------------------------
 

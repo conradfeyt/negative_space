@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import { formatSize } from "../utils";
 import Toast from "../components/Toast.vue";
 import {
@@ -17,28 +15,20 @@ import {
   compressDirectoryToVault,
   restoreFromVault,
   deleteVaultEntry,
+  removeCandidates,
 } from "../stores/scanStore";
+import { useCompressionQueue } from "../composables/useCompressionQueue";
 
 // ---------------------------------------------------------------------------
-// Queue: directories/files staged for compression
+// UI state
 // ---------------------------------------------------------------------------
-
-interface QueueItem {
-  path: string;
-  name: string;
-  size: number;
-  isDirectory: boolean;
-  calculating: boolean;
-}
 
 type Tab = "compress" | "archived";
 const activeTab = ref<Tab>("compress");
 
-const queue = ref<QueueItem[]>([]);
 const toast = ref<{ message: string; type: "success" | "error" | "info" } | null>(null);
 const restoring = ref<string | null>(null);
 const confirmDeleteId = ref<string | null>(null);
-const compressProgress = ref<{ current: number; total: number; name: string } | null>(null);
 const minAgeDays = ref(30);
 
 // Candidates selection
@@ -49,102 +39,24 @@ function showToast(message: string, type: "success" | "error" | "info" = "succes
 }
 
 // ---------------------------------------------------------------------------
-// Add to queue
+// Compression queue (composable)
 // ---------------------------------------------------------------------------
 
-async function addFolderToQueue() {
-  const folder = await open({
-    directory: true,
-    multiple: false,
-    title: "Choose a folder to add to compression queue",
-  });
-  if (!folder || typeof folder !== "string") return;
-
-  // Check if already in queue
-  if (queue.value.some(q => q.path === folder)) {
-    showToast("This folder is already in the queue", "info");
-    return;
-  }
-
-  const name = folder.split("/").pop() || folder;
-  const item: QueueItem = { path: folder, name, size: 0, isDirectory: true, calculating: true };
-  queue.value.push(item);
-
-  // Calculate size in background
-  try {
-    const size = await invoke<number>("get_directory_size", { path: folder });
-    const idx = queue.value.findIndex(q => q.path === folder);
-    if (idx !== -1) {
-      queue.value[idx].size = size;
-      queue.value[idx].calculating = false;
-    }
-  } catch {
-    const idx = queue.value.findIndex(q => q.path === folder);
-    if (idx !== -1) queue.value[idx].calculating = false;
-  }
-}
-
-function removeFromQueue(path: string) {
-  queue.value = queue.value.filter(q => q.path !== path);
-}
-
-function clearQueue() {
-  queue.value = [];
-}
-
-const totalQueueSize = computed(() =>
-  queue.value.reduce((sum, q) => sum + q.size, 0)
-);
-
-// ---------------------------------------------------------------------------
-// Compress queue
-// ---------------------------------------------------------------------------
-
-async function compressQueue() {
-  if (queue.value.length === 0) return;
-
-  const items = [...queue.value];
-  let totalSavings = 0;
-  let compressed = 0;
-  const errors: string[] = [];
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    compressProgress.value = { current: i + 1, total: items.length, name: item.name };
-
-    try {
-      if (item.isDirectory) {
-        const result = await compressDirectoryToVault(item.path);
-        if (result.success || result.files_compressed > 0) {
-          totalSavings += result.total_savings;
-          compressed++;
-          queue.value = queue.value.filter(q => q.path !== item.path);
-        }
-        if (result.errors.length) errors.push(...result.errors);
-      } else {
-        const result = await compressToVault([item.path]);
-        if (result.success || result.files_compressed > 0) {
-          totalSavings += result.total_savings;
-          compressed++;
-          queue.value = queue.value.filter(q => q.path !== item.path);
-        }
-        if (result.errors.length) errors.push(...result.errors);
-      }
-    } catch (e) {
-      console.warn('[vault] compress failed for', item.path, e);
-      errors.push(`${item.name}: ${String(e)}`);
-    }
-  }
-
-  compressProgress.value = null;
-
-  if (compressed > 0) {
-    showToast(`Archived ${compressed} item(s), saved ${formatSize(totalSavings)}`);
-  }
-  if (errors.length > 0) {
-    vaultError.value = errors.join("; ");
-  }
-}
+const {
+  queue,
+  compressProgress,
+  totalQueueSize,
+  addFolderToQueue,
+  removeFromQueue,
+  clearQueue,
+  compressQueue,
+} = useCompressionQueue({
+  compressDirectoryToVault,
+  compressToVault,
+  onError: (msg) => { vaultError.value = msg; },
+  onSuccess: (msg) => showToast(msg),
+  compressing: vaultCompressing,
+});
 
 // ---------------------------------------------------------------------------
 // Candidates (file-level scan)
@@ -182,7 +94,7 @@ async function compressSelectedCandidates() {
   if (result.success || result.files_compressed > 0) {
     showToast(`Compressed ${result.files_compressed} file(s), saved ${formatSize(result.total_savings)}`);
     selectedCandidates.value = new Set();
-    vaultCandidates.value = vaultCandidates.value.filter(c => !paths.includes(c.path));
+    removeCandidates(paths);
   }
   if (result.errors.length) vaultError.value = result.errors.join("; ");
 }

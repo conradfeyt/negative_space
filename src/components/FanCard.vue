@@ -39,7 +39,7 @@ function fanGaugeColor(pct: number): string {
     <div class="stat-hero">{{ avgRpm }}<span class="stat-unit">RPM</span></div>
     <div class="fan-items">
       <div v-for="fan in fans" :key="fan.id" class="fan-item">
-        <svg class="fan-mini-gauge" viewBox="0 0 48 30">
+        <svg class="fan-mini-gauge" viewBox="0 0 48 30" role="img" :aria-label="'Fan ' + fan.id + ' speed gauge at ' + fan.percent + '%'">
           <!-- 4 background zones -->
           <path :d="fanArc(24, 27, 19, 0, 44)" stroke="hsla(140, 20%, 40%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           <path :d="fanArc(24, 27, 19, 46, 89)" stroke="hsla(45, 25%, 42%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>

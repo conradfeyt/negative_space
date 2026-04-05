@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { formatSize, KIND_COLORS, KIND_COLOR_DEFAULT } from "../utils";
+import { formatSize, getFileExtension } from "../utils";
 import {
   duplicateResult,
   duplicateScanning,
@@ -19,6 +19,15 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
+import {
+  useDuplicateFilters,
+  extCardColor,
+  isImageFile,
+  KIND_LABELS,
+  type FileKind,
+} from "../composables/useDuplicateFilters";
+
+const PREVIEW_FILES_PER_GROUP = 10;
 
 // Tab state
 const activeTab = ref<"exact" | "similar">("exact");
@@ -64,58 +73,13 @@ async function deleteSimilarSelected() {
   }
 }
 
-// ── File kind classification ───────────────────────────────────────────────
-type FileKind = "all" | "images" | "documents" | "audio" | "video" | "archives" | "code" | "other";
+// ── File kind filtering (composable) ──────────────────────────────────────
 
-const KIND_EXTENSIONS: Record<Exclude<FileKind, "all" | "other">, string[]> = {
-  images: ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "tiff", "tif", "bmp", "svg", "ico", "raw", "cr2", "nef", "arw", "dng", "psd", "ai"],
-  documents: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "csv", "pages", "numbers", "keynote", "odt", "ods", "odp", "epub", "md"],
-  audio: ["mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "aiff", "alac", "opus"],
-  video: ["mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v", "ts", "vob"],
-  archives: ["zip", "tar", "gz", "tgz", "rar", "7z", "dmg", "iso", "pkg", "deb", "bz2", "xz", "zst"],
-  code: ["js", "ts", "jsx", "tsx", "py", "rs", "go", "java", "c", "cpp", "h", "hpp", "swift", "rb", "php", "css", "scss", "html", "json", "xml", "yaml", "yml", "toml", "sh", "sql", "vue", "svelte"],
-};
-
-function getFileKind(name: string): FileKind {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  for (const [kind, exts] of Object.entries(KIND_EXTENSIONS)) {
-    if (exts.includes(ext)) return kind as FileKind;
-  }
-  return "other";
-}
-
-const activeKindFilter = ref<FileKind>("all");
-
-const kindCounts = computed(() => {
-  if (!duplicateResult.value) return {};
-  const counts: Record<string, { groups: number; wasted: number }> = {};
-  for (const group of duplicateResult.value.groups) {
-    const kind = getFileKind(group.files[0].name);
-    if (!counts[kind]) counts[kind] = { groups: 0, wasted: 0 };
-    counts[kind].groups++;
-    counts[kind].wasted += group.wasted_bytes;
-  }
-  return counts;
-});
-
-const filteredGroups = computed(() => {
-  if (!duplicateResult.value) return [];
-  if (activeKindFilter.value === "all") return duplicateResult.value.groups;
-  return duplicateResult.value.groups.filter(
-    (g) => getFileKind(g.files[0].name) === activeKindFilter.value
-  );
-});
-
-const KIND_LABELS: Record<FileKind, string> = {
-  all: "All",
-  images: "Images",
-  documents: "Documents",
-  audio: "Audio",
-  video: "Video",
-  archives: "Archives",
-  code: "Code",
-  other: "Other",
-};
+const {
+  activeKindFilter,
+  kindCounts,
+  filteredGroups,
+} = useDuplicateFilters(duplicateResult);
 
 
 // File icon cache (same pattern as LargeFiles)
@@ -131,7 +95,7 @@ async function loadFileIcon(ext: string) {
 }
 
 function getFileIcon(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const ext = getFileExtension(name);
   if (!fileIconCache.value[ext] && ext) loadFileIcon(ext);
   return fileIconCache.value[ext] || "";
 }
@@ -139,13 +103,7 @@ function getFileIcon(name: string): string {
 // Preload common icons
 for (const ext of ["png", "jpg", "pdf", "zip", "mp4", "mp3", "doc", "js", "py"]) loadFileIcon(ext);
 
-function isImageFile(name: string): boolean {
-  return getFileKind(name) === "images";
-}
-
-function extCardColor(name: string): string {
-  return KIND_COLORS[getFileKind(name)] ?? KIND_COLOR_DEFAULT;
-}
+// isImageFile and extCardColor are imported from useDuplicateFilters
 
 function getExtLabel(name: string): string {
   const ext = name.split(".").pop()?.toUpperCase() ?? "";
@@ -492,7 +450,7 @@ function shortPath(p: string): string {
           <div class="card-strip-container">
             <div class="card-strip">
               <div
-                v-for="(file, idx) in group.files.slice(0, 10)"
+                v-for="(file, idx) in group.files.slice(0, PREVIEW_FILES_PER_GROUP)"
                 :key="file.path"
                 class="file-card"
                 :class="{
@@ -673,7 +631,7 @@ function shortPath(p: string): string {
             <div class="card-strip-container">
               <div class="card-strip">
                 <div
-                  v-for="(file, idx) in group.files.slice(0, 10)"
+                  v-for="(file, idx) in group.files.slice(0, PREVIEW_FILES_PER_GROUP)"
                   :key="file.path"
                   class="file-card"
                   :class="{

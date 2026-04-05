@@ -112,15 +112,9 @@ pub async fn scan_apps(has_fda: Option<bool>) -> Result<Vec<AppInfo>, String> {
     Ok(apps)
 }
 
-/// Move an .app to the Trash via Finder (so it goes to the Trash instead of
-/// being permanently deleted), and optionally remove leftover Library files.
-#[tauri::command]
-pub async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanResult {
-    let mut freed_bytes: u64 = 0;
-    let mut deleted_count: u64 = 0;
-    let mut errors: Vec<String> = Vec::new();
-
-    let path = Path::new(&app_path);
+/// Move an .app bundle to the Trash only (no leftover cleanup).
+fn trash_app_only(app_path: &str) -> CleanResult {
+    let path = Path::new(app_path);
     if !path.exists() {
         return CleanResult {
             success: false,
@@ -130,11 +124,11 @@ pub async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanRes
         };
     }
 
-    // Measure app size before trashing.
-    let app_size = commands::get_du_size(&app_path);
+    let app_size = commands::get_du_size(app_path);
+    let mut freed_bytes: u64 = 0;
+    let mut deleted_count: u64 = 0;
+    let mut errors: Vec<String> = Vec::new();
 
-    // Use AppleScript to move the .app to Trash. This is the macOS-native way
-    // and shows the expected "moved to Trash" behaviour.
     let script = format!(
         "tell application \"Finder\" to delete POSIX file \"{}\"",
         app_path
@@ -158,42 +152,53 @@ pub async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanRes
         }
     }
 
-    // Optionally remove leftover Library files.
-    if remove_leftovers {
-        let home = commands::home_dir().unwrap_or_default();
-        let app_name = Path::new(&app_path)
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+    CleanResult {
+        success: errors.is_empty(),
+        freed_bytes,
+        deleted_count,
+        errors,
+    }
+}
 
-        let plist_path = format!("{}/Contents/Info.plist", app_path);
-        let bundle_id = get_bundle_id(&plist_path);
+/// Remove leftover Library files for an app that has already been trashed.
+fn remove_app_leftovers(app_path: &str) -> CleanResult {
+    let home = commands::home_dir().unwrap_or_default();
+    let app_name = Path::new(app_path)
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
 
-        let leftover_paths = find_leftover_paths(&home, &app_name, &bundle_id);
+    let plist_path = format!("{}/Contents/Info.plist", app_path);
+    let bundle_id = get_bundle_id(&plist_path);
 
-        for leftover in &leftover_paths {
-            let leftover_p = Path::new(leftover);
-            if !leftover_p.exists() {
-                continue;
+    let leftover_paths = find_leftover_paths(&home, &app_name, &bundle_id);
+
+    let mut freed_bytes: u64 = 0;
+    let mut deleted_count: u64 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for leftover in &leftover_paths {
+        let leftover_p = Path::new(leftover);
+        if !leftover_p.exists() {
+            continue;
+        }
+
+        let size = commands::get_du_size(leftover);
+
+        let del_result = if leftover_p.is_dir() {
+            fs::remove_dir_all(leftover_p)
+        } else {
+            fs::remove_file(leftover_p)
+        };
+
+        match del_result {
+            Ok(()) => {
+                freed_bytes += size;
+                deleted_count += 1;
             }
-
-            let size = commands::get_du_size(leftover);
-
-            let del_result = if leftover_p.is_dir() {
-                fs::remove_dir_all(leftover_p)
-            } else {
-                fs::remove_file(leftover_p)
-            };
-
-            match del_result {
-                Ok(()) => {
-                    freed_bytes += size;
-                    deleted_count += 1;
-                }
-                Err(e) => {
-                    errors.push(format!("Failed to delete leftover {}: {}", leftover, e));
-                }
+            Err(e) => {
+                errors.push(format!("Failed to delete leftover {}: {}", leftover, e));
             }
         }
     }
@@ -204,6 +209,23 @@ pub async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanRes
         deleted_count,
         errors,
     }
+}
+
+/// Move an .app to the Trash via Finder (so it goes to the Trash instead of
+/// being permanently deleted), and optionally remove leftover Library files.
+#[tauri::command]
+pub async fn uninstall_app(app_path: String, remove_leftovers: bool) -> CleanResult {
+    let mut result = trash_app_only(&app_path);
+
+    if remove_leftovers {
+        let leftover_result = remove_app_leftovers(&app_path);
+        result.freed_bytes += leftover_result.freed_bytes;
+        result.deleted_count += leftover_result.deleted_count;
+        result.errors.extend(leftover_result.errors);
+        result.success = result.success && leftover_result.success;
+    }
+
+    result
 }
 
 // ---------------------------------------------------------------------------
