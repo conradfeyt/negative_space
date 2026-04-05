@@ -18,6 +18,7 @@ import * as d3 from "d3";
 import { voronoiTreemap } from "d3-voronoi-treemap";
 import { formatSize } from "../utils";
 import type { DiskNode, DiskMapResult } from "../types";
+import { useZoomPan } from "../composables/useZoomPan";
 
 const props = defineProps<{
   data: DiskMapResult | null;
@@ -38,33 +39,23 @@ type VoronoiMode = "consolidated" | "clusters";
 const voronoiMode = ref<VoronoiMode>("consolidated");
 
 // ---------------------------------------------------------------------------
-// Camera state for zoom/pan (viewBox-based, like Galactic's approach)
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 // Zoom/pan — direct DOM manipulation on a <g> wrapper.
 // NO Vue reactivity in the zoom loop to avoid re-diffing hundreds of paths.
+// Uses shared composable for drag state machine and wheel gating;
+// SVG-specific coordinate math lives here.
 // ---------------------------------------------------------------------------
 const zoomGroupRef = ref<SVGGElement | null>(null);
-let zoomScale = 1;
 let zoomX = 0;
 let zoomY = 0;
-let vDragging = false;
-let vDragStartX = 0;
-let vDragStartY = 0;
 let zoomStartX = 0;
 let zoomStartY = 0;
 let zoomDebounce = 0;
-
-// Track whether a real drag happened (mouse moved > threshold).
-// If true, suppress the next click so panning doesn't trigger drill-down.
-let didDrag = false;
-const DRAG_THRESHOLD = 4; // pixels — below this we treat it as a click
 
 function applyZoomTransform() {
   if (!zoomGroupRef.value) return;
   zoomGroupRef.value.setAttribute(
     "transform",
-    `translate(${zoomX},${zoomY}) scale(${zoomScale})`
+    `translate(${zoomX},${zoomY}) scale(${zoomPan.state.scale})`
   );
 }
 
@@ -79,80 +70,73 @@ function setZoomingClass(active: boolean) {
   }
 }
 
+const zoomPan = useZoomPan(
+  { minScale: 0.3, maxScale: 8, dragThreshold: 4 },
+  {
+    onZoom(e, newScale, oldScale) {
+      const rect = containerRef.value?.getBoundingClientRect();
+      if (!rect) return;
+      // Cursor position in SVG element space (0..width, 0..height)
+      const mx = (e.clientX - rect.left) / rect.width * width;
+      const my = (e.clientY - rect.top) / rect.height * height;
+
+      // Zoom toward cursor: adjust translation so the point under cursor stays fixed
+      zoomX = mx - (mx - zoomX) * (newScale / oldScale);
+      zoomY = my - (my - zoomY) * (newScale / oldScale);
+
+      setZoomingClass(true);
+      applyZoomTransform();
+
+      // Debounce: re-show labels after zoom stops
+      clearTimeout(zoomDebounce);
+      zoomDebounce = window.setTimeout(() => setZoomingClass(false), 150);
+    },
+    onPan(_e, pixelDx, pixelDy) {
+      const rect = containerRef.value?.getBoundingClientRect();
+      if (!rect) return;
+      // Convert pixel delta to SVG coordinate delta.
+      // The <g> transform is `translate(tx,ty) scale(s)` — translate operates in
+      // the untransformed SVG coordinate system, so no zoomScale adjustment needed.
+      // The ratio (width / rect.width) converts screen pixels → SVG units.
+      const dx = pixelDx / rect.width * width;
+      const dy = pixelDy / rect.height * height;
+      zoomX = zoomStartX + dx;
+      zoomY = zoomStartY + dy;
+      applyZoomTransform();
+    },
+    onDragStart() {
+      // Snapshot current translate for drag delta calculation
+      zoomStartX = zoomX;
+      zoomStartY = zoomY;
+      // Hide labels during pan for smoother performance
+      setZoomingClass(true);
+      containerRef.value?.classList.add("panning");
+    },
+    onDragEnd() {
+      setZoomingClass(false);
+      containerRef.value?.classList.remove("panning");
+    },
+  },
+);
+
 function onVoronoiWheel(e: WheelEvent) {
-  if (!props.expanded) return;
-  e.preventDefault();
-
-  const rect = containerRef.value?.getBoundingClientRect();
-  if (!rect) return;
-  // Cursor position in SVG element space (0..width, 0..height)
-  const mx = (e.clientX - rect.left) / rect.width * width;
-  const my = (e.clientY - rect.top) / rect.height * height;
-
-  const factor = e.deltaY > 0 ? 0.94 : 1.06;
-  const newScale = Math.max(0.3, Math.min(8, zoomScale * factor));
-
-  // Zoom toward cursor: adjust translation so the point under cursor stays fixed
-  zoomX = mx - (mx - zoomX) * (newScale / zoomScale);
-  zoomY = my - (my - zoomY) * (newScale / zoomScale);
-  zoomScale = newScale;
-
-  setZoomingClass(true);
-  applyZoomTransform();
-
-  // Debounce: re-show labels after zoom stops
-  clearTimeout(zoomDebounce);
-  zoomDebounce = window.setTimeout(() => setZoomingClass(false), 150);
+  zoomPan.onWheel(e, props.expanded);
 }
 
 function onVoronoiMouseDown(e: MouseEvent) {
-  if (!props.expanded) return;
-  vDragging = true;
-  didDrag = false; // reset — we haven't moved yet
-  vDragStartX = e.clientX;
-  vDragStartY = e.clientY;
-  zoomStartX = zoomX;
-  zoomStartY = zoomY;
+  zoomPan.onMouseDown(e, props.expanded);
 }
 
 function onVoronoiMouseMove(e: MouseEvent) {
-  if (!vDragging) return;
-
-  // Check if we've moved past the threshold — if so, this is a real drag
-  const pixelDx = e.clientX - vDragStartX;
-  const pixelDy = e.clientY - vDragStartY;
-  if (!didDrag && Math.abs(pixelDx) + Math.abs(pixelDy) > DRAG_THRESHOLD) {
-    didDrag = true;
-    // Hide labels during pan for smoother performance
-    setZoomingClass(true);
-    // Switch to grabbing cursor
-    containerRef.value?.classList.add("panning");
-  }
-
-  const rect = containerRef.value?.getBoundingClientRect();
-  if (!rect) return;
-  // Convert pixel delta to SVG coordinate delta.
-  // The <g> transform is `translate(tx,ty) scale(s)` — translate operates in
-  // the untransformed SVG coordinate system, so no zoomScale adjustment needed.
-  // The ratio (width / rect.width) converts screen pixels → SVG units.
-  const dx = pixelDx / rect.width * width;
-  const dy = pixelDy / rect.height * height;
-  zoomX = zoomStartX + dx;
-  zoomY = zoomStartY + dy;
-  applyZoomTransform();
+  zoomPan.onMouseMove(e);
 }
 
 function onVoronoiMouseUp() {
-  if (vDragging && didDrag) {
-    // Re-show labels and revert cursor now that pan has ended
-    setZoomingClass(false);
-    containerRef.value?.classList.remove("panning");
-  }
-  vDragging = false;
+  zoomPan.onMouseUp();
 }
 
 function resetCamera() {
-  zoomScale = 1;
+  zoomPan.resetZoom();
   zoomX = 0;
   zoomY = 0;
   applyZoomTransform();
@@ -1003,7 +987,7 @@ function maxChars(cellSize: number, fontSize: number): number {
 // ---------------------------------------------------------------------------
 function drillInto(cell: VoronoiCell) {
   // Suppress drill-down if the user just finished panning (drag, not click)
-  if (didDrag) return;
+  if (zoomPan.state.didDrag) return;
 
   if (!cell.node || !cell.node.children || cell.node.children.length === 0) return;
 
@@ -1017,7 +1001,7 @@ function drillInto(cell: VoronoiCell) {
 
 /** Drill into a cluster circle — stays in clusters mode, showing that node's children as new clusters */
 function drillIntoCluster(cluster: ClusterCircle) {
-  if (didDrag) return;
+  if (zoomPan.state.didDrag) return;
   if (!cluster.node.children || cluster.node.children.length === 0) return;
 
   // Push current node onto breadcrumbs so navigateBack works

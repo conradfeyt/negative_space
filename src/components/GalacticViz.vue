@@ -22,6 +22,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import * as d3 from "d3";
 import { formatSize } from "../utils";
 import type { DiskNode, DiskMapResult } from "../types";
+import { useZoomPan } from "../composables/useZoomPan";
 
 const props = defineProps<{
   data: DiskMapResult | null;
@@ -106,7 +107,10 @@ let dpr = 1;
 let animFrame = 0;
 let time = 0;
 
-// Camera — pan/zoom in world coordinates
+// Camera — pan/zoom in world coordinates.
+// camZoom stays as a plain local variable because it's referenced in ~50 places
+// including smoothPanTo animation. The composable handles drag state and wheel
+// gating; camZoom is updated directly in the onZoom callback.
 let camX = 0;    // world X at canvas center
 let camY = 0;
 let camZoom = 1; // 1 = default, >1 = zoomed in
@@ -126,17 +130,56 @@ function onVisibilityChange() {
   }
 }
 
-// Drag state
-let dragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
+// Drag start camera snapshot (set in onDragStart callback)
 let camStartX = 0;
 let camStartY = 0;
 
 // Hover
 let hoveredBody: { name: string; size: number; x: number; y: number; type: string } | null = null;
 
+// ---------------------------------------------------------------------------
+// Zoom/pan composable — handles drag state machine and wheel gating.
+// Canvas-specific coordinate math is in the callbacks.
+// ---------------------------------------------------------------------------
+const zoomPan = useZoomPan(
+  { minScale: 0.15, maxScale: 12, dragThreshold: 3 },
+  {
+    onZoom(e, newScale, _oldScale) {
+      const canvas = canvasRef.value;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
 
+      // Zoom toward cursor position
+      const [wx, wy] = screenToWorld(mx, my);
+      // Adjust camera so the world point under cursor stays fixed
+      camX = wx - (mx - width / 2) / newScale;
+      camY = wy - (my - height / 2) / newScale;
+      camZoom = newScale;
+    },
+    onPan(_e, pixelDx, pixelDy) {
+      // pixelDx/pixelDy are total delta from drag start (client coords).
+      const dx = pixelDx / camZoom;
+      const dy = pixelDy / camZoom;
+      camX = camStartX - dx;
+      camY = camStartY - dy;
+      const canvas = canvasRef.value;
+      if (canvas) canvas.style.cursor = "grabbing";
+      hoveredBody = null;
+    },
+    onDragStart() {
+      camStartX = camX;
+      camStartY = camY;
+      const canvas = canvasRef.value;
+      if (canvas) canvas.style.cursor = "grabbing";
+    },
+    onDragEnd() {
+      const canvas = canvasRef.value;
+      if (canvas) canvas.style.cursor = "grab";
+    },
+  },
+);
 
 // Expand / compact — emits to parent, parent handles layout.
 // Scale camZoom proportionally so the scene fills the new canvas size.
@@ -147,6 +190,7 @@ function toggleExpand() {
     resize();
     const newSize = Math.min(width, height) || 1;
     camZoom *= newSize / oldSize;
+    zoomPan.state.scale = camZoom;
   });
 }
 
@@ -719,24 +763,21 @@ function hitTest(sx: number, sy: number): { name: string; size: number; x: numbe
 }
 
 // ---------------------------------------------------------------------------
-// Mouse / touch handlers
+// Mouse / touch handlers — delegate drag/wheel to composable, keep
+// component-specific hover and click-to-zoom logic here.
 // ---------------------------------------------------------------------------
 function onMouseMove(e: MouseEvent) {
+  // Let the composable handle drag detection and panning
+  zoomPan.onMouseMove(e);
+
+  // If composable is handling a drag, skip hover detection
+  if (zoomPan.state.dragging) return;
+
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
-
-  if (dragging) {
-    const dx = (mx - dragStartX) / camZoom;
-    const dy = (my - dragStartY) / camZoom;
-    camX = camStartX - dx;
-    camY = camStartY - dy;
-    canvas.style.cursor = "grabbing";
-    hoveredBody = null;
-    return;
-  }
 
   const hit = hitTest(mx, my);
   hoveredBody = hit;
@@ -744,29 +785,22 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseDown(e: MouseEvent) {
-  const canvas = canvasRef.value;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  dragging = true;
-  dragStartX = e.clientX - rect.left;
-  dragStartY = e.clientY - rect.top;
-  camStartX = camX;
-  camStartY = camY;
-  canvas.style.cursor = "grabbing";
+  // Always allow drag/click — GalacticViz supports pan in compact mode too.
+  // Only wheel zoom is gated by expanded.
+  zoomPan.onMouseDown(e, true);
 }
 
 function onMouseUp(e: MouseEvent) {
-  const canvas = canvasRef.value;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
+  const wasDrag = zoomPan.state.didDrag;
+  zoomPan.onMouseUp();
 
-  const didDrag = Math.abs(mx - dragStartX) > 3 || Math.abs(my - dragStartY) > 3;
-  dragging = false;
-  canvas.style.cursor = "grab";
+  if (!wasDrag) {
+    const canvas = canvasRef.value;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-  if (!didDrag) {
     // Click — zoom into / center on clicked body
     const hit = hitTest(mx, my);
     if (hit) {
@@ -793,31 +827,12 @@ function onMouseUp(e: MouseEvent) {
 }
 
 function onMouseLeave() {
-  dragging = false;
+  zoomPan.onMouseLeave();
   hoveredBody = null;
 }
 
 function onWheel(e: WheelEvent) {
-  // Only capture wheel for zoom when expanded — in compact mode let the
-  // event bubble so the parent .content panel scrolls normally.
-  if (!props.expanded) return;
-
-  e.preventDefault();
-  const canvas = canvasRef.value;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-
-  // Zoom toward cursor position (gentler factor for less sensitivity)
-  const [wx, wy] = screenToWorld(mx, my);
-  const factor = e.deltaY > 0 ? 0.94 : 1.06;
-  const newZoom = Math.max(0.15, Math.min(12, camZoom * factor));
-
-  // Adjust camera so the world point under cursor stays fixed
-  camX = wx - (mx - width / 2) / newZoom;
-  camY = wy - (my - height / 2) / newZoom;
-  camZoom = newZoom;
+  zoomPan.onWheel(e, props.expanded);
 }
 
 // Smooth pan animation
@@ -835,7 +850,7 @@ function smoothPanTo(wx: number, wy: number, zoom: number) {
     camY = startY + (wy - startY) * ease;
     camZoom = startZ + (zoom - startZ) * ease;
     if (t < 1) panAnim = requestAnimationFrame(step);
-    else panAnim = null;
+    else { panAnim = null; zoomPan.state.scale = camZoom; }
   }
   panAnim = requestAnimationFrame(step);
 }
@@ -881,6 +896,7 @@ function build() {
     );
     // Use 1.8 divisor instead of 2.5 for tighter framing, and raise the max from 1.5 to 2.2
     camZoom = Math.min(2.2, Math.min(width, height) / (extent * 1.8));
+    zoomPan.state.scale = camZoom;
   }
 
   cancelAnimationFrame(animFrame);
@@ -916,6 +932,7 @@ watch(() => props.expanded, () => {
     resize();
     const newSize = Math.min(width, height) || 1;
     camZoom *= newSize / oldSize;
+    zoomPan.state.scale = camZoom;
   });
 });
 </script>
