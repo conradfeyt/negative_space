@@ -186,10 +186,10 @@ fn blake3_hash_file(path: &str) -> Result<String, String> {
     let mut hasher = blake3::Hasher::new();
     let mut buf = [0u8; 65536];
     loop {
-        let n = file.read(&mut buf)
+        let bytes_read = file.read(&mut buf)
             .map_err(|e| format!("Read error on {}: {}", path, e))?;
-        if n == 0 { break; }
-        hasher.update(&buf[..n]);
+        if bytes_read == 0 { break; }
+        hasher.update(&buf[..bytes_read]);
     }
     Ok(hasher.finalize().to_hex().to_string())
 }
@@ -201,12 +201,12 @@ fn blake3_hash_file(path: &str) -> Result<String, String> {
 fn estimate_compression(path: &str) -> Option<f64> {
     let mut file = fs::File::open(path).ok()?;
     let mut sample = vec![0u8; SAMPLE_BYTES];
-    let n = file.read(&mut sample).ok()?;
-    if n == 0 { return None; }
-    sample.truncate(n);
+    let bytes_read = file.read(&mut sample).ok()?;
+    if bytes_read == 0 { return None; }
+    sample.truncate(bytes_read);
 
     let compressed = zstd::encode_all(sample.as_slice(), ZSTD_LEVEL).ok()?;
-    let ratio = compressed.len() as f64 / n as f64;
+    let ratio = compressed.len() as f64 / bytes_read as f64;
     Some(ratio)
 }
 
@@ -759,10 +759,10 @@ fn verify_compressed(vault_path: &str, expected_hash: &str) -> Result<bool, Stri
     let mut hasher = blake3::Hasher::new();
     let mut buf = [0u8; 65536];
     loop {
-        let n = decoder.read(&mut buf)
+        let bytes_read = decoder.read(&mut buf)
             .map_err(|e| format!("Read error during verification: {}", e))?;
-        if n == 0 { break; }
-        hasher.update(&buf[..n]);
+        if bytes_read == 0 { break; }
+        hasher.update(&buf[..bytes_read]);
     }
 
     let hash = hasher.finalize().to_hex().to_string();

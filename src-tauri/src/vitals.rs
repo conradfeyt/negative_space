@@ -569,12 +569,12 @@ fn parse_uptime_display(text: &str) -> String {
                 // "3:42" -> "3h 42m"
                 let hm: Vec<&str> = part.split(':').collect();
                 if hm.len() == 2 {
-                    let h = hm[0].trim();
-                    let m = hm[1].trim();
-                    if h != "0" {
-                        result.push(format!("{}h {}m", h, m));
+                    let hours = hm[0].trim();
+                    let minutes = hm[1].trim();
+                    if hours != "0" {
+                        result.push(format!("{}h {}m", hours, minutes));
                     } else {
-                        result.push(format!("{}m", m));
+                        result.push(format!("{}m", minutes));
                     }
                 } else {
                     result.push(part.to_string());

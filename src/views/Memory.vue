@@ -118,24 +118,24 @@ onUnmounted(() => stopClock());
 // Memory bar segments
 const memoryBarSegments = computed(() => {
   if (!memoryResult.value) return [];
-  const s = memoryResult.value.stats;
-  const total = s.total_bytes;
+  const stats = memoryResult.value.stats;
+  const total = stats.total_bytes;
   if (total === 0) return [];
 
   return [
-    { label: "App Memory", bytes: s.app_bytes, color: MEMORY_BAR_COLORS.app, pct: (s.app_bytes / total) * 100 },
-    { label: "Wired", bytes: s.wired_bytes, color: MEMORY_BAR_COLORS.wired, pct: (s.wired_bytes / total) * 100 },
-    { label: "Compressed", bytes: s.compressed_bytes, color: MEMORY_BAR_COLORS.compressed, pct: (s.compressed_bytes / total) * 100 },
-    { label: "Inactive", bytes: s.inactive_bytes, color: MEMORY_BAR_COLORS.inactive, pct: (s.inactive_bytes / total) * 100 },
-    { label: "Free", bytes: s.free_bytes, color: MEMORY_BAR_COLORS.free, pct: (s.free_bytes / total) * 100 },
+    { label: "App Memory", bytes: stats.app_bytes, color: MEMORY_BAR_COLORS.app, pct: (stats.app_bytes / total) * 100 },
+    { label: "Wired", bytes: stats.wired_bytes, color: MEMORY_BAR_COLORS.wired, pct: (stats.wired_bytes / total) * 100 },
+    { label: "Compressed", bytes: stats.compressed_bytes, color: MEMORY_BAR_COLORS.compressed, pct: (stats.compressed_bytes / total) * 100 },
+    { label: "Inactive", bytes: stats.inactive_bytes, color: MEMORY_BAR_COLORS.inactive, pct: (stats.inactive_bytes / total) * 100 },
+    { label: "Free", bytes: stats.free_bytes, color: MEMORY_BAR_COLORS.free, pct: (stats.free_bytes / total) * 100 },
   ];
 });
 
 // Memory pressure level
 const memoryPressure = computed(() => {
   if (!memoryResult.value) return { label: "Unknown", class: "" };
-  const s = memoryResult.value.stats;
-  const usedPct = (s.used_bytes / s.total_bytes) * 100;
+  const stats = memoryResult.value.stats;
+  const usedPct = (stats.used_bytes / stats.total_bytes) * 100;
   if (usedPct > 85) return { label: "High", class: "pressure-high" };
   if (usedPct > 65) return { label: "Moderate", class: "pressure-moderate" };
   return { label: "Low", class: "pressure-low" };
@@ -274,8 +274,8 @@ const sortedGroups = computed((): ProcessGroup[] => {
                   <th>PID</th>
                   <th>Name</th>
                   <th>Description</th>
-                  <th style="text-align: right;">RSS</th>
-                  <th style="text-align: right;">Mem %</th>
+                  <th class="th-right">RSS</th>
+                  <th class="th-right">Mem %</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,8 +283,8 @@ const sortedGroups = computed((): ProcessGroup[] => {
                   <td class="mono">{{ proc.pid }}</td>
                   <td class="proc-name truncate" :title="proc.command">{{ proc.name }}</td>
                   <td class="proc-desc">{{ proc.description || '-' }}</td>
-                  <td class="mono" style="text-align: right;">{{ formatSize(proc.rss_bytes) }}</td>
-                  <td class="mono" style="text-align: right;">{{ formatPercent(proc.mem_percent) }}</td>
+                  <td class="mono th-right">{{ formatSize(proc.rss_bytes) }}</td>
+                  <td class="mono th-right">{{ formatPercent(proc.mem_percent) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -645,4 +645,6 @@ const sortedGroups = computed((): ProcessGroup[] => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.th-right { text-align: right; }
 </style>

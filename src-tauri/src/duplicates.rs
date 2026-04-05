@@ -236,10 +236,10 @@ fn collect_files(
             .follow_links(false)
             .into_iter()
             .filter_entry(|e| {
-                let p = e.path().to_string_lossy();
+                let entry_path = e.path().to_string_lossy();
                 if skip_prefixes
                     .iter()
-                    .any(|prefix| p.starts_with(prefix.as_str()))
+                    .any(|prefix| entry_path.starts_with(prefix.as_str()))
                 {
                     return false;
                 }
@@ -368,19 +368,19 @@ fn assemble_groups(
         let dup_files: Vec<DuplicateFile> = files
             .iter()
             .map(|(path, modified)| {
-                let p = std::path::Path::new(path);
+                let file_path = std::path::Path::new(path);
                 DuplicateFile {
                     path: path.clone(),
-                    name: p
+                    name: file_path
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy()
                         .to_string(),
                     size: *size,
                     modified: modified.clone(),
-                    parent_dir: p
+                    parent_dir: file_path
                         .parent()
-                        .map(|pp| pp.to_string_lossy().to_string())
+                        .map(|parent_path| parent_path.to_string_lossy().to_string())
                         .unwrap_or_default(),
                 }
             })

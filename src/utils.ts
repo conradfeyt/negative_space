@@ -150,10 +150,12 @@ export function formatSize(bytes: number): string {
   if (bytes === 0) return "0 B";
 
   const units = ["B", "KB", "MB", "GB", "TB"];
-  const k = 1024;
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  const index = Math.min(i, units.length - 1);
-  const value = bytes / Math.pow(k, index);
+  const bytesPerUnit = 1024;
+  const unitIndex = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(bytesPerUnit)),
+    units.length - 1,
+  );
+  const value = bytes / Math.pow(bytesPerUnit, unitIndex);
 
-  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }

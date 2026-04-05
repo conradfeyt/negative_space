@@ -286,8 +286,8 @@ fn hash_images(
                 Err(_) => { images_skipped += 1; continue; }
             };
             let mut buf = [0u8; 4096];
-            let n = std::io::Read::read(&mut file, &mut buf).unwrap_or(0);
-            blake3::hash(&buf[..n]).to_hex().to_string()
+            let bytes_read = std::io::Read::read(&mut file, &mut buf).unwrap_or(0);
+            blake3::hash(&buf[..bytes_read]).to_hex().to_string()
         };
 
         // Get modified timestamp.
@@ -356,13 +356,13 @@ fn build_similar_groups(
             .iter()
             .map(|&i| {
                 let hi = &hashed_images[i];
-                let p = Path::new(&hi.path);
+                let file_path = Path::new(&hi.path);
                 SimilarFile {
                     path: hi.path.clone(),
-                    name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+                    name: file_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
                     size: hi.size,
                     modified: hi.modified.clone(),
-                    parent_dir: p.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                    parent_dir: file_path.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
                     hash_hex: hi.hash_b64.clone(),
                     thumbnail: None, // Generated after truncation
                 }
@@ -438,17 +438,17 @@ fn generate_thumbnails(similar_groups: &mut [SimilarGroup]) {
 /// Cluster images by Hamming distance. Returns groups of indices where all
 /// pairs within a group have distance <= threshold.
 fn cluster_by_distance(images: &[HashedImage], threshold: u32) -> Vec<Vec<usize>> {
-    let n = images.len();
-    if n == 0 {
+    let image_count = images.len();
+    if image_count == 0 {
         return vec![];
     }
 
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut rank: Vec<usize> = vec![0; n];
+    let mut parent: Vec<usize> = (0..image_count).collect();
+    let mut rank: Vec<usize> = vec![0; image_count];
 
     // O(n^2) pairwise comparison — fine for up to ~10k images.
-    for i in 0..n {
-        for j in (i + 1)..n {
+    for i in 0..image_count {
+        for j in (i + 1)..image_count {
             let dist = images[i].hash.dist(&images[j].hash);
             if dist <= threshold {
                 union(&mut parent, &mut rank, i, j);
@@ -457,7 +457,7 @@ fn cluster_by_distance(images: &[HashedImage], threshold: u32) -> Vec<Vec<usize>
     }
 
     let mut groups_map: HashMap<usize, Vec<usize>> = HashMap::new();
-    for i in 0..n {
+    for i in 0..image_count {
         let root = find(&mut parent, i);
         groups_map.entry(root).or_default().push(i);
     }

@@ -347,20 +347,20 @@ pub fn scan_thermal() -> Result<ThermalScanResult, String> {
 
     // --- Generate assessment ---
     let assessment = if let Some(ref hot) = hottest_sensor {
-        let t = hot.temp_celsius;
-        if t >= 100.0 {
+        let hottest_temp = hot.temp_celsius;
+        if hottest_temp >= 100.0 {
             format!(
                 "{} is critically hot at {}C. Thermal throttling likely active.",
-                hot.name, t
+                hot.name, hottest_temp
             )
-        } else if t >= 90.0 {
+        } else if hottest_temp >= 90.0 {
             format!(
                 "{} is running very hot at {}C. Consider reducing workload.",
-                hot.name, t
+                hot.name, hottest_temp
             )
-        } else if t >= 80.0 {
-            format!("{} is warm at {}C. Normal under heavy load.", hot.name, t)
-        } else if t >= 60.0 {
+        } else if hottest_temp >= 80.0 {
+            format!("{} is warm at {}C. Normal under heavy load.", hot.name, hottest_temp)
+        } else if hottest_temp >= 60.0 {
             "Temperatures are normal. System is running well.".to_string()
         } else {
             "System is cool. All sensors within comfortable range.".to_string()

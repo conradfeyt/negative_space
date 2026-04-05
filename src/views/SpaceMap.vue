@@ -271,10 +271,10 @@ function recencyColor(modified: number | null | undefined): string {
   const raw = Math.max(0, Math.min(1, ageDays / 365));
   // Apply a bias curve so things shift toward amber sooner.
   // pow(0.7) pushes midpoint toward old (t=0.5 input → ~0.62 output).
-  const t = Math.pow(raw, 0.7);
+  const normalizedAge = Math.pow(raw, 0.7);
   // Recent = cool blue, Old = warm amber
   const interp = d3.interpolateRgb(RECENCY_RECENT, RECENCY_OLD);
-  return interp(t);
+  return interp(normalizedAge);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ function renderSunburst() {
     .append("circle")
     .attr("r", radius);
 
-  const g = svg.append("g").attr("clip-path", "url(#sunburst-clip)");
+  const chartGroup = svg.append("g").attr("clip-path", "url(#sunburst-clip)");
 
   // ---- d3.zoom: wheel-to-zoom + drag-to-pan on the SVG ----
   // Created once, persists across re-renders. The zoom handler
@@ -566,8 +566,8 @@ function renderSunburst() {
         liveG.attr("transform", event.transform.toString());
         const centerEl = sunburstContainerRef.value?.querySelector('.sunburst-center') as HTMLElement | null;
         if (centerEl) {
-          const t = event.transform;
-          centerEl.style.transform = `translate(calc(-50% + ${t.x}px), calc(-50% + ${t.y}px)) scale(${t.k})`;
+          const zoomXform = event.transform;
+          centerEl.style.transform = `translate(calc(-50% + ${zoomXform.x}px), calc(-50% + ${zoomXform.y}px)) scale(${zoomXform.k})`;
         }
       });
   }
@@ -581,7 +581,7 @@ function renderSunburst() {
   const descendants = partitioned.descendants().filter((d) => d.depth > 0);
 
   // ---- Center disc (root node): transparent with subtle border ----
-  g.append("circle")
+  chartGroup.append("circle")
     .datum(partitioned)
     .attr("r", () => yScale(partitioned.y1))
     .attr("fill", "rgba(255, 255, 255, 0.18)")
@@ -596,7 +596,7 @@ function renderSunburst() {
     });
 
   // ---- Arcs for all child nodes ----
-  const path = g
+  const path = chartGroup
     .selectAll<SVGPathElement, d3.HierarchyRectangularNode<DiskNode>>("path")
     .data(descendants)
     .join("path")
@@ -647,7 +647,7 @@ function renderSunburst() {
     });
 
   // ---- Text labels (only on large, prominent arcs) ----
-  const label = g
+  const label = chartGroup
     .selectAll<SVGTextElement, d3.HierarchyRectangularNode<DiskNode>>("text")
     .data(descendants)
     .join("text")
@@ -682,16 +682,16 @@ function renderSunburst() {
     xScale.domain([target.x0, target.x1]);
     yScale.domain([target.y0, radius]);
 
-    const t = g.transition().duration(650).ease(d3.easeCubicInOut);
+    const zoomTransition = chartGroup.transition().duration(650).ease(d3.easeCubicInOut);
 
     // Update center disc radius
-    g.select("circle")
-      .transition(t as any)
+    chartGroup.select("circle")
+      .transition(zoomTransition as any)
       .attr("r", yScale(target.y1));
 
     // Transition arcs
     path
-      .transition(t as any)
+      .transition(zoomTransition as any)
       .attrTween("d", (d: any) => () => arc(d) || "")
       .attr("fill-opacity", (d: any) => arcVisible(d) ? 1 : 0)
       .attr("stroke", (d: any) => arcVisible(d) ? "rgba(12, 16, 42, 0.82)" : "none")
@@ -711,7 +711,7 @@ function renderSunburst() {
 
     // Transition labels
     label
-      .transition(t as any)
+      .transition(zoomTransition as any)
       .attr("fill-opacity", (d: any) => labelVisible(d) ? 1 : 0)
       .attr("stroke-opacity", (d: any) => labelVisible(d) ? 1 : 0)
       .attrTween("transform", (d: any) => () => labelTransform(d));
