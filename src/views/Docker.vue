@@ -81,7 +81,7 @@ onMounted(loadDockerInfo);
             The Docker CLI is installed but the daemon is not responding.
             Start your Docker runtime and retry.
           </p>
-          <button class="btn-primary" style="margin-top: 16px;" @click="loadDockerInfo">
+          <button class="btn-primary mt-4" @click="loadDockerInfo">
             Retry
           </button>
         </div>
@@ -253,4 +253,6 @@ onMounted(loadDockerInfo);
   line-height: 1.6;
   color: var(--text-secondary);
 }
+
+.mt-4 { margin-top: var(--sp-4); }
 </style>

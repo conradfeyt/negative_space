@@ -798,7 +798,7 @@ onUnmounted(() => {
   <div v-else class="fda-gate">
     <div class="fda-drag-strip" @mousedown="startDrag"></div>
     <div class="fda-gate-content">
-      <div class="spinner" style="margin: 0 auto 16px;"></div>
+      <div class="spinner spinner-centered"></div>
       <p style="color: var(--muted); font-size: 14px;">Checking permissions...</p>
     </div>
   </div>
@@ -1197,4 +1197,6 @@ onUnmounted(() => {
 
 /* View transitions removed — opacity animations cause white flash on transparent
    Tauri windows when composited over blur filters. Instant swap is cleanest. */
+
+.spinner-centered { margin: 0 auto var(--sp-4); }
 </style>

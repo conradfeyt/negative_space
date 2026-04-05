@@ -254,9 +254,9 @@ onMounted(() => {
     </div>
 
     <!-- Debug -->
-    <div class="card" style="margin-top: 24px;">
+    <div class="card mt-6">
       <h3>Debug</h3>
-      <button class="btn-secondary" style="margin-top: 8px;" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
+      <button class="btn-secondary mt-2" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
     </div>
   </div>
 </template>
@@ -520,4 +520,7 @@ onMounted(() => {
   background: transparent;
   color: var(--muted);
 }
+
+.mt-6 { margin-top: var(--sp-6); }
+.mt-2 { margin-top: var(--sp-2); }
 </style>

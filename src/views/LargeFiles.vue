@@ -1018,7 +1018,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                         </div>
                                       </div>
                                       <!-- Files inside depth-3+ dirs shown flat -->
-                                      <div v-if="!collapsedGroups.has(d3.key)" class="file-list" :style="{ paddingLeft: '20px' }">
+                                      <div v-if="!collapsedGroups.has(d3.key)" class="file-list file-list-indented">
                                         <div
                                           v-for="file in collectFiles(d3)"
                                           :key="file.path"
@@ -1056,7 +1056,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                   </template>
 
                                   <!-- Files at depth 2 -->
-                                  <div v-if="d2.files.length > 0" class="file-list" :style="{ paddingLeft: '20px' }">
+                                  <div v-if="d2.files.length > 0" class="file-list file-list-indented">
                                     <div
                                       v-for="file in d2.files"
                                       :key="file.path"
@@ -1096,7 +1096,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                           </template>
 
                           <!-- Files at depth 1 -->
-                          <div v-if="d1.files.length > 0" class="file-list" :style="{ paddingLeft: '20px' }">
+                          <div v-if="d1.files.length > 0" class="file-list file-list-indented">
                             <div
                               v-for="file in d1.files"
                               :key="file.path"
@@ -1136,7 +1136,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                   </template>
 
                   <!-- Files at depth 0 (directly under top-level dir) -->
-                  <div v-if="child.files.length > 0" class="file-list" :style="{ paddingLeft: '20px' }">
+                  <div v-if="child.files.length > 0" class="file-list file-list-indented">
                     <div
                       v-for="file in child.files"
                       :key="file.path"
@@ -1926,5 +1926,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 .reveal-btn:active {
   transform: scale(0.92);
 }
+
+.file-list-indented { padding-left: var(--sp-5); }
 </style>
 

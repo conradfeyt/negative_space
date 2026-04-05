@@ -70,7 +70,7 @@ onMounted(async () => {
       <p class="text-muted">Native macOS icons rendered via Swift bridge</p>
     </div>
 
-    <div v-if="loading" class="text-muted" style="padding: 40px; text-align: center;">
+    <div v-if="loading" class="text-muted loading-placeholder">
       Loading icons...
     </div>
 
@@ -149,5 +149,10 @@ onMounted(async () => {
   height: 0;
   border-top: 0.5px solid rgba(0, 0, 0, 0.1);
   margin: 4px 16px;
+}
+
+.loading-placeholder {
+  padding: var(--sp-10);
+  text-align: center;
 }
 </style>
