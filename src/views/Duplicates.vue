@@ -302,7 +302,7 @@ function shortPath(p: string): string {
 </script>
 
 <template>
-  <div class="duplicates-view">
+  <section class="duplicates-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -317,8 +317,8 @@ function shortPath(p: string): string {
         </div>
         <div v-if="activeTab === 'exact'" class="scan-controls">
           <div class="min-size-control">
-            <label class="text-muted">Min size</label>
-            <select v-model.number="minSizeMb" class="size-select">
+            <label for="dup-min-size" class="text-muted">Min size</label>
+            <select id="dup-min-size" v-model.number="minSizeMb" class="size-select">
               <option :value="0">1 KB</option>
               <option :value="1">1 MB</option>
               <option :value="5">5 MB</option>
@@ -338,8 +338,8 @@ function shortPath(p: string): string {
         </div>
         <div v-if="activeTab === 'similar'" class="scan-controls">
           <div class="min-size-control">
-            <label class="text-muted">Threshold</label>
-            <select v-model.number="similarThreshold" class="size-select">
+            <label for="dup-threshold" class="text-muted">Threshold</label>
+            <select id="dup-threshold" v-model.number="similarThreshold" class="size-select">
               <option :value="5">Strict (5)</option>
               <option :value="10">Normal (10)</option>
               <option :value="15">Loose (15)</option>
@@ -507,8 +507,8 @@ function shortPath(p: string): string {
                 <span v-if="idx === 0" class="card-badge-keep">Keep</span>
 
                 <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
-                  <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" class="card-thumb-img" />
-                  <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="card-placeholder-icon" />
+                  <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" alt="" class="card-thumb-img" />
+                  <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="card-placeholder-icon" />
                   <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
                 </div>
 
@@ -688,8 +688,8 @@ function shortPath(p: string): string {
                   <span v-if="idx === group.representative_idx" class="card-badge-keep">Keep</span>
 
                   <div class="card-face card-face--thumb">
-                    <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" class="card-thumb-img" />
-                    <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" class="card-placeholder-icon" />
+                    <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" alt="" class="card-thumb-img" />
+                    <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="card-placeholder-icon" />
                     <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
                   </div>
 
@@ -712,7 +712,7 @@ function shortPath(p: string): string {
       </template>
 
     </template><!-- /similar tab -->
-  </div>
+  </section>
 </template>
 
 <style scoped>
