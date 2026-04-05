@@ -658,17 +658,17 @@ const totalRuntimeSize = computed(() =>
 
 .source-homebrew {
   background: rgba(251, 146, 60, 0.15);
-  color: #c2410c;
+  color: var(--source-homebrew);
 }
 
 .source-nvm {
   background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  color: var(--source-success);
 }
 
 .source-rustup {
   background: rgba(251, 146, 60, 0.15);
-  color: #c2410c;
+  color: var(--source-homebrew);
 }
 
 .source-manual {

@@ -567,7 +567,7 @@ onMounted(loadVaultSummary);
   font-weight: 500;
   background: rgba(255, 69, 58, 0.1);
   border: 1px solid rgba(255, 69, 58, 0.15);
-  color: #c03030;
+  color: var(--danger-text);
 }
 
 .dismiss-btn {

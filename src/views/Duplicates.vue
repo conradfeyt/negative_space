@@ -1287,8 +1287,8 @@ function shortPath(p: string): string {
 }
 
 .preview-code {
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--preview-bg);
+  color: var(--preview-text);
   border-radius: var(--radius-md);
   padding: 14px var(--sp-4);
   font-family: var(--font-mono);

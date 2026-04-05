@@ -47,15 +47,99 @@ export function timeAgo(modified: string | Date | null): string {
   return years === 1 ? "a year ago" : `${years} years ago`;
 }
 
+// ---------------------------------------------------------------------------
+// CSS token reader — reads custom properties from :root with fallback
+// ---------------------------------------------------------------------------
+
+/** Read a CSS custom property value from :root, with a fallback. */
+function cssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Shared color palettes — single source of truth, backed by CSS tokens
+// ---------------------------------------------------------------------------
+
 /** File-kind colors used by the Duplicates extension-card display. */
 export const KIND_COLORS: Record<string, string> = {
-  documents: "#E74C3C",
-  code: "#3498DB",
-  archives: "#F39C12",
-  audio: "#9B59B6",
-  video: "#27AE60",
+  documents: cssVar("--kind-documents", "#E74C3C"),
+  code: cssVar("--kind-code", "#3498DB"),
+  archives: cssVar("--kind-archives", "#F39C12"),
+  audio: cssVar("--kind-audio", "#9B59B6"),
+  video: cssVar("--kind-video", "#27AE60"),
 };
-export const KIND_COLOR_DEFAULT = "#95A5A6";
+export const KIND_COLOR_DEFAULT = cssVar("--kind-default", "#95A5A6");
+
+/** Memory process category colors (Memory.vue group badges + dots). */
+export const MEMORY_CATEGORY_COLORS: Record<string, string> = {
+  app:         cssVar("--cat-app",         "#00b4d8"),
+  system:      cssVar("--cat-system",      "#6c7086"),
+  display:     cssVar("--cat-display",     "#a78bfa"),
+  networking:  cssVar("--cat-networking",  "#38bdf8"),
+  security:    cssVar("--cat-security",    "#f97316"),
+  storage:     cssVar("--cat-storage",     "#84cc16"),
+  icloud:      cssVar("--cat-icloud",      "#60a5fa"),
+  audio:       cssVar("--cat-audio",       "#e879f9"),
+  input:       cssVar("--cat-input",       "#a3a3a3"),
+  developer:   cssVar("--cat-developer",   "#34d399"),
+  background:  cssVar("--cat-background",  "#94a3b8"),
+};
+
+/** Memory bar segment colors (system memory breakdown). */
+export const MEMORY_BAR_COLORS = {
+  app:        cssVar("--mem-app",        "#00b4d8"),
+  wired:      cssVar("--mem-wired",      "#f97316"),
+  compressed: cssVar("--mem-compressed", "#a78bfa"),
+  inactive:   cssVar("--mem-inactive",   "#94a3b8"),
+  free:       cssVar("--mem-free",       "#30d158"),
+};
+
+/** SpaceMap category fill colors (sunburst legend). */
+export const SPACEMAP_CATEGORY_FILLS: Record<string, string> = {
+  applications:   cssVar("--space-applications",   "#e53935"),
+  documents:      cssVar("--space-documents",      "#f57c00"),
+  developer:      cssVar("--space-developer",      "#f9a825"),
+  books:          cssVar("--space-books",          "#43a047"),
+  icloud:         cssVar("--space-icloud",         "#2196f3"),
+  ios_files:      cssVar("--space-ios-files",      "#78909c"),
+  mail:           cssVar("--space-mail",           "#1e88e5"),
+  messages:       cssVar("--space-messages",       "#43a047"),
+  music:          cssVar("--space-music",          "#e53935"),
+  music_creation: cssVar("--space-music-creation", "#78909c"),
+  photos:         cssVar("--space-photos",         "#ad1457"),
+  media:          cssVar("--space-media",          "#8e24aa"),
+  bin:            cssVar("--space-bin",            "#78909c"),
+  podcasts:       cssVar("--space-podcasts",       "#7b1fa2"),
+  other_users:    cssVar("--space-other-users",    "#78909c"),
+  docker:         cssVar("--space-docker",         "#00acc1"),
+  caches:         cssVar("--space-caches",         "#fb8c00"),
+  macos:          cssVar("--space-macos",          "#5c6bc0"),
+  system_data:    cssVar("--space-system-data",    "#546e7a"),
+  system:         cssVar("--space-system",         "#5c6bc0"),
+  other:          cssVar("--space-other",          "#78909c"),
+};
+
+/** Dashboard waffle chart category colors (HSLA, opacity-tuned for waffle). */
+export const DASHBOARD_CATEGORY_COLORS: Record<string, string> = {
+  applications: "hsla(0, 65%, 55%, 0.8)",
+  documents:    "hsla(35, 75%, 55%, 0.8)",
+  developer:    "hsla(45, 80%, 50%, 0.8)",
+  books:        "hsla(145, 50%, 45%, 0.8)",
+  icloud:       "hsla(210, 65%, 55%, 0.8)",
+  mail:         "hsla(210, 60%, 55%, 0.8)",
+  photos:       "hsla(320, 45%, 55%, 0.8)",
+  media:        "hsla(280, 40%, 55%, 0.8)",
+  bin:          "hsla(220, 10%, 55%, 0.6)",
+  docker:       "hsla(195, 55%, 45%, 0.8)",
+  caches:       "hsla(35, 45%, 50%, 0.7)",
+  macos:        "hsla(220, 15%, 50%, 0.65)",
+  system_data:  "hsla(220, 10%, 45%, 0.6)",
+  system:       "hsla(220, 15%, 50%, 0.65)",
+  other:        "hsla(220, 10%, 60%, 0.45)",
+  free:         "hsla(0, 0%, 88%, 0.35)",
+};
 
 /** Open a path in Finder. Silently catches errors (best-effort). */
 export async function revealInFinder(path: string): Promise<void> {

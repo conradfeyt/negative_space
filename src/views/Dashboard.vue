@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize, fileDiskSize, tempToColor, revealInFinder } from "../utils";
+import { formatSize, fileDiskSize, tempToColor, revealInFinder, DASHBOARD_CATEGORY_COLORS } from "../utils";
 import ThermalCard from "../components/ThermalCard.vue";
 import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
@@ -184,7 +184,7 @@ const thermalColor = computed(() => {
   switch (vitalsResult.value.thermal_state) {
     case "Nominal": return "var(--success)";
     case "Fair": return "var(--warning)";
-    case "Serious": return "#E5700F";
+    case "Serious": return "var(--thermal-serious)";
     case "Critical": return "var(--danger)";
     default: return "var(--muted)";
   }
@@ -231,24 +231,7 @@ const storageColor = computed(() => {
 // ---------------------------------------------------------------------------
 // Storage card — waffle chart
 // ---------------------------------------------------------------------------
-const categoryColors: Record<string, string> = {
-  applications: "hsla(0, 65%, 55%, 0.8)",
-  documents:    "hsla(35, 75%, 55%, 0.8)",
-  developer:    "hsla(45, 80%, 50%, 0.8)",
-  books:        "hsla(145, 50%, 45%, 0.8)",
-  icloud:       "hsla(210, 65%, 55%, 0.8)",
-  mail:         "hsla(210, 60%, 55%, 0.8)",
-  photos:       "hsla(320, 45%, 55%, 0.8)",
-  media:        "hsla(280, 40%, 55%, 0.8)",
-  bin:          "hsla(220, 10%, 55%, 0.6)",
-  docker:       "hsla(195, 55%, 45%, 0.8)",
-  caches:       "hsla(35, 45%, 50%, 0.7)",
-  macos:        "hsla(220, 15%, 50%, 0.65)",
-  system_data:  "hsla(220, 10%, 45%, 0.6)",
-  system:       "hsla(220, 15%, 50%, 0.65)",
-  other:        "hsla(220, 10%, 60%, 0.45)",
-  free:         "hsla(0, 0%, 88%, 0.35)",
-};
+const categoryColors = DASHBOARD_CATEGORY_COLORS;
 
 const categoryLabels: Record<string, string> = {
   applications: "Apps", documents: "Docs", media: "Media",

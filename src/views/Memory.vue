@@ -8,7 +8,7 @@ import {
   memoryError,
   scanMemory,
 } from "../stores/scanStore";
-import { formatSize } from "../utils";
+import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS } from "../utils";
 
 // ---------------------------------------------------------------------------
 // Live refresh
@@ -68,20 +68,8 @@ onUnmounted(() => stopTimer());
 // Track which process groups are expanded to show individual processes
 const expandedGroups = ref<Set<string>>(new Set());
 
-// Category colors for the memory bar and group badges
-const categoryColors: Record<string, string> = {
-  app: "#00b4d8",
-  system: "#6c7086",
-  display: "#a78bfa",
-  networking: "#38bdf8",
-  security: "#f97316",
-  storage: "#84cc16",
-  icloud: "#60a5fa",
-  audio: "#e879f9",
-  input: "#a3a3a3",
-  developer: "#34d399",
-  background: "#94a3b8",
-};
+// Category colors for the memory bar and group badges (from shared tokens)
+const categoryColors = MEMORY_CATEGORY_COLORS;
 
 function toggleGroup(groupKey: string) {
   const next = new Set(expandedGroups.value);
@@ -135,11 +123,11 @@ const memoryBarSegments = computed(() => {
   if (total === 0) return [];
 
   return [
-    { label: "App Memory", bytes: s.app_bytes, color: "#00b4d8", pct: (s.app_bytes / total) * 100 },
-    { label: "Wired", bytes: s.wired_bytes, color: "#f97316", pct: (s.wired_bytes / total) * 100 },
-    { label: "Compressed", bytes: s.compressed_bytes, color: "#a78bfa", pct: (s.compressed_bytes / total) * 100 },
-    { label: "Inactive", bytes: s.inactive_bytes, color: "#94a3b8", pct: (s.inactive_bytes / total) * 100 },
-    { label: "Free", bytes: s.free_bytes, color: "#30d158", pct: (s.free_bytes / total) * 100 },
+    { label: "App Memory", bytes: s.app_bytes, color: MEMORY_BAR_COLORS.app, pct: (s.app_bytes / total) * 100 },
+    { label: "Wired", bytes: s.wired_bytes, color: MEMORY_BAR_COLORS.wired, pct: (s.wired_bytes / total) * 100 },
+    { label: "Compressed", bytes: s.compressed_bytes, color: MEMORY_BAR_COLORS.compressed, pct: (s.compressed_bytes / total) * 100 },
+    { label: "Inactive", bytes: s.inactive_bytes, color: MEMORY_BAR_COLORS.inactive, pct: (s.inactive_bytes / total) * 100 },
+    { label: "Free", bytes: s.free_bytes, color: MEMORY_BAR_COLORS.free, pct: (s.free_bytes / total) * 100 },
   ];
 });
 

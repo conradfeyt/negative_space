@@ -13,7 +13,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import * as d3 from "d3";
-import { formatSize, revealInFinder } from "../utils";
+import { formatSize, revealInFinder, SPACEMAP_CATEGORY_FILLS } from "../utils";
 import {
   diskMapResult,
   diskMapLoading,
@@ -51,30 +51,8 @@ const enriched = ref(false);
 // Color system: per-subtree distinct hues (like the D3 reference)
 // ---------------------------------------------------------------------------
 // Each top-level directory gets a unique hue from a well-separated palette.
-// Category colors for the legend only
-const categoryFills: Record<string, string> = {
-  applications: "#e53935",
-  documents: "#f57c00",
-  developer: "#f9a825",
-  books: "#43a047",
-  icloud: "#2196f3",
-  ios_files: "#78909c",
-  mail: "#1e88e5",
-  messages: "#43a047",
-  music: "#e53935",
-  music_creation: "#78909c",
-  photos: "#ad1457",
-  media: "#8e24aa",
-  bin: "#78909c",
-  podcasts: "#7b1fa2",
-  other_users: "#78909c",
-  docker: "#00acc1",
-  caches: "#fb8c00",
-  macos: "#5c6bc0",
-  system_data: "#546e7a",
-  system: "#5c6bc0",
-  other: "#78909c",
-};
+// Category colors for the legend only (from shared tokens)
+const categoryFills = SPACEMAP_CATEGORY_FILLS;
 
 // ---------------------------------------------------------------------------
 // Overview mode — macOS-style stacked bar + category list
@@ -279,8 +257,14 @@ function getFill(d: d3.HierarchyRectangularNode<DiskNode>): string {
 
 // Recency scale: blue (recent) → warm amber (old).
 // Biased toward the "old" end so stale files stand out more.
+// Read recency scale colors from CSS tokens (fallback to hardcoded values)
+const _rootStyles = getComputedStyle(document.documentElement);
+const RECENCY_UNKNOWN = _rootStyles.getPropertyValue("--recency-unknown").trim() || "#b0bec5";
+const RECENCY_RECENT  = _rootStyles.getPropertyValue("--recency-recent").trim() || "#3b82f6";
+const RECENCY_OLD     = _rootStyles.getPropertyValue("--recency-old").trim() || "#e8960c";
+
 function recencyColor(modified: number | null | undefined): string {
-  if (modified == null) return "#b0bec5";
+  if (modified == null) return RECENCY_UNKNOWN;
   const now = Date.now() / 1000;
   const ageDays = (now - modified) / 86400;
   // t=0 → just modified, t=1 → 1 year+ old
@@ -289,7 +273,7 @@ function recencyColor(modified: number | null | undefined): string {
   // pow(0.7) pushes midpoint toward old (t=0.5 input → ~0.62 output).
   const t = Math.pow(raw, 0.7);
   // Recent = cool blue, Old = warm amber
-  const interp = d3.interpolateRgb("#3b82f6", "#e8960c");
+  const interp = d3.interpolateRgb(RECENCY_RECENT, RECENCY_OLD);
   return interp(t);
 }
 
@@ -1162,7 +1146,7 @@ onBeforeUnmount(() => {
             <div class="recency-gradient"></div>
             <span class="recency-label">Old (&gt; 1 year)</span>
             <span class="legend-item">
-              <span class="legend-swatch" style="background: #90a4ae"></span>
+              <span class="legend-swatch" style="background: var(--recency-legend-unknown)"></span>
               <span class="legend-label">Unknown</span>
             </span>
           </div>
@@ -1652,7 +1636,7 @@ onBeforeUnmount(() => {
   position: absolute;
   padding: 4px 8px;
   background: rgba(30, 30, 40, 0.88);
-  color: #fff;
+  color: white;
   font-size: 11px;
   font-weight: 500;
   border-radius: 6px;
@@ -1709,7 +1693,7 @@ onBeforeUnmount(() => {
   max-width: 200px;
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(to right, #3b82f6, #e8960c);
+  background: linear-gradient(to right, var(--recency-recent), var(--recency-old));
 }
 
 /* ---- Directory list ---- */

@@ -1332,7 +1332,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 .sort-btn--active {
   background: var(--accent);
-  color: #fff;
+  color: white;
 }
 
 .sort-btn--active:hover {

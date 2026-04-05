@@ -97,6 +97,74 @@
     "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   --font-mono: "SF Mono", ui-monospace, "Fira Code", "Cascadia Code", monospace;
 
+  /* --- Thermal state (Dashboard) --- */
+  --thermal-serious: #E5700F;
+
+  /* --- Source badge colors (Packages, Apps) --- */
+  --source-homebrew: #c2410c;
+  --source-success: #15803d;
+
+  /* --- Code preview (Duplicates dark theme) --- */
+  --preview-bg: #1e1e2e;
+  --preview-text: #cdd6f4;
+
+  /* --- Recency scale (SpaceMap) --- */
+  --recency-unknown: #b0bec5;
+  --recency-recent: #3b82f6;
+  --recency-old: #e8960c;
+  --recency-legend-unknown: #90a4ae;
+
+  /* --- Memory bar segments --- */
+  --mem-app: #00b4d8;
+  --mem-wired: #f97316;
+  --mem-compressed: #a78bfa;
+  --mem-inactive: #94a3b8;
+  --mem-free: #30d158;
+
+  /* --- Memory process category colors --- */
+  --cat-app: #00b4d8;
+  --cat-system: #6c7086;
+  --cat-display: #a78bfa;
+  --cat-networking: #38bdf8;
+  --cat-security: #f97316;
+  --cat-storage: #84cc16;
+  --cat-icloud: #60a5fa;
+  --cat-audio: #e879f9;
+  --cat-input: #a3a3a3;
+  --cat-developer: #34d399;
+  --cat-background: #94a3b8;
+
+  /* --- SpaceMap / overview category fills --- */
+  --space-applications: #e53935;
+  --space-documents: #f57c00;
+  --space-developer: #f9a825;
+  --space-books: #43a047;
+  --space-icloud: #2196f3;
+  --space-ios-files: #78909c;
+  --space-mail: #1e88e5;
+  --space-messages: #43a047;
+  --space-music: #e53935;
+  --space-music-creation: #78909c;
+  --space-photos: #ad1457;
+  --space-media: #8e24aa;
+  --space-bin: #78909c;
+  --space-podcasts: #7b1fa2;
+  --space-other-users: #78909c;
+  --space-docker: #00acc1;
+  --space-caches: #fb8c00;
+  --space-macos: #5c6bc0;
+  --space-system-data: #546e7a;
+  --space-system: #5c6bc0;
+  --space-other: #78909c;
+
+  /* --- Duplicate / file-kind colors --- */
+  --kind-documents: #E74C3C;
+  --kind-code: #3498DB;
+  --kind-archives: #F39C12;
+  --kind-audio: #9B59B6;
+  --kind-video: #27AE60;
+  --kind-default: #95A5A6;
+
   /* Legacy aliases */
   --content-bg: var(--app-bg);
   --card-bg: var(--surface);
@@ -173,7 +241,7 @@ button {
 
 .btn-primary {
   background: var(--accent);
-  color: #ffffff;
+  color: white;
   box-shadow: 0 1px 3px rgba(59, 199, 232, 0.25), 0 2px 8px rgba(59, 199, 232, 0.15);
 }
 
@@ -204,7 +272,7 @@ button {
 
 .btn-danger:hover {
   background: var(--danger);
-  color: #ffffff;
+  color: white;
   border-color: transparent;
   box-shadow: 0 2px 8px rgba(217, 75, 75, 0.25);
 }
@@ -450,7 +518,7 @@ tr:last-child td {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff;
+  border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -482,7 +550,7 @@ tr:last-child td {
 .view-header .view-title {
   font-size: 28px;
   font-weight: 700;
-  color: #1A1D2E;
+  color: var(--text);
   letter-spacing: -0.5px;
   line-height: 1.15;
 }
@@ -491,7 +559,7 @@ tr:last-child td {
 .view-header .view-subtitle {
   margin-top: 6px;
   font-size: 14px;
-  color: #4A4E63;
+  color: var(--text-secondary);
   font-weight: 400;
 }
 
