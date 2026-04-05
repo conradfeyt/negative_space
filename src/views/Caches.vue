@@ -212,7 +212,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
       <div class="cache-groups">
         <div v-for="group in groupedCaches" :key="group.id" class="cache-category">
           <!-- Category header -->
-          <div class="category-header" tabindex="0" role="button" @click="toggleCategory(group.id)" @keydown.enter="toggleCategory(group.id)" @keydown.space.prevent="toggleCategory(group.id)">
+          <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedCategories.has(group.id)" @click="toggleCategory(group.id)" @keydown.enter="toggleCategory(group.id)" @keydown.space.prevent="toggleCategory(group.id)">
             <div class="category-header-left">
               <span class="category-chevron" :class="{ expanded: !collapsedCategories.has(group.id) }">
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>

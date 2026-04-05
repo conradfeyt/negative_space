@@ -377,7 +377,7 @@ onUnmounted(() => stopPolling());
     <div class="stats-row">
 
       <!-- THERMAL -->
-      <div class="stat-card stat-card--thermal" @click="navigateTo('thermal')">
+      <div class="stat-card stat-card--thermal" tabindex="0" role="button" @click="navigateTo('thermal')" @keydown.enter="navigateTo('thermal')" @keydown.space.prevent="navigateTo('thermal')">
         <div class="stat-label">Thermal</div>
         <div class="stat-hero" v-if="hottestTemp !== null" :style="{ color: tempToColor(hottestTemp) }">
           {{ hottestTemp }}<span class="stat-unit">&deg;C</span>
@@ -392,7 +392,7 @@ onUnmounted(() => stopPolling());
       </div>
 
       <!-- CPU -->
-      <div class="stat-card stat-card--cpu" @click="navigateTo('cpu')">
+      <div class="stat-card stat-card--cpu" tabindex="0" role="button" @click="navigateTo('cpu')" @keydown.enter="navigateTo('cpu')" @keydown.space.prevent="navigateTo('cpu')">
         <div class="stat-label">CPU</div>
         <div class="cpu-top">
           <div class="stat-hero" v-if="vitalsResult">
@@ -421,7 +421,7 @@ onUnmounted(() => stopPolling());
       </div>
 
       <!-- MEMORY -->
-      <div class="stat-card stat-card--memory" @click="navigateTo('memory')" v-if="memoryResult">
+      <div class="stat-card stat-card--memory" tabindex="0" role="button" @click="navigateTo('memory')" @keydown.enter="navigateTo('memory')" @keydown.space.prevent="navigateTo('memory')" v-if="memoryResult">
         <div class="stat-label">Memory</div>
         <MemoryCard :stats="memoryResult.stats" />
         <div v-if="topMemConsumers.length" class="mem-top-consumers">
@@ -433,7 +433,7 @@ onUnmounted(() => stopPolling());
       </div>
 
       <!-- STORAGE -->
-      <div class="stat-card" @click="navigateTo('space-map')" v-if="diskUsage">
+      <div class="stat-card" tabindex="0" role="button" @click="navigateTo('space-map')" @keydown.enter="navigateTo('space-map')" @keydown.space.prevent="navigateTo('space-map')" v-if="diskUsage">
         <div>
           <div class="stat-label">Storage</div>
           <div class="stat-hero" :style="{ color: storageColor }">
@@ -570,7 +570,7 @@ onUnmounted(() => stopPolling());
           <span class="scan-progress-label">{{ scanAllStep.replace('_', ' ') }}</span>
           <span class="scan-progress-count mono">{{ quickScanDone }} / {{ quickScanTotal }}</span>
         </div>
-        <div class="scan-progress-track">
+        <div class="scan-progress-track" role="progressbar" :aria-valuenow="scanProgress" aria-valuemin="0" aria-valuemax="100">
           <div class="scan-progress-fill" :style="{ width: scanProgress + '%' }"></div>
         </div>
       </div>

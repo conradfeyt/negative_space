@@ -245,7 +245,7 @@ const sortedGroups = computed((): ProcessGroup[] => {
           :key="group.name"
           class="group-card card-flush"
         >
-          <div class="group-header" @click="toggleGroup(group.name)">
+          <div class="group-header" tabindex="0" role="button" @click="toggleGroup(group.name)" @keydown.enter="toggleGroup(group.name)" @keydown.space.prevent="toggleGroup(group.name)">
             <div class="group-left">
               <span
                 class="group-color-dot"

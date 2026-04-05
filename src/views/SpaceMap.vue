@@ -1018,7 +1018,7 @@ onBeforeUnmount(() => {
               @click="activeViz = 'sunburst'"
             >
               <div class="overview-list-icon">
-                <img v-if="sfSymbolCache[cat.key]" :src="sfSymbolCache[cat.key]" width="25" height="25" />
+                <img v-if="sfSymbolCache[cat.key]" :src="sfSymbolCache[cat.key]" :alt="cat.label" width="25" height="25" />
               </div>
               <span class="overview-list-label">{{ cat.label }}</span>
               <span class="overview-list-size mono">{{ formatSize(cat.size) }}</span>

@@ -183,7 +183,7 @@ function shortPath(path: string): string {
 
       <div class="log-groups">
         <div v-for="group in groupedLogs" :key="group.source" class="log-category">
-          <div class="category-header" tabindex="0" role="button" @click="toggleGroup(group.source)" @keydown.enter="toggleGroup(group.source)" @keydown.space.prevent="toggleGroup(group.source)">
+          <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.source)" @click="toggleGroup(group.source)" @keydown.enter="toggleGroup(group.source)" @keydown.space.prevent="toggleGroup(group.source)">
             <div class="category-header-left">
               <span class="category-chevron" :class="{ expanded: !collapsedGroups.has(group.source) }">
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>

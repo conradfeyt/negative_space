@@ -121,7 +121,7 @@ const totalRuntimeSize = computed(() =>
 
         <div v-for="mgr in packagesResult.managers" :key="mgr.id" class="card-flush manager-card">
           <!-- Manager header -->
-          <div class="manager-header" tabindex="0" role="button" @click="toggleManager(mgr.id)" @keydown.enter="toggleManager(mgr.id)" @keydown.space.prevent="toggleManager(mgr.id)">
+          <div class="manager-header" tabindex="0" role="button" :aria-expanded="expandedManagers.has(mgr.id)" @click="toggleManager(mgr.id)" @keydown.enter="toggleManager(mgr.id)" @keydown.space.prevent="toggleManager(mgr.id)">
             <span
               class="expand-chevron"
               :class="{ expanded: expandedManagers.has(mgr.id) }"
@@ -213,7 +213,7 @@ const totalRuntimeSize = computed(() =>
         </div>
 
         <div v-for="rt in packagesResult.runtimes" :key="rt.id" class="card-flush runtime-card">
-          <div class="runtime-header" tabindex="0" role="button" @click="toggleRuntime(rt.id)" @keydown.enter="toggleRuntime(rt.id)" @keydown.space.prevent="toggleRuntime(rt.id)">
+          <div class="runtime-header" tabindex="0" role="button" :aria-expanded="expandedRuntimes.has(rt.id)" @click="toggleRuntime(rt.id)" @keydown.enter="toggleRuntime(rt.id)" @keydown.space.prevent="toggleRuntime(rt.id)">
             <span
               class="expand-chevron"
               :class="{ expanded: expandedRuntimes.has(rt.id) }"

@@ -81,7 +81,7 @@ onMounted(async () => {
           <div v-if="icon.key === 'docker' && idx > 0" class="icon-list-divider"></div>
           <div class="icon-list-row">
             <div class="icon-list-preview">
-              <img v-if="icon.base64" :src="icon.base64" width="25" height="25" />
+              <img v-if="icon.base64" :src="icon.base64" :alt="icon.label" width="25" height="25" />
               <span v-else class="icon-missing">?</span>
             </div>
             <span class="icon-list-label">{{ icon.label }}</span>

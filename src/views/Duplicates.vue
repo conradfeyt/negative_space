@@ -311,9 +311,9 @@ function shortPath(p: string): string {
             {{ activeTab === 'exact' ? 'Find identical files wasting disk space' : 'Find visually similar images' }}
           </p>
         </div>
-        <div class="tab-switcher">
-          <button class="tab-btn" :class="{ active: activeTab === 'exact' }" @click="activeTab = 'exact'">Exact Duplicates</button>
-          <button class="tab-btn" :class="{ active: activeTab === 'similar' }" @click="activeTab = 'similar'">Similar Images</button>
+        <div class="tab-switcher" role="tablist">
+          <button class="tab-btn" :class="{ active: activeTab === 'exact' }" role="tab" :aria-selected="activeTab === 'exact'" @click="activeTab = 'exact'">Exact Duplicates</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'similar' }" role="tab" :aria-selected="activeTab === 'similar'" @click="activeTab = 'similar'">Similar Images</button>
         </div>
         <div v-if="activeTab === 'exact'" class="scan-controls">
           <div class="min-size-control">
@@ -599,7 +599,7 @@ function shortPath(p: string): string {
           </span>
         </div>
         <div v-if="similarProgress && similarProgress.phase === 'hashing' && similarProgress.total_images > 0" class="similar-progress-bar-wrap">
-          <div class="similar-progress-bar">
+          <div class="similar-progress-bar" role="progressbar" :aria-valuenow="Math.round(similarProgress.images_processed / similarProgress.total_images * 100)" aria-valuemin="0" aria-valuemax="100">
             <div class="similar-progress-fill" :style="{ width: Math.round(similarProgress.images_processed / similarProgress.total_images * 100) + '%' }"></div>
           </div>
           <span class="similar-progress-pct text-muted">{{ Math.round(similarProgress.images_processed / similarProgress.total_images * 100) }}%</span>

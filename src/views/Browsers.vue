@@ -411,9 +411,9 @@ function selectAllSafe(browser: BrowserInfo) {
 
     <!-- Confirmation modal for unsafe operations -->
     <Teleport to="body">
-      <div v-if="showConfirmModal" class="modal-overlay" @click.self="cancelClean">
+      <div v-if="showConfirmModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" @click.self="cancelClean">
         <div class="modal-content">
-          <h3>Confirm Cleanup</h3>
+          <h3 id="modal-title">Confirm Cleanup</h3>
           <p class="modal-warning-text">
             The selected items include data that may affect your browsing
             experience:
