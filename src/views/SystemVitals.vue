@@ -28,6 +28,11 @@ import {
   loadDiskUsage,
 } from "../stores/scanStore";
 import { formatSize, tempToColor } from "../utils";
+import ThermalCard from "../components/ThermalCard.vue";
+import FanCard from "../components/FanCard.vue";
+import BatteryCard from "../components/BatteryCard.vue";
+import CpuCard from "../components/CpuCard.vue";
+import MemoryCard from "../components/MemoryCard.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -114,43 +119,7 @@ const cpuLoadColor = computed(() => {
 // Thermal card: hottest sensor + 4 category bars
 // ---------------------------------------------------------------------------
 
-// The 4 categories we show as vertical bars, in display order
-const thermalBarCategories = [
-  { id: "cpu", short: "CPU" },
-  { id: "gpu", short: "GPU" },
-  { id: "storage", short: "SSD" },
-  { id: "battery", short: "BAT" },
-] as const;
-
-// Get the max temp for a category, normalized to a 0-110 scale for bar height
-interface ThermalBar {
-  category: string;
-  label: string;
-  maxTemp: number;
-  /** Height as percentage (0-100) — scaled against 110°C ceiling */
-  heightPct: number;
-  color: string;
-}
-
-
-const thermalBars = computed<ThermalBar[]>(() => {
-  if (!thermalResult.value) return [];
-  const summaryMap = new Map(
-    thermalResult.value.summaries.map(s => [s.category, s])
-  );
-  return thermalBarCategories
-    .filter(c => summaryMap.has(c.id))
-    .map(c => {
-      const s = summaryMap.get(c.id)!;
-      return {
-        category: c.id,
-        label: c.short,
-        maxTemp: s.max_celsius,
-        heightPct: Math.min(100, (s.max_celsius / 110) * 100),
-        color: tempToColor(s.max_celsius),
-      };
-    });
-});
+// Thermal bars now in ThermalCard.vue component
 
 const hottestTemp = computed(() => {
   if (!thermalResult.value?.hottest_sensor) return null;
@@ -171,31 +140,7 @@ const hottestName = computed(() => {
 // may all be the same P-core). We deduplicate by taking only keys that
 // match the "primary die temp" patterns: Tp0{digit} for P-cores, Te0{digit}
 // for E-cores. This gives ~10-14 cores on M1 Pro, ~12-24 on M4 Pro.
-const coreTempStrip = computed(() => {
-  if (!thermalResult.value) return [];
-  const primaryPattern = /^T[pe]\d[0-9]$/;
-  let cores = thermalResult.value.sensors
-    .filter(s => s.category === "cpu" && primaryPattern.test(s.key))
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .map(s => ({
-      key: s.key,
-      temp: s.temp_celsius,
-      color: tempToColor(s.temp_celsius),
-    }));
-  // Fallback: if pattern matched nothing, take first 24 cpu sensors
-  if (cores.length === 0) {
-    cores = thermalResult.value.sensors
-      .filter(s => s.category === "cpu")
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .slice(0, 24)
-      .map(s => ({
-        key: s.key,
-        temp: s.temp_celsius,
-        color: tempToColor(s.temp_celsius),
-      }));
-  }
-  return cores;
-});
+// Core temp strip now in CpuCard.vue
 
 // ---------------------------------------------------------------------------
 // Fan card
@@ -218,53 +163,13 @@ const avgFanRpm = computed(() => {
 
 const battery = computed(() => vitalsResult.value?.battery ?? null);
 
-const batteryHealthColor = computed(() => {
-  if (!battery.value) return "var(--muted)";
-  const h = battery.value.health_percent;
-  if (h >= 80) return "var(--success)";
-  if (h >= 50) return "var(--warning)";
-  return "var(--danger)";
-});
-
-const batteryConditionClass = computed(() => {
-  if (!battery.value) return "dot-muted";
-  const c = battery.value.condition.toLowerCase();
-  if (c === "normal") return "dot-success";
-  if (c.includes("service")) return "dot-warning";
-  return "dot-danger";
-});
+// Battery computeds now in BatteryCard.vue
 
 // ---------------------------------------------------------------------------
 // Memory card
 // ---------------------------------------------------------------------------
 
-const memPressure = computed(() => {
-  if (!memoryResult.value) return { label: "—", class: "dot-muted", color: "var(--muted)" };
-  const s = memoryResult.value.stats;
-  const pct = s.total_bytes > 0 ? (s.used_bytes / s.total_bytes) * 100 : 0;
-  if (pct >= 90) return { label: "Critical", class: "dot-danger", color: "var(--danger)" };
-  if (pct >= 75) return { label: "High", class: "dot-warning", color: "var(--warning)" };
-  if (pct >= 50) return { label: "Moderate", class: "dot-success", color: "var(--success)" };
-  return { label: "Low", class: "dot-success", color: "var(--success)" };
-});
-
-const memUsedPct = computed(() => {
-  if (!memoryResult.value) return 0;
-  const s = memoryResult.value.stats;
-  return s.total_bytes > 0 ? (s.used_bytes / s.total_bytes) * 100 : 0;
-});
-
-const memSegments = computed(() => {
-  if (!memoryResult.value) return [];
-  const s = memoryResult.value.stats;
-  const t = s.total_bytes || 1;
-  return [
-    { label: "App", pct: (s.app_bytes / t) * 100, color: "hsla(195, 45%, 42%, 0.65)" },
-    { label: "Wired", pct: (s.wired_bytes / t) * 100, color: "hsla(35, 50%, 45%, 0.6)" },
-    { label: "Compressed", pct: (s.compressed_bytes / t) * 100, color: "hsla(280, 30%, 50%, 0.5)" },
-    { label: "Free", pct: (s.free_bytes / t) * 100, color: "hsla(140, 20%, 70%, 0.4)" },
-  ].filter(s => s.pct > 0.5);
-});
+// Memory computeds now in MemoryCard.vue
 
 // ---------------------------------------------------------------------------
 // Storage card
@@ -351,21 +256,7 @@ const timeAgo = computed(() => {
                 {{ thermalLabel }}
               </div>
             </div>
-            <div class="thermal-bars" v-if="thermalBars.length">
-              <div
-                v-for="bar in thermalBars"
-                :key="bar.category"
-                class="tbar-col"
-              >
-                <div class="tbar-track">
-                  <div
-                    class="tbar-fill"
-                    :style="{ height: bar.heightPct + '%', background: bar.color }"
-                  ></div>
-                </div>
-                <span class="tbar-label">{{ bar.label }}</span>
-              </div>
-            </div>
+            <ThermalCard v-if="thermalResult" :summaries="thermalResult.summaries" />
           </div>
         </div>
 
@@ -381,15 +272,7 @@ const timeAgo = computed(() => {
               :style="{ width: cpuLoadWidth + '%', background: cpuLoadColor }"
             ></div>
           </div>
-          <div class="core-strip" v-if="coreTempStrip.length">
-            <div
-              v-for="core in coreTempStrip"
-              :key="core.key"
-              class="core-pip"
-              :style="{ background: core.color }"
-              :title="core.key + ': ' + core.temp + '°C'"
-            ></div>
-          </div>
+          <CpuCard v-if="thermalResult" :sensors="thermalResult.sensors" />
           <div class="load-averages">
             <span>1m: {{ vitalsResult.load.load_1m.toFixed(1) }}</span>
             <span>5m: {{ vitalsResult.load.load_5m.toFixed(1) }}</span>
@@ -397,96 +280,22 @@ const timeAgo = computed(() => {
           </div>
         </div>
 
-        <!-- FANS: RPM + percent bars -->
+        <!-- FANS: RPM + gauge bars -->
         <div class="stat-card stat-card--fans">
           <div class="stat-label">Fans</div>
-          <template v-if="fans.length">
-            <div class="stat-hero">
-              {{ avgFanRpm }}<span class="stat-unit">RPM</span>
-            </div>
-            <div class="fan-bars">
-              <div v-for="fan in fans" :key="fan.id" class="fan-row">
-                <span class="fan-name">{{ fan.name }}</span>
-                <div class="fan-track">
-                  <div
-                    class="fan-fill"
-                    :style="{ width: fan.percent + '%' }"
-                  ></div>
-                </div>
-                <span class="fan-rpm mono">{{ Math.round(fan.current_rpm) }}</span>
-              </div>
-            </div>
-          </template>
-          <template v-else>
-            <div class="stat-hero" style="color: var(--muted)">--</div>
-            <div class="stat-detail">No fan data</div>
-          </template>
+          <FanCard :fans="fans" :avg-rpm="avgFanRpm" />
         </div>
 
         <!-- BATTERY: charge + health -->
         <div class="stat-card stat-card--battery" v-if="battery">
           <div class="stat-label">Battery</div>
-          <div class="stat-hero">
-            {{ battery.charge_percent }}<span class="stat-unit">%</span>
-          </div>
-          <div class="battery-status">
-            <span v-if="battery.is_charging" class="battery-charging">Charging</span>
-            <span v-else-if="battery.ac_connected" class="battery-plugged">Plugged In</span>
-            <span v-else class="battery-discharging">On Battery</span>
-          </div>
-          <div class="battery-details">
-            <div class="battery-row">
-              <span class="battery-detail-label">Health</span>
-              <span class="battery-detail-value" :style="{ color: batteryHealthColor }">{{ battery.health_percent }}%</span>
-            </div>
-            <div class="battery-row">
-              <span class="battery-detail-label">Cycles</span>
-              <span class="battery-detail-value mono">{{ battery.cycle_count }}</span>
-            </div>
-            <div class="battery-row">
-              <span class="battery-detail-label">Temp</span>
-              <span class="battery-detail-value mono">{{ battery.temperature_celsius.toFixed(1) }}°C</span>
-            </div>
-          </div>
-          <div class="battery-condition">
-            <span :class="['thermal-dot', batteryConditionClass]"></span>
-            {{ battery.condition }}
-          </div>
+          <BatteryCard :battery="battery" />
         </div>
 
-        <!-- MEMORY: pressure + segmented bar -->
+        <!-- MEMORY: pressure + ring gauge -->
         <div class="stat-card stat-card--memory" v-if="memoryResult">
           <div class="stat-label">Memory</div>
-          <div class="stat-hero">
-            {{ Math.round(memUsedPct) }}<span class="stat-unit">%</span>
-          </div>
-          <div class="mem-usage-text">
-            {{ formatSize(memoryResult.stats.used_bytes) }}
-            <span class="stat-dim">/ {{ formatSize(memoryResult.stats.total_bytes) }}</span>
-          </div>
-          <div class="mem-seg-bar" v-if="memSegments.length">
-            <div
-              v-for="(seg, i) in memSegments"
-              :key="seg.label"
-              class="mem-seg"
-              :style="{
-                flex: seg.pct,
-                background: seg.color,
-                borderRadius: i === 0 ? '2px 0 0 2px' : i === memSegments.length - 1 ? '0 2px 2px 0' : '0',
-              }"
-              :title="seg.label + ': ' + seg.pct.toFixed(1) + '%'"
-            ></div>
-          </div>
-          <div class="mem-legend">
-            <span v-for="seg in memSegments" :key="seg.label" class="mem-legend-item">
-              <span class="mem-legend-dot" :style="{ background: seg.color }"></span>
-              {{ seg.label }}
-            </span>
-          </div>
-          <div class="mem-pressure-row">
-            <span :class="['thermal-dot', memPressure.class]"></span>
-            {{ memPressure.label }} pressure
-          </div>
+          <MemoryCard :stats="memoryResult.stats" />
         </div>
 
         <!-- STORAGE: capacity bar -->
@@ -687,47 +496,7 @@ const timeAgo = computed(() => {
   flex-shrink: 0;
 }
 
-/* 4 vertical bars */
-.thermal-bars {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  height: 64px;
-  flex-shrink: 0;
-}
-
-.tbar-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 22px;
-}
-
-.tbar-track {
-  width: 6px;
-  height: 48px;
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 3px;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-}
-
-.tbar-fill {
-  width: 100%;
-  border-radius: 3px;
-  transition: height 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.3s;
-}
-
-.tbar-label {
-  font-size: 8px;
-  font-weight: 600;
-  color: rgba(60, 65, 80, 0.45);
-  letter-spacing: 0.2px;
-  line-height: 1;
-  white-space: nowrap;
-}
+/* Thermal bars now in ThermalCard.vue */
 
 /* ---------------------------------------------------------------------------
    CPU card — load bar + core heat strip
@@ -746,21 +515,7 @@ const timeAgo = computed(() => {
   transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.3s;
 }
 
-/* Core heat strip — row of tiny colored pips, one per CPU core */
-.core-strip {
-  display: flex;
-  gap: 2px;
-  margin-top: 8px;
-}
-
-.core-pip {
-  flex: 1;
-  height: 4px;
-  border-radius: 1px;
-  min-width: 3px;
-  max-width: 12px;
-  transition: background 0.3s;
-}
+/* Core heat strip styles now in CpuCard.vue */
 
 .load-averages {
   display: flex;
@@ -774,166 +529,19 @@ const timeAgo = computed(() => {
 /* ---------------------------------------------------------------------------
    Fans card
    --------------------------------------------------------------------------- */
-.fan-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.fan-row {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.fan-name {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.fan-track {
-  height: 3px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.fan-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.fan-rpm {
-  font-size: 10px;
-  color: var(--muted);
-  min-width: 32px;
-  text-align: right;
-}
+/* Fan styles now in FanCard.vue */
 
 /* ---------------------------------------------------------------------------
    Battery card
    --------------------------------------------------------------------------- */
 
-.battery-status {
-  font-size: 11px;
-  font-weight: 500;
-  margin-top: 4px;
-}
-
-.battery-charging {
-  color: var(--success);
-}
-
-.battery-plugged {
-  color: var(--accent);
-}
-
-.battery-discharging {
-  color: var(--text-secondary);
-}
-
-.battery-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 10px;
-}
-
-.battery-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.battery-detail-label {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.battery-detail-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.battery-condition {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
+/* Battery styles now in BatteryCard.vue */
 
 /* ---------------------------------------------------------------------------
    Memory card
    --------------------------------------------------------------------------- */
 
-.mem-usage-text {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-.stat-dim {
-  color: var(--muted);
-}
-
-.mem-seg-bar {
-  display: flex;
-  height: 4px;
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 10px;
-}
-
-.mem-seg {
-  min-width: 2px;
-  transition: flex 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.mem-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.mem-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.mem-legend-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-}
-
-.mem-pressure-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
+/* Memory styles now in MemoryCard.vue */
 
 /* ---------------------------------------------------------------------------
    Storage card

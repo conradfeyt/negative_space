@@ -12,6 +12,11 @@ import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivate
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
 import { formatSize, fileDiskSize, tempToColor, revealInFinder } from "../utils";
+import ThermalCard from "../components/ThermalCard.vue";
+import FanCard from "../components/FanCard.vue";
+import BatteryCard from "../components/BatteryCard.vue";
+import CpuCard from "../components/CpuCard.vue";
+import MemoryCard from "../components/MemoryCard.vue";
 import {
   diskUsage,
   scanAllRunning,
@@ -170,26 +175,6 @@ function updateLastScanAgo() {
 // ---------------------------------------------------------------------------
 // Thermal card
 // ---------------------------------------------------------------------------
-const thermalBarCategories = [
-  { id: "cpu", short: "CPU" }, { id: "gpu", short: "GPU" },
-  { id: "storage", short: "SSD" }, { id: "battery", short: "BAT" },
-] as const;
-
-
-const thermalBars = computed(() => {
-  if (!thermalResult.value) return [];
-  const summaryMap = new Map(thermalResult.value.summaries.map(s => [s.category, s]));
-  return thermalBarCategories
-    .filter(c => summaryMap.has(c.id))
-    .map(c => {
-      const s = summaryMap.get(c.id)!;
-      return {
-        category: c.id, label: c.short, maxTemp: s.max_celsius,
-        heightPct: Math.min(100, (s.max_celsius / 110) * 100),
-        color: tempToColor(s.max_celsius),
-      };
-    });
-});
 
 const hottestTemp = computed(() => thermalResult.value?.hottest_sensor?.temp_celsius ?? null);
 const hottestName = computed(() => thermalResult.value?.hottest_sensor?.name ?? "");
@@ -212,48 +197,14 @@ const thermalLabel = computed(() => vitalsResult.value?.thermal_state ?? "—");
 // ---------------------------------------------------------------------------
 // cpuLoadWidth/cpuLoadColor removed — load bar replaced with heatmap grid
 
-const coreTempStrip = computed(() => {
-  if (!thermalResult.value) return [];
-  const primaryPattern = /^T[pe]\d[0-9]$/;
-  let cores = thermalResult.value.sensors
-    .filter(s => s.category === "cpu" && primaryPattern.test(s.key))
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .map(s => ({ key: s.key, temp: s.temp_celsius, color: tempToColor(s.temp_celsius) }));
-  if (cores.length === 0) {
-    cores = thermalResult.value.sensors
-      .filter(s => s.category === "cpu")
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .slice(0, 24)
-      .map(s => ({ key: s.key, temp: s.temp_celsius, color: tempToColor(s.temp_celsius) }));
-  }
-  return cores;
-});
+// Core temp strip now in CpuCard.vue
 
 // ---------------------------------------------------------------------------
 // Fans card
 // ---------------------------------------------------------------------------
 const fans = computed(() => thermalResult.value?.fans ?? []);
 
-function fanArc(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const x1 = cx + r * Math.cos(toRad(180 - startDeg));
-  const y1 = cy - r * Math.sin(toRad(180 - startDeg));
-  const x2 = cx + r * Math.cos(toRad(180 - endDeg));
-  const y2 = cy - r * Math.sin(toRad(180 - endDeg));
-  const large = endDeg - startDeg > 180 ? 1 : 0;
-  return `M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2}`;
-}
-
-function fanNeedle(cx: number, cy: number, r: number, t: number): { x: number; y: number } {
-  const angle = Math.PI * (1 - Math.max(0, Math.min(1, t)));
-  return { x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle) };
-}
-
-function fanGaugeColor(pct: number): string {
-  if (pct > 70) return "hsla(0, 45%, 45%, 0.7)";
-  if (pct > 40) return "hsla(40, 50%, 42%, 0.7)";
-  return "hsla(195, 40%, 40%, 0.6)";
-}
+// Fan gauge functions now in FanCard.vue
 const avgFanRpm = computed(() => {
   if (!fans.value.length) return 0;
   return Math.round(fans.value.reduce((sum, f) => sum + f.current_rpm, 0) / fans.value.length);
@@ -263,74 +214,9 @@ const avgFanRpm = computed(() => {
 // Battery card
 // ---------------------------------------------------------------------------
 const battery = computed(() => vitalsResult.value?.battery ?? null);
-const batteryHealthColor = computed(() => {
-  if (!battery.value) return "var(--muted)";
-  const h = battery.value.health_percent;
-  if (h >= 80) return "var(--success)";
-  if (h >= 50) return "var(--warning)";
-  return "var(--danger)";
-});
-const batteryConditionClass = computed(() => {
-  if (!battery.value) return "dot-muted";
-  const c = battery.value.condition.toLowerCase();
-  if (c === "normal") return "dot-success";
-  if (c.includes("service")) return "dot-warning";
-  return "dot-danger";
-});
+// Battery ring/health computeds now in BatteryCard.vue
 
-// Battery ring
-const batteryRingColor = computed(() => {
-  if (!battery.value) return "var(--muted)";
-  const c = battery.value.charge_percent;
-  if (c > 50) return "var(--success)";
-  if (c > 20) return "var(--warning)";
-  return "var(--danger)";
-});
-
-const batteryDash = computed(() => {
-  if (!battery.value) return `0 ${RING_CIRCUMFERENCE}`;
-  const frac = battery.value.charge_percent / 100;
-  return `${frac * RING_CIRCUMFERENCE} ${(1 - frac) * RING_CIRCUMFERENCE}`;
-});
-
-const HEALTH_R = 38;
-const HEALTH_CIRCUMFERENCE = 2 * Math.PI * HEALTH_R;
-
-const healthDash = computed(() => {
-  if (!battery.value) return `0 ${HEALTH_CIRCUMFERENCE}`;
-  const frac = battery.value.health_percent / 100;
-  return `${frac * HEALTH_CIRCUMFERENCE} ${(1 - frac) * HEALTH_CIRCUMFERENCE}`;
-});
-
-// ---------------------------------------------------------------------------
-// Memory card
-// ---------------------------------------------------------------------------
-const memPressure = computed(() => {
-  if (!memoryResult.value) return { label: "—", class: "dot-muted" };
-  const s = memoryResult.value.stats;
-  const pct = s.total_bytes > 0 ? (s.used_bytes / s.total_bytes) * 100 : 0;
-  if (pct >= 90) return { label: "Critical", class: "dot-danger" };
-  if (pct >= 75) return { label: "High", class: "dot-warning" };
-  return { label: "Low", class: "dot-success" };
-});
-
-const memUsedPct = computed(() => {
-  if (!memoryResult.value) return 0;
-  const s = memoryResult.value.stats;
-  return s.total_bytes > 0 ? (s.used_bytes / s.total_bytes) * 100 : 0;
-});
-
-const memSegments = computed(() => {
-  if (!memoryResult.value) return [];
-  const s = memoryResult.value.stats;
-  const t = s.total_bytes || 1;
-  return [
-    { label: "App", bytes: s.app_bytes, pct: (s.app_bytes / t) * 100, color: "hsla(195, 45%, 42%, 0.65)" },
-    { label: "Wired", bytes: s.wired_bytes, pct: (s.wired_bytes / t) * 100, color: "hsla(35, 50%, 45%, 0.6)" },
-    { label: "Compressed", bytes: s.compressed_bytes, pct: (s.compressed_bytes / t) * 100, color: "hsla(280, 30%, 50%, 0.5)" },
-    { label: "Free", bytes: s.free_bytes, pct: (s.free_bytes / t) * 100, color: "hsla(140, 20%, 70%, 0.4)" },
-  ].filter(seg => seg.pct > 0.5);
-});
+// Memory computeds (memPressure, memUsedPct, memSegments) now in MemoryCard.vue
 
 // ---------------------------------------------------------------------------
 // Storage card
@@ -433,46 +319,7 @@ const waffleCells = computed(() => {
   return { cells, legend };
 });
 
-// ---------------------------------------------------------------------------
-// Memory card — ring gauge segments
-// ---------------------------------------------------------------------------
-const RING_R = 50;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
-
-const memRingSegments = computed(() => {
-  if (!memoryResult.value) return [];
-  const s = memoryResult.value.stats;
-  const t = s.total_bytes || 1;
-  // Build segments in order: App, Wired, Compressed (skip Free — it's the gap)
-  const segs = [
-    { label: "App", bytes: s.app_bytes, color: "hsla(195, 55%, 42%, 0.75)" },
-    { label: "Wired", bytes: s.wired_bytes, color: "hsla(35, 55%, 45%, 0.7)" },
-    { label: "Compressed", bytes: s.compressed_bytes, color: "hsla(280, 35%, 50%, 0.65)" },
-  ].filter(seg => seg.bytes > 0);
-
-  let cumulative = 0;
-  return segs.map(seg => {
-    const frac = seg.bytes / t;
-    const dashLen = frac * RING_CIRCUMFERENCE;
-    const gapLen = RING_CIRCUMFERENCE - dashLen;
-    // SVG circle starts at 3 o'clock, offset rotates to 12 o'clock (+ 90deg = circumference/4)
-    const offset = RING_CIRCUMFERENCE * 0.25 - cumulative * RING_CIRCUMFERENCE;
-    cumulative += frac;
-    return {
-      label: seg.label,
-      color: seg.color,
-      dash: `${dashLen} ${gapLen}`,
-      offset: `${offset}`,
-    };
-  });
-});
-
-const memCardBg = computed(() => {
-  const pct = memUsedPct.value;
-  if (pct >= 90) return "rgba(217, 75, 75, 0.08)";
-  if (pct >= 75) return "rgba(229, 163, 15, 0.06)";
-  return "rgba(255, 255, 255, 0.45)";
-});
+// Memory ring gauge segments now in MemoryCard.vue
 
 // ---------------------------------------------------------------------------
 // Memory card — top consumers
@@ -558,15 +405,7 @@ onUnmounted(() => stopPolling());
           <span>{{ thermalLabel }}</span>
           <span v-if="hottestName" class="thermal-source">{{ hottestName }}</span>
         </div>
-        <div class="thermal-strips" v-if="thermalBars.length">
-          <div v-for="bar in thermalBars" :key="bar.category" class="tstrip-row">
-            <span class="tstrip-label">{{ bar.label }}</span>
-            <div class="tstrip-track">
-              <div class="tstrip-marker" :style="{ left: bar.heightPct + '%' }"></div>
-            </div>
-            <span class="tstrip-temp mono" :style="{ color: bar.color }">{{ bar.maxTemp }}°</span>
-          </div>
-        </div>
+        <ThermalCard v-if="thermalResult" :summaries="thermalResult.summaries" />
       </div>
 
       <!-- CPU -->
@@ -578,11 +417,7 @@ onUnmounted(() => stopPolling());
           </div>
           <div class="cpu-cores-label" v-if="vitalsResult">{{ vitalsResult.load.cpu_cores }} cores</div>
         </div>
-        <div class="cpu-heatmap" v-if="coreTempStrip.length">
-          <div v-for="core in coreTempStrip" :key="core.key" class="cpu-heat-cell"
-            :style="{ background: core.color }" :title="core.key + ': ' + core.temp + '°C'">
-          </div>
-        </div>
+        <CpuCard v-if="thermalResult" :sensors="thermalResult.sensors" />
         <div class="load-averages" v-if="vitalsResult">
           <span>1m: {{ vitalsResult.load.load_1m.toFixed(1) }}</span>
           <span>5m: {{ vitalsResult.load.load_5m.toFixed(1) }}</span>
@@ -593,123 +428,19 @@ onUnmounted(() => stopPolling());
       <!-- FANS -->
       <div class="stat-card">
         <div class="stat-label">Fans</div>
-        <template v-if="fans.length">
-          <div class="stat-hero">{{ avgFanRpm }}<span class="stat-unit">RPM</span></div>
-          <div class="fan-items">
-            <div v-for="fan in fans" :key="fan.id" class="fan-item">
-              <svg class="fan-mini-gauge" viewBox="0 0 48 30">
-                <!-- 4 background zones -->
-                <path :d="fanArc(24, 27, 19, 0, 44)" stroke="hsla(140, 20%, 40%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path :d="fanArc(24, 27, 19, 46, 89)" stroke="hsla(45, 25%, 42%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path :d="fanArc(24, 27, 19, 91, 134)" stroke="hsla(25, 30%, 40%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path :d="fanArc(24, 27, 19, 136, 180)" stroke="hsla(0, 30%, 42%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <!-- Active zone -->
-                <path v-if="fan.percent <= 25" :d="fanArc(24, 27, 19, 0, 44)" stroke="hsla(140, 35%, 35%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path v-else-if="fan.percent <= 50" :d="fanArc(24, 27, 19, 46, 89)" stroke="hsla(45, 45%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path v-else-if="fan.percent <= 75" :d="fanArc(24, 27, 19, 91, 134)" stroke="hsla(25, 50%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <path v-else :d="fanArc(24, 27, 19, 136, 180)" stroke="hsla(0, 45%, 42%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                <!-- Needle -->
-                <line x1="24" y1="27"
-                  :x2="fanNeedle(24, 27, 13, fan.percent / 100).x"
-                  :y2="fanNeedle(24, 27, 13, fan.percent / 100).y"
-                  :stroke="fanGaugeColor(fan.percent)" stroke-width="1" stroke-linecap="round"/>
-                <circle cx="24" cy="27" r="1.5" :fill="fanGaugeColor(fan.percent)"/>
-              </svg>
-            </div>
-          </div>
-          <div class="fan-bars">
-            <div v-for="fan in fans" :key="'b'+fan.id" class="fan-bar-row">
-              <span class="fan-bar-name">{{ fan.name }}</span>
-              <div class="fan-bar-track">
-                <div class="fan-bar-fill" :style="{ width: fan.percent + '%' }"></div>
-              </div>
-              <span class="fan-bar-rpm mono">{{ Math.round(fan.current_rpm) }}</span>
-            </div>
-          </div>
-        </template>
-        <template v-else>
-          <div class="stat-hero" style="color: var(--muted)">--</div>
-          <div class="stat-detail">No fan data</div>
-        </template>
+        <FanCard :fans="fans" :avg-rpm="avgFanRpm" />
       </div>
 
       <!-- BATTERY -->
       <div class="stat-card stat-card--battery" v-if="battery">
         <div class="stat-label">Battery</div>
-        <div class="bat-ring-row">
-          <svg class="bat-ring-svg" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="10"/>
-            <circle cx="60" cy="60" r="50" fill="none"
-              :stroke="batteryRingColor" stroke-width="10" stroke-linecap="round"
-              :stroke-dasharray="batteryDash" :stroke-dashoffset="RING_CIRCUMFERENCE * 0.25"
-              :style="{ transition: 'stroke-dasharray 0.6s ease' }"
-            />
-            <!-- Health arc (inner, thinner) -->
-            <circle cx="60" cy="60" r="38" fill="none" stroke="rgba(0,0,0,0.04)" stroke-width="4"/>
-            <circle cx="60" cy="60" r="38" fill="none"
-              :stroke="batteryHealthColor" stroke-width="4" stroke-linecap="round"
-              :stroke-dasharray="healthDash" :stroke-dashoffset="HEALTH_CIRCUMFERENCE * 0.25"
-              :style="{ transition: 'stroke-dasharray 0.6s ease' }"
-            />
-          </svg>
-          <div class="bat-ring-center">
-            <span class="bat-ring-value">{{ battery.charge_percent }}%</span>
-            <span class="bat-ring-status">
-              <span v-if="battery.is_charging">Charging</span>
-              <span v-else-if="battery.ac_connected">Plugged In</span>
-              <span v-else>On Battery</span>
-            </span>
-          </div>
-        </div>
-        <div class="bat-meta">
-          <span class="bat-meta-item">
-            <span class="bat-meta-label">Health</span>
-            <span class="bat-meta-value" :style="{ color: batteryHealthColor }">{{ battery.health_percent }}%</span>
-          </span>
-          <span class="bat-meta-divider"></span>
-          <span class="bat-meta-item">
-            <span class="bat-meta-label">Cycles</span>
-            <span class="bat-meta-value mono">{{ battery.cycle_count }}</span>
-          </span>
-          <span class="bat-meta-divider"></span>
-          <span class="bat-meta-item">
-            <span :class="['thermal-dot', batteryConditionClass]"></span>
-            <span class="bat-meta-value">{{ battery.condition }}</span>
-          </span>
-        </div>
+        <BatteryCard :battery="battery" />
       </div>
 
       <!-- MEMORY -->
-      <div class="stat-card stat-card--memory" @click="navigateTo('memory')" v-if="memoryResult"
-        :style="{ background: memCardBg }">
+      <div class="stat-card stat-card--memory" @click="navigateTo('memory')" v-if="memoryResult">
         <div class="stat-label">Memory</div>
-        <div class="mem-ring-row">
-          <svg class="mem-ring-svg" viewBox="0 0 120 120">
-            <!-- Background track -->
-            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="10"/>
-            <!-- Segmented arc: each memory segment drawn as a stroke-dasharray arc -->
-            <circle v-for="seg in memRingSegments" :key="seg.label"
-              cx="60" cy="60" r="50" fill="none"
-              :stroke="seg.color" stroke-width="10" stroke-linecap="butt"
-              :stroke-dasharray="seg.dash" :stroke-dashoffset="seg.offset"
-              :style="{ transition: 'stroke-dasharray 0.6s ease, stroke-dashoffset 0.6s ease' }"
-            />
-          </svg>
-          <div class="mem-ring-center">
-            <span class="mem-ring-value">{{ formatSize(memoryResult.stats.used_bytes) }}</span>
-            <span class="mem-ring-total">of {{ formatSize(memoryResult.stats.total_bytes) }}</span>
-          </div>
-        </div>
-        <div class="mem-ring-legend">
-          <span v-for="seg in memSegments" :key="seg.label" class="mem-ring-legend-item">
-            <span class="mem-ring-legend-dot" :style="{ background: seg.color }"></span>
-            {{ seg.label }} {{ formatSize(seg.bytes) }}
-          </span>
-        </div>
-        <div class="mem-pressure-row">
-          <span :class="['thermal-dot', memPressure.class]"></span>
-          {{ memPressure.label }} pressure
-        </div>
+        <MemoryCard :stats="memoryResult.stats" />
         <div v-if="topMemConsumers.length" class="mem-top-consumers">
           <div v-for="g in topMemConsumers" :key="g.name" class="mem-consumer-row">
             <span class="mem-consumer-name">{{ g.name }}</span>
@@ -1136,228 +867,26 @@ onUnmounted(() => stopPolling());
 .thermal-source { color: var(--muted); }
 .thermal-source::before { content: "\00b7"; margin-right: 5px; }
 .thermal-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-/* Thermal gradient strips */
-.thermal-strips {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.tstrip-row {
-  display: grid;
-  grid-template-columns: 28px 1fr 32px;
-  align-items: center;
-  gap: 6px;
-}
-
-.tstrip-label {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(60, 65, 80, 0.5);
-  letter-spacing: 0.2px;
-}
-
-.tstrip-track {
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(90deg,
-    hsla(195, 50%, 55%, 0.35) 0%,
-    hsla(50, 60%, 50%, 0.4) 45%,
-    hsla(25, 60%, 50%, 0.5) 70%,
-    hsla(0, 55%, 50%, 0.6) 100%
-  );
-  position: relative;
-}
-
-.tstrip-marker {
-  position: absolute;
-  top: -2px;
-  width: 3px;
-  height: 10px;
-  border-radius: 1.5px;
-  background: var(--text);
-  transform: translateX(-1.5px);
-  transition: left 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.tstrip-temp {
-  font-size: 10px;
-  font-weight: 500;
-  text-align: right;
-}
+/* Thermal strips now in ThermalCard.vue */
 
 /* CPU */
 .stat-card--cpu { justify-content: space-between; }
 .cpu-top { }
 .cpu-cores-label { font-size: 10px; font-weight: 500; color: var(--muted); margin-top: 2px; }
 
-.cpu-heatmap {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16px, 1fr));
-  gap: 3px;
-  margin-top: 12px;
-}
-
-.cpu-heat-cell {
-  aspect-ratio: 1;
-  border-radius: 3px;
-  transition: background 0.4s ease;
-  min-height: 16px;
-}
+/* CPU heatmap styles now in CpuCard.vue */
 
 .load-averages { display: flex; gap: 10px; margin-top: 8px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* Fans */
-.fan-items { display: flex; gap: 12px; margin-top: 10px; justify-content: center; padding-bottom: 8px; border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
-.fan-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.fan-mini-gauge { width: 52px; height: 32px; }
-.fan-bars { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
-.fan-bar-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
-.fan-bar-name { font-size: 10px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
-.fan-bar-track { height: 3px; background: rgba(0, 0, 0, 0.05); border-radius: 2px; overflow: hidden; }
-.fan-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.fan-bar-rpm { font-size: 10px; color: var(--muted); min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+/* Fan styles now in FanCard.vue */
 
-/* Battery */
-/* Battery ring gauge */
-.bat-ring-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 8px 0 4px;
-}
-
-.bat-ring-svg {
-  width: 130px;
-  height: 130px;
-}
-
-.bat-ring-center {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-}
-
-.bat-ring-value {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.bat-ring-status {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.bat-meta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.bat-meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bat-meta-label {
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.bat-meta-value {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.bat-meta-divider {
-  width: 1px;
-  height: 12px;
-  background: rgba(0, 0, 0, 0.08);
-}
+/* Battery styles now in BatteryCard.vue */
 
 /* Memory */
 .mem-usage-text { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-top: 2px; }
 .mem-seg-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 10px; }
 .mem-seg { min-width: 2px; transition: flex 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-/* Memory ring gauge */
-.stat-card--memory { transition: background 0.5s ease; }
-
-.mem-ring-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 8px 0 4px;
-}
-
-.mem-ring-svg {
-  width: 130px;
-  height: 130px;
-  transform: rotate(0deg);
-}
-
-.mem-ring-center {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-}
-
-.mem-ring-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.mem-ring-total {
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.mem-ring-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 4px;
-}
-
-.mem-ring-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.mem-ring-legend-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.mem-pressure-row { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+/* Memory ring/pressure styles now in MemoryCard.vue */
 
 .mem-top-consumers { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid rgba(0, 0, 0, 0.06); }
 .mem-consumer-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; }
