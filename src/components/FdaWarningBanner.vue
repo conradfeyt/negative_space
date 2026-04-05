@@ -2,10 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasFullDiskAccess, checkFullDiskAccess } from "../stores/scanStore";
 
-const emit = defineEmits<{
-  "fda-granted": [];
-}>();
-
 defineProps<{
   title?: string;
   text?: string;
@@ -14,17 +10,13 @@ defineProps<{
 async function openFdaSettings() {
   try {
     await invoke("open_full_disk_access_settings");
-  } catch (_) {
-    /* non-critical */
+  } catch (e) {
+    console.debug('[fda-banner] FDA settings open failed:', e);
   }
 }
 
 async function recheckFda() {
-  const hadFda = hasFullDiskAccess.value;
   await checkFullDiskAccess();
-  if (!hadFda && hasFullDiskAccess.value === true) {
-    emit("fda-granted");
-  }
 }
 
 defineExpose({ hasFda: hasFullDiskAccess });

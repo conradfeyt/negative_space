@@ -245,7 +245,6 @@ function selectAllSafe(browser: BrowserInfo) {
     <FdaWarningBanner
       title="Safari data requires Full Disk Access"
       text="Safari stores data in TCC-protected directories. Without Full Disk Access, Safari cache, cookies, and history cannot be scanned or cleaned. Other browsers are not affected."
-      @fda-granted="scan"
     />
 
     <!-- Error/success messages -->

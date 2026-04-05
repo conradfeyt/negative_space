@@ -357,7 +357,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
     <!-- FDA warning -->
     <FdaWarningBanner
       text="Without Full Disk Access, Desktop, Documents, Downloads, and other protected folders are skipped to avoid macOS permission prompts."
-      @fda-granted="scan"
     />
 
     <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>

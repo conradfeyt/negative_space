@@ -121,7 +121,6 @@ function sourceLabel(source: string): string {
     <FdaWarningBanner
       title="Leftover detection limited -- Full Disk Access required"
       text="Without Full Disk Access, leftover files in ~/Library cannot be detected. Apps are still listed with their bundle sizes."
-      @fda-granted="scan"
     />
 
     <div v-if="appsError" class="error-message">{{ appsError }}</div>

@@ -931,7 +931,6 @@ onBeforeUnmount(() => {
     <FdaWarningBanner
       title="Limited view -- Full Disk Access shows all directories"
       text="Without Full Disk Access, Desktop, Documents, Downloads, and media folders are not included. Sizes shown may not account for all disk usage."
-      @fda-granted="scan"
     />
 
     <!-- Messages -->

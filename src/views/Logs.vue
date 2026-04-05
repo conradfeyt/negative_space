@@ -147,7 +147,6 @@ function shortPath(path: string): string {
 
     <FdaWarningBanner
       text="Without Full Disk Access, only /var/log is scanned. ~/Library/Logs is skipped."
-      @fda-granted="scan"
     />
 
     <div v-if="logsError" class="error-message">{{ logsError }}</div>

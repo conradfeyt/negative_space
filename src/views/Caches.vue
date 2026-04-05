@@ -170,7 +170,6 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
 
     <FdaWarningBanner
       text="Without Full Disk Access, only Xcode and CoreSimulator caches are shown. Other app caches in ~/Library/Caches are skipped."
-      @fda-granted="scan"
     />
 
     <div v-if="cachesError" class="error-message">{{ cachesError }}</div>
