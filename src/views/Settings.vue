@@ -144,7 +144,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="settings">
+  <section class="settings">
     <div class="view-header">
       <h2>Settings</h2>
       <p class="text-muted">Manage permissions and scan areas</p>
@@ -258,7 +258,7 @@ onMounted(() => {
       <h3>Debug</h3>
       <button class="btn-secondary mt-2" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>

@@ -98,7 +98,7 @@ function sourceLabel(source: string): string {
 </script>
 
 <template>
-  <div class="apps-view">
+  <section class="apps-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -307,7 +307,7 @@ function sourceLabel(source: string): string {
         </div>
       </div>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>

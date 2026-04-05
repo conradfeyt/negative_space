@@ -44,7 +44,7 @@ onMounted(loadTrashInfo);
 </script>
 
 <template>
-  <div class="trash-view">
+  <section class="trash-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -71,21 +71,21 @@ onMounted(loadTrashInfo);
 
     <template v-else-if="trashInfo">
       <div class="card trash-card">
-        <div class="trash-stats">
+        <dl class="trash-stats">
           <div class="stat-block">
-            <span class="stat-value-large">
+            <dd class="stat-value-large">
               {{ formatSize(trashInfo.size) }}
-            </span>
-            <span class="stat-label">Total Size</span>
+            </dd>
+            <dt class="stat-label">Total Size</dt>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-block">
-            <span class="stat-value-large">
+            <dd class="stat-value-large">
               {{ trashInfo.item_count.toLocaleString() }}
-            </span>
-            <span class="stat-label">Items</span>
+            </dd>
+            <dt class="stat-label">Items</dt>
           </div>
-        </div>
+        </dl>
       </div>
 
       <div class="card action-card">
@@ -133,7 +133,7 @@ onMounted(loadTrashInfo);
         </template>
       </div>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>
@@ -151,6 +151,7 @@ onMounted(loadTrashInfo);
   justify-content: center;
   gap: 48px;
   padding: var(--sp-4) 0;
+  margin: 0;
 }
 
 .stat-block {
@@ -165,6 +166,7 @@ onMounted(loadTrashInfo);
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.5px;
+  margin: 0;
 }
 
 .stat-label {

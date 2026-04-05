@@ -221,7 +221,7 @@ function selectAllSafe(browser: BrowserInfo) {
 </script>
 
 <template>
-  <div class="browsers-view">
+  <section class="browsers-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -309,7 +309,7 @@ function selectAllSafe(browser: BrowserInfo) {
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
-              <img v-if="getBrowserIcon(browser.id)" :src="getBrowserIcon(browser.id)" class="browser-icon" width="44" height="44" />
+              <img v-if="getBrowserIcon(browser.id)" :src="getBrowserIcon(browser.id)" :alt="browser.name" class="browser-icon" width="44" height="44" />
               <div class="browser-info">
                 <span class="browser-name">{{ browser.name }}</span>
                 <span class="browser-meta text-muted">
@@ -438,7 +438,7 @@ function selectAllSafe(browser: BrowserInfo) {
         </div>
       </div>
     </Teleport>
-  </div>
+  </section>
 </template>
 
 <style scoped>

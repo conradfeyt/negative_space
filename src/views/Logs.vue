@@ -131,7 +131,7 @@ function shortPath(path: string): string {
 </script>
 
 <template>
-  <div class="logs-view">
+  <section class="logs-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -183,7 +183,7 @@ function shortPath(path: string): string {
 
       <div class="log-groups">
         <div v-for="group in groupedLogs" :key="group.source" class="log-category">
-          <div class="category-header" @click="toggleGroup(group.source)">
+          <div class="category-header" tabindex="0" role="button" @click="toggleGroup(group.source)" @keydown.enter="toggleGroup(group.source)" @keydown.space.prevent="toggleGroup(group.source)">
             <div class="category-header-left">
               <span class="category-chevron" :class="{ expanded: !collapsedGroups.has(group.source) }">
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
@@ -208,7 +208,7 @@ function shortPath(path: string): string {
               @click="toggleSelect(log.path)"
             >
               <div class="log-icon">
-                <img v-if="logIcon" :src="logIcon" width="28" height="28" />
+                <img v-if="logIcon" :src="logIcon" alt="" width="28" height="28" />
               </div>
               <div class="log-info">
                 <span class="log-name">{{ log.name }}</span>
@@ -226,7 +226,7 @@ function shortPath(path: string): string {
         </div>
       </div>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>

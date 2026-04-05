@@ -212,7 +212,7 @@ onMounted(loadVaultSummary);
 </script>
 
 <template>
-  <div class="vault-view">
+  <section class="vault-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -493,7 +493,7 @@ onMounted(loadVaultSummary);
 
     </template>
 
-  </div>
+  </section>
 </template>
 
 <style scoped>

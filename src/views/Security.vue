@@ -144,7 +144,7 @@ async function handleRemove(item: LaunchItem) {
 </script>
 
 <template>
-  <div class="security-view">
+  <section class="security-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -199,7 +199,7 @@ async function handleRemove(item: LaunchItem) {
 
       <!-- Launch Items Section -->
       <div class="section">
-        <div class="section-header" @click="toggleSection('launch')">
+        <div class="section-header" tabindex="0" role="button" @click="toggleSection('launch')" @keydown.enter="toggleSection('launch')" @keydown.space.prevent="toggleSection('launch')">
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('launch') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
@@ -313,7 +313,7 @@ async function handleRemove(item: LaunchItem) {
 
       <!-- App Trust Section -->
       <div class="section">
-        <div class="section-header" @click="toggleSection('trust')">
+        <div class="section-header" tabindex="0" role="button" @click="toggleSection('trust')" @keydown.enter="toggleSection('trust')" @keydown.space.prevent="toggleSection('trust')">
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('trust') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
@@ -422,7 +422,7 @@ async function handleRemove(item: LaunchItem) {
 
       <!-- Shell Init Section -->
       <div class="section">
-        <div class="section-header" @click="toggleSection('shell')">
+        <div class="section-header" tabindex="0" role="button" @click="toggleSection('shell')" @keydown.enter="toggleSection('shell')" @keydown.space.prevent="toggleSection('shell')">
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('shell') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
@@ -485,7 +485,7 @@ async function handleRemove(item: LaunchItem) {
         </div>
       </div>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>

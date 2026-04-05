@@ -37,7 +37,7 @@ onMounted(loadDockerInfo);
 </script>
 
 <template>
-  <div class="docker-view">
+  <section class="docker-view">
     <div class="view-header">
       <div class="view-header-top">
         <div>
@@ -152,7 +152,7 @@ onMounted(loadDockerInfo);
         </div>
       </template>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>

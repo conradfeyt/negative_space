@@ -45,7 +45,7 @@ function statusLabel(status: string): string {
 </script>
 
 <template>
-  <div class="maintenance-view">
+  <section class="maintenance-view">
     <div class="view-header">
       <div>
         <h2>System Maintenance</h2>
@@ -222,7 +222,7 @@ function statusLabel(status: string): string {
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>
