@@ -955,11 +955,9 @@ fn count_launch_agents() -> u32 {
         let user_agents = format!("{}/Library/LaunchAgents", home);
         if let Ok(entries) = std::fs::read_dir(&user_agents) {
             count += entries
-                .filter(|e| e.is_ok())
+                .filter_map(|e| e.ok())
                 .filter(|e| {
-                    e.as_ref()
-                        .unwrap()
-                        .path()
+                    e.path()
                         .extension()
                         .map(|x| x == "plist")
                         .unwrap_or(false)

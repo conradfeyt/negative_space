@@ -47,7 +47,7 @@ pub fn hide_background() {
 
 /// Remove any existing native gradient subview and clear cached state.
 pub fn teardown_background() {
-    let mut state = GRADIENT_STATE.lock().unwrap();
+    let mut state = GRADIENT_STATE.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(existing) = state.take() {
         unsafe {
             let view: &NSView = &*(existing.view.0 as *const NSView);
@@ -60,7 +60,7 @@ pub fn teardown_background() {
 /// in logical screen coordinates.
 #[tauri::command]
 pub fn update_native_background_position(window_x: f64, window_y: f64) -> Result<(), String> {
-    let state = GRADIENT_STATE.lock().unwrap();
+    let state = GRADIENT_STATE.lock().unwrap_or_else(|e| e.into_inner());
     let Some(ref s) = *state else {
         return Ok(());
     };
@@ -159,7 +159,7 @@ pub fn set_native_background(
 
         // Store state for high-frequency follow-up updates.
         let view_raw = Retained::into_raw(image_view) as *mut AnyObject;
-        let mut state = GRADIENT_STATE.lock().unwrap();
+        let mut state = GRADIENT_STATE.lock().unwrap_or_else(|e| e.into_inner());
         *state = Some(NativeGradientState {
             view: RawPtr(view_raw),
             main_window: RawPtr(ns_window_ptr),

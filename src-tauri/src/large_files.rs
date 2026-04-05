@@ -193,14 +193,16 @@ pub async fn scan_large_files_stream(
         }
     }
 
-    // Emit final "done" event.
-    let _ = app.emit(
+    // Emit final "done" event — critical for the frontend to exit scanning state.
+    if let Err(e) = app.emit(
         "large-file-done",
         LargeFileScanDone {
             total_files: files_found,
             skipped_paths,
         },
-    );
+    ) {
+        eprintln!("[scan] failed to emit done: {}", e);
+    }
 
     Ok(())
 }

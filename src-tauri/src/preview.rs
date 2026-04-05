@@ -167,7 +167,10 @@ fn generate_image_preview(
 
     // Clean up any previous temp files.
     let _ = fs::remove_dir_all(&tmp_dir);
-    let _ = fs::create_dir_all(&tmp_dir);
+    if let Err(e) = fs::create_dir_all(&tmp_dir) {
+        eprintln!("[preview] failed to create temp dir {}: {}", tmp_dir, e);
+        return fallback_metadata(ext, file_size, file_name);
+    }
 
     // Run qlmanage to generate thumbnail.
     // -t: generate thumbnail
