@@ -156,7 +156,7 @@ onMounted(loadVaultSummary);
     <!-- Error -->
     <div v-if="vaultError" class="error-banner">
       <span>{{ vaultError }}</span>
-      <button class="dismiss-btn" @click="vaultError = ''">
+      <button class="btn-close" @click="vaultError = ''">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
@@ -216,7 +216,7 @@ onMounted(loadVaultSummary);
           <div class="queue-item-right">
             <span v-if="item.calculating" class="spinner-sm"></span>
             <span v-else class="queue-item-size mono">{{ formatSize(item.size) }}</span>
-            <button class="btn-remove" @click="removeFromQueue(item.path)">
+            <button class="btn-close" @click="removeFromQueue(item.path)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -460,25 +460,6 @@ onMounted(loadVaultSummary);
   color: var(--danger-text);
 }
 
-.dismiss-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  opacity: 0.5;
-  cursor: pointer;
-}
-
-.dismiss-btn:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.06);
-}
 
 /* Vault summary */
 .vault-summary {
@@ -577,24 +558,6 @@ onMounted(loadVaultSummary);
   color: var(--text);
 }
 
-.btn-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.btn-remove:hover {
-  background: rgba(255, 69, 58, 0.1);
-  color: var(--danger);
-}
 
 .queue-actions {
   margin-top: var(--sp-4);

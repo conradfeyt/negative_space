@@ -423,28 +423,6 @@ function sourceLabel(source: string): string {
   font-size: 11px;
 }
 
-/* Source badges */
-.source-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.source-homebrew {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--source-homebrew);
-}
-
-.source-app-store {
-  background: var(--source-appstore-tint);
-  color: var(--source-appstore);
-}
-
 /* Size columns */
 .app-sizes {
   display: flex;

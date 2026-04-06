@@ -609,36 +609,4 @@ const totalRuntimeSize = computed(() =>
   color: var(--text-secondary);
 }
 
-/* Source badges reuse from Apps view pattern */
-.source-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--muted);
-}
-
-.source-homebrew {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--source-homebrew);
-}
-
-.source-nvm {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--source-success);
-}
-
-.source-rustup {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--source-homebrew);
-}
-
-.source-manual {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--muted);
-}
 </style>

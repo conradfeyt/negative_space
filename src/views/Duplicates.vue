@@ -471,7 +471,7 @@ function shortPath(p: string): string {
           <div v-if="previewPath && group.files.some(f => f.path === previewPath)" class="preview-panel">
             <div class="preview-header">
               <span class="preview-title">{{ (previewData as any)?.file_name || '...' }}</span>
-              <button class="btn-preview-close" @click="closePreview">
+              <button class="btn-close" @click="closePreview">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             </div>
@@ -1098,25 +1098,6 @@ function shortPath(p: string): string {
   white-space: nowrap;
 }
 
-.btn-preview-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
-  padding: 0;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.btn-preview-close:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
 
 .preview-loading {
   display: flex;
