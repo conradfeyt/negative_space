@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
 const router = useRouter();
 import type { PathAccess, ScanArea } from "../types";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 
 const checking = ref(false);
 const hasFullDiskAccess = ref<boolean | null>(null);
@@ -195,10 +196,7 @@ onMounted(() => {
           <span class="behavior-label">Smooth gradient drag</span>
           <span class="behavior-desc text-muted">Uses custom JS window dragging with native background sync.</span>
         </div>
-        <label class="toggle">
-          <input type="checkbox" v-model="customJsDrag" />
-          <span class="toggle-slider"></span>
-        </label>
+        <ToggleSwitch v-model="customJsDrag" />
       </div>
     </div>
 
@@ -227,10 +225,7 @@ onMounted(() => {
           :class="{ disabled: !area.enabled }"
         >
           <div class="area-toggle">
-            <label class="toggle">
-              <input type="checkbox" :checked="area.enabled" @change="toggleArea(area)" />
-              <span class="toggle-slider"></span>
-            </label>
+            <ToggleSwitch :model-value="area.enabled" @update:model-value="toggleArea(area)" />
           </div>
 
           <div class="area-info">
@@ -418,53 +413,6 @@ onMounted(() => {
 
 .area-toggle {
   flex-shrink: 0;
-}
-
-/* Toggle switch */
-.toggle {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 22px;
-  cursor: pointer;
-}
-
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.20);
-  border-radius: 22px;
-  transition: background 0.2s;
-}
-
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 2px;
-  bottom: 2px;
-  background: white;
-  border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.toggle input:checked + .toggle-slider {
-  background: var(--accent);
-}
-
-.toggle input:checked + .toggle-slider::before {
-  transform: translateX(18px);
 }
 
 .area-info {
