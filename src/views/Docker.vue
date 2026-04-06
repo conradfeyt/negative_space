@@ -100,7 +100,7 @@ onMounted(loadDockerInfo);
                 :disabled="cleaning"
                 @click="prune(false)"
               >
-                <span v-if="cleaning" class="spinner spinner-sm"></span>
+                <span v-if="cleaning" class="spinner-sm"></span>
                 {{ cleaning ? "Pruning..." : "Prune" }}
               </button>
               <button

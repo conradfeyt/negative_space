@@ -136,7 +136,7 @@ onMounted(loadVaultSummary);
             Add Folder...
           </button>
           <button class="btn-primary" :disabled="vaultScanning" @click="scanCandidates">
-            <span v-if="vaultScanning" class="spinner spinner-sm"></span>
+            <span v-if="vaultScanning" class="spinner-sm"></span>
             {{ vaultScanning ? "Scanning..." : "Find Files" }}
           </button>
         </div>
@@ -221,7 +221,7 @@ onMounted(loadVaultSummary);
             </div>
           </div>
           <div class="queue-item-right">
-            <span v-if="item.calculating" class="spinner spinner-sm"></span>
+            <span v-if="item.calculating" class="spinner-sm"></span>
             <span v-else class="queue-item-size mono">{{ formatSize(item.size) }}</span>
             <button class="btn-remove" @click="removeFromQueue(item.path)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -236,7 +236,7 @@ onMounted(loadVaultSummary);
           :disabled="vaultCompressing || queue.some(q => q.calculating)"
           @click="compressQueue"
         >
-          <span v-if="vaultCompressing" class="spinner spinner-sm"></span>
+          <span v-if="vaultCompressing" class="spinner-sm"></span>
           <template v-if="compressProgress">
             Compressing {{ compressProgress.current }}/{{ compressProgress.total }}: {{ compressProgress.name }}
           </template>
@@ -533,7 +533,7 @@ onMounted(loadVaultSummary);
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 /* Sections */

@@ -290,7 +290,7 @@ function shortPath(p: string): string {
             :disabled="duplicateScanning"
             @click="scan"
           >
-            <span v-if="duplicateScanning" class="spinner spinner-sm"></span>
+            <span v-if="duplicateScanning" class="spinner-sm"></span>
             {{ duplicateScanning ? "Scanning..." : "Find Duplicates" }}
           </button>
         </div>
@@ -309,7 +309,7 @@ function shortPath(p: string): string {
             :disabled="similarScanning"
             @click="scanSimilar"
           >
-            <span v-if="similarScanning" class="spinner spinner-sm"></span>
+            <span v-if="similarScanning" class="spinner-sm"></span>
             {{ similarScanning ? "Scanning..." : "Find Similar" }}
           </button>
         </div>
@@ -413,7 +413,7 @@ function shortPath(p: string): string {
             :disabled="selected.size === 0 || cleaning"
             @click="deleteSelected"
           >
-            <span v-if="cleaning" class="spinner spinner-sm"></span>
+            <span v-if="cleaning" class="spinner-sm"></span>
             {{ cleaning ? "Deleting..." : "Delete Selected" }}
           </button>
         </div>
@@ -466,7 +466,7 @@ function shortPath(p: string): string {
                 <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
                   <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" alt="" class="card-thumb-img" />
                   <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="card-placeholder-icon" />
-                  <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
+                  <span v-else class="card-loading-dot"><span class="spinner-sm"></span></span>
                 </div>
 
                 <div v-else class="card-face card-face--ext" :style="{ background: `linear-gradient(135deg, ${extCardColor(file.name)}, color-mix(in srgb, ${extCardColor(file.name)} 80%, black))` }">
@@ -608,7 +608,7 @@ function shortPath(p: string): string {
             :disabled="similarSelected.size === 0 || cleaning"
             @click="deleteSimilarSelected"
           >
-            <span v-if="cleaning" class="spinner spinner-sm"></span>
+            <span v-if="cleaning" class="spinner-sm"></span>
             {{ cleaning ? "Deleting..." : `Delete ${similarSelected.size} selected` }}
           </button>
         </div>
@@ -647,7 +647,7 @@ function shortPath(p: string): string {
                   <div class="card-face card-face--thumb">
                     <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" alt="" class="card-thumb-img" />
                     <img v-else-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="card-placeholder-icon" />
-                    <span v-else class="card-loading-dot"><span class="spinner spinner-sm"></span></span>
+                    <span v-else class="card-loading-dot"><span class="spinner-sm"></span></span>
                   </div>
 
                   <div class="card-meta">
@@ -713,8 +713,8 @@ function shortPath(p: string): string {
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(59, 199, 232, 0.15);
-  color: rgba(59, 199, 232, 1);
+  background: var(--accent-glow);
+  color: var(--accent);
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -799,8 +799,8 @@ function shortPath(p: string): string {
 }
 
 .kind-pill.active {
-  background: rgba(59, 199, 232, 0.15);
-  color: rgba(40, 160, 200, 1);
+  background: var(--accent-glow);
+  color: var(--accent-deep);
 }
 
 .kind-pill.empty {
@@ -818,8 +818,8 @@ function shortPath(p: string): string {
 }
 
 .kind-pill.active .kind-count {
-  background: rgba(59, 199, 232, 0.2);
-  color: rgba(40, 160, 200, 1);
+  background: var(--accent-glow);
+  color: var(--accent-deep);
 }
 
 .scan-controls {
@@ -872,7 +872,7 @@ function shortPath(p: string): string {
 
 .stat-highlight {
   border: 1px solid var(--accent);
-  background: rgba(59, 199, 232, 0.20);
+  background: var(--accent-glow);
 }
 
 .stat-value {
@@ -989,8 +989,8 @@ function shortPath(p: string): string {
 }
 
 .file-card--keep {
-  border-color: rgba(59, 199, 232, 0.5);
-  box-shadow: 0 0 0 1px rgba(59, 199, 232, 0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
 }
 
 .file-card--selected {

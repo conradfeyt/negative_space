@@ -71,7 +71,7 @@ const totalRuntimeSize = computed(() =>
           :disabled="packagesScanning"
           @click="scan"
         >
-          <span v-if="packagesScanning" class="spinner spinner-sm"></span>
+          <span v-if="packagesScanning" class="spinner-sm"></span>
           {{ packagesScanning ? "Scanning..." : "Scan" }}
         </button>
       </div>
@@ -293,7 +293,7 @@ const totalRuntimeSize = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   min-width: 100px;
   flex: 1;
 }
@@ -310,7 +310,7 @@ const totalRuntimeSize = computed(() =>
   color: var(--muted);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 /* Sections */
@@ -493,7 +493,7 @@ const totalRuntimeSize = computed(() =>
   background: rgba(0, 0, 0, 0.05);
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 .pkg-right {
@@ -562,7 +562,7 @@ const totalRuntimeSize = computed(() =>
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   flex-shrink: 0;
 }
 
@@ -630,7 +630,7 @@ const totalRuntimeSize = computed(() =>
   background: rgba(59, 199, 232, 0.12);
   color: var(--accent-deep);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 .version-right {
@@ -650,7 +650,7 @@ const totalRuntimeSize = computed(() =>
   padding: 2px 7px;
   border-radius: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.05);
   color: var(--muted);

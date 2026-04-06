@@ -158,7 +158,7 @@ async function handleRemove(item: LaunchItem) {
           :disabled="securityScanning"
           @click="scan"
         >
-          <span v-if="securityScanning" class="spinner spinner-sm"></span>
+          <span v-if="securityScanning" class="spinner-sm"></span>
           {{ securityScanning ? "Scanning..." : "Scan" }}
         </button>
       </div>
@@ -590,6 +590,12 @@ async function handleRemove(item: LaunchItem) {
   padding: var(--sp-3) 0;
   cursor: pointer;
   user-select: none;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.section-header:hover {
+  background: var(--surface-alt);
 }
 
 .section-header h3 {

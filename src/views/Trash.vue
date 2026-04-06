@@ -125,7 +125,7 @@ onMounted(loadTrashInfo);
                 :disabled="emptying"
                 @click="handleEmptyTrash"
               >
-                <span v-if="emptying" class="spinner spinner-sm"></span>
+                <span v-if="emptying" class="spinner-sm"></span>
                 {{ emptying ? "Emptying..." : "Yes, Empty Trash" }}
               </button>
             </div>

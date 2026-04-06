@@ -921,7 +921,7 @@ onBeforeUnmount(() => {
           :disabled="diskMapLoading"
           @click="scan"
         >
-          <span v-if="diskMapLoading" class="spinner spinner-sm"></span>
+          <span v-if="diskMapLoading" class="spinner-sm"></span>
           {{ diskMapLoading ? "Scanning..." : "Scan" }}
         </button>
       </div>
@@ -1053,7 +1053,7 @@ onBeforeUnmount(() => {
               :class="{ active: vizExpanded }"
               @click="vizExpanded = !vizExpanded"
             >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <template v-if="!vizExpanded">
                   <path d="M8.5 1.5H12.5V5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                   <path d="M5.5 12.5H1.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1162,7 +1162,7 @@ onBeforeUnmount(() => {
                 @click="revealInFinder(child.path)"
                 title="Reveal in Finder"
               >
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                   <path d="M4.5 1.5H2.5C1.95 1.5 1.5 1.95 1.5 2.5V9.5C1.5 10.05 1.95 10.5 2.5 10.5H9.5C10.05 10.5 10.5 10.05 10.5 9.5V7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                   <path d="M7 1.5H10.5V5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                   <path d="M10.5 1.5L5.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>

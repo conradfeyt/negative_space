@@ -112,7 +112,7 @@ function sourceLabel(source: string): string {
           :disabled="appsScanning"
           @click="scan"
         >
-          <span v-if="appsScanning" class="spinner spinner-sm"></span>
+          <span v-if="appsScanning" class="spinner-sm"></span>
           {{ appsScanning ? "Scanning..." : "Scan" }}
         </button>
       </div>
@@ -242,7 +242,7 @@ function sourceLabel(source: string): string {
                   :disabled="uninstalling === app.path"
                   @click.stop="handleUninstall(app)"
                 >
-                  <span v-if="uninstalling === app.path" class="spinner spinner-sm"></span>
+                  <span v-if="uninstalling === app.path" class="spinner-sm"></span>
                   {{ uninstalling === app.path ? "Removing..." : "Yes, Uninstall" }}
                 </button>
               </template>
@@ -326,7 +326,7 @@ function sourceLabel(source: string): string {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   min-width: 100px;
   flex: 1;
 }
@@ -343,7 +343,7 @@ function sourceLabel(source: string): string {
   color: var(--muted);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 .stat-warning {
@@ -468,19 +468,19 @@ function sourceLabel(source: string): string {
   padding: 2px 7px;
   border-radius: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .source-homebrew {
   background: rgba(251, 146, 60, 0.15);
-  color: #c2410c;
+  color: var(--source-homebrew);
 }
 
 .source-app-store {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
+  background: var(--source-appstore-tint);
+  color: var(--source-appstore);
 }
 
 /* Size columns */
@@ -504,7 +504,7 @@ function sourceLabel(source: string): string {
   color: var(--muted);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 .size-value {

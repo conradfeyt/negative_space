@@ -235,7 +235,7 @@ function selectAllSafe(browser: BrowserInfo) {
           :disabled="browserScanning"
           @click="scan"
         >
-          <span v-if="browserScanning" class="spinner spinner-sm"></span>
+          <span v-if="browserScanning" class="spinner-sm"></span>
           {{ browserScanning ? "Scanning..." : "Scan Browsers" }}
         </button>
       </div>
@@ -283,7 +283,7 @@ function selectAllSafe(browser: BrowserInfo) {
             :disabled="selected.size === 0 || cleaning"
             @click="cleanSelected"
           >
-            <span v-if="cleaning" class="spinner spinner-sm"></span>
+            <span v-if="cleaning" class="spinner-sm"></span>
             {{ cleaning ? "Cleaning..." : "Clean Selected" }}
           </button>
         </div>
@@ -523,7 +523,7 @@ function selectAllSafe(browser: BrowserInfo) {
   align-items: center;
   padding: var(--sp-3) var(--sp-5) var(--sp-3) 48px;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background 0.15s ease;
   border-bottom: 1px solid var(--border-divider);
 }
 

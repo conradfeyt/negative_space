@@ -139,7 +139,7 @@ function statusLabel(status: string): string {
             >
               <span
                 v-if="task.status === 'running'"
-                class="spinner spinner-sm"
+                class="spinner-sm"
               ></span>
               {{ statusLabel(task.status) }}
             </button>
@@ -505,12 +505,17 @@ function statusLabel(status: string): string {
 }
 
 .task-result-success {
-  background: rgba(48, 209, 88, 0.12);
-  color: #1a8d36;
+  background: var(--success-tint);
+  color: var(--success-text);
 }
 
 .task-result-error {
-  background: rgba(255, 69, 58, 0.12);
+  background: var(--danger-tint);
   color: var(--danger);
+}
+
+.btn-task-success:active,
+.btn-task-error:active {
+  transform: scale(0.98);
 }
 </style>
