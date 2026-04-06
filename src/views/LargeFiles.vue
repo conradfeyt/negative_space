@@ -21,6 +21,7 @@ import {
   isProtected,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import EmptyState from "../components/EmptyState.vue";
 import {
   useFileGrouping,
   collectFiles,
@@ -94,7 +95,7 @@ function safetyColor(safety: string): string {
     case "safe_rebuild": return "hsla(195, 55%, 42%, 0.85)";
     case "probably_safe": return "var(--accent)";
     case "risky": return "var(--danger)";
-    case "vaulted": return "hsla(280, 40%, 50%, 0.85)";
+    case "vaulted": return "var(--vault)";
     default: return "var(--muted)";
   }
 }
@@ -372,9 +373,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
     </div>
 
     <!-- Empty state -->
-    <div v-if="!largeFilesScanning && largeFilesScanned && largeFiles.length === 0" class="card empty-state">
-      <p class="text-muted">No files found larger than {{ minSizeMb }} MB</p>
-    </div>
+    <EmptyState
+      v-if="!largeFilesScanning && largeFilesScanned && largeFiles.length === 0"
+      :title="`No files found larger than ${minSizeMb} MB`"
+      description="Try lowering the minimum size threshold or scanning a different directory."
+    />
 
     <!-- Results -->
     <div v-if="largeFiles.length > 0" class="results-container">
@@ -484,8 +487,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
                 <span v-if="isProtected(file.path)" class="icon-shield-badge" title="Click to unprotect" @click.stop="toggleProtected(file.path)">
-                  <svg class="shield-normal" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="#d94b4b" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="#d94b4b" stroke-width="2.5"/></svg>
+                  <svg class="shield-normal" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="var(--danger)" stroke-width="2.5"/></svg>
                 </span>
               </div>
               <div class="file-row-info">
@@ -648,7 +651,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
-                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <div class="file-row-info">
                                             <div class="file-row-name">
@@ -686,7 +689,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
-                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <div class="file-row-info">
                                         <div class="file-row-name">
@@ -726,7 +729,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
-                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <div class="file-row-info">
                                 <div class="file-row-name">
@@ -766,7 +769,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
-                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg v-if="isProtected(file.path)" class="icon-shield-badge" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none" title="Click to unprotect" @click.stop="toggleProtected(file.path)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <div class="file-row-info">
                         <div class="file-row-name">
@@ -804,8 +807,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
                 <div v-else class="file-row-icon-placeholder"></div>
                 <span v-if="isProtected(file.path)" class="icon-shield-badge" title="Click to unprotect" @click.stop="toggleProtected(file.path)">
-                  <svg class="shield-normal" viewBox="0 0 24 24" fill="hsla(145, 55%, 45%, 1)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="#d94b4b" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="#d94b4b" stroke-width="2.5"/></svg>
+                  <svg class="shield-normal" viewBox="0 0 24 24" fill="var(--protect-green)" stroke="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <svg class="shield-hover" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="var(--danger)" stroke-width="2.5"/></svg>
                 </span>
               </div>
               <div class="file-row-info">
@@ -1238,7 +1241,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .protect-action-btn svg {
-  color: hsla(145, 55%, 45%, 0.9);
+  color: var(--protect-green);
 }
 
 .file-row-name {
@@ -1248,7 +1251,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-name {
-  font-family: "SF Pro Display", "SF Pro Text", -apple-system, sans-serif; font-size: 13px;
+  font-family: var(--font-sans); font-size: 13px;
   font-weight: 500;
   color: var(--text);
   overflow: hidden;
@@ -1290,7 +1293,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* Vault section */
 .vault-group {
-  border: 1px solid hsla(280, 40%, 60%, 0.15);
+  border: 1px solid var(--vault-border);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.55);
   padding: 4px 0;
@@ -1298,11 +1301,11 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .vault-title {
-  color: hsla(280, 40%, 45%, 0.9);
+  color: var(--vault-text);
 }
 
 .vault-description {
-  color: hsla(280, 35%, 35%, 0.7);
+  color: var(--vault-muted);
   font-style: italic;
   font-size: 11px;
 }
@@ -1319,17 +1322,17 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  border-bottom: 1px solid hsla(280, 20%, 50%, 0.08);
+  border-bottom: 1px solid var(--vault-tint);
 }
 
 .vault-file-row:hover {
-  background: hsla(280, 30%, 70%, 0.08);
+  background: var(--vault-tint);
   opacity: 0.8;
 }
 
 .vault-badge {
-  color: hsla(280, 40%, 50%, 0.85);
-  border-color: hsla(280, 40%, 50%, 0.35);
+  color: var(--vault);
+  border-color: var(--vault-border);
   font-size: 9px;
   font-weight: 600;
   padding: 1px 6px;
@@ -1341,7 +1344,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 .vault-file-name {
   font-size: 12px;
-  color: hsla(280, 30%, 30%, 0.8);
+  color: var(--vault-muted);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1351,7 +1354,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 .vault-file-size {
   font-size: 12px;
-  color: hsla(280, 30%, 30%, 0.6);
+  color: var(--vault-muted);
   flex-shrink: 0;
 }
 
@@ -1431,7 +1434,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .file-row-path {
-  font-family: "SF Pro Display", "SF Pro Text", -apple-system, sans-serif; font-size: 10px;
+  font-family: var(--font-sans); font-size: 10px;
   margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1476,7 +1479,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: hsla(280, 40%, 55%, 0.7);
+  color: var(--vault);
   opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
@@ -1497,7 +1500,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .protect-btn--active {
-  color: hsla(280, 40%, 50%, 0.85);
+  color: var(--vault);
   opacity: 0.85;
 }
 

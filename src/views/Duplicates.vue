@@ -19,6 +19,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
+import EmptyState from "../components/EmptyState.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
   useDuplicateFilters,
@@ -338,15 +339,11 @@ function shortPath(p: string): string {
     </div>
 
     <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="duplicateScanned && (!duplicateResult || duplicateResult.groups.length === 0)"
-      class="card empty-state"
-    >
-      <p class="text-muted">No duplicate files found</p>
-      <p v-if="duplicateResult" class="text-muted scan-stats">
-        Scanned {{ duplicateResult.files_scanned.toLocaleString() }} files
-      </p>
-    </div>
+      title="No duplicate files found"
+      :description="duplicateResult ? `Scanned ${duplicateResult.files_scanned.toLocaleString()} files` : 'Run a scan to find exact duplicate files.'"
+    />
 
     <!-- Results -->
     <template v-else-if="duplicateResult && duplicateResult.groups.length > 0">
@@ -548,15 +545,11 @@ function shortPath(p: string): string {
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="similarScanned && (!similarResult || similarResult.groups.length === 0)" class="card empty-state">
-        <p class="text-muted">No similar images found</p>
-        <p v-if="similarResult" class="text-muted scan-stats">
-          Scanned {{ similarResult.images_scanned.toLocaleString() }} images
-          <template v-if="similarResult.images_skipped > 0">
-            ({{ similarResult.images_skipped }} skipped)
-          </template>
-        </p>
-      </div>
+      <EmptyState
+        v-else-if="similarScanned && (!similarResult || similarResult.groups.length === 0)"
+        title="No similar images found"
+        :description="similarResult ? `Scanned ${similarResult.images_scanned.toLocaleString()} images${similarResult.images_skipped > 0 ? ` (${similarResult.images_skipped} skipped)` : ''}` : 'Run a scan to find visually similar images.'"
+      />
 
       <!-- Results -->
       <template v-else-if="similarResult && similarResult.groups.length > 0">
@@ -816,11 +809,6 @@ function shortPath(p: string): string {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-}
-
-.scan-stats {
-  font-size: 12px;
-  margin-top: var(--sp-2);
 }
 
 /* Stats bar */

@@ -11,6 +11,7 @@ import {
   removeLaunchItem,
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 type SectionId = "launch" | "trust" | "shell";
 
@@ -202,9 +203,11 @@ async function handleRemove(item: LaunchItem) {
         </div>
 
         <div v-if="expandedSections.has('launch')" class="section-body">
-          <div v-if="securityResult.launch_items.length === 0" class="card empty-state">
-            <p class="text-muted">No launch items found</p>
-          </div>
+          <EmptyState
+            v-if="securityResult.launch_items.length === 0"
+            title="No launch items found"
+            description="Startup agents and daemons will appear here if detected."
+          />
 
           <div
             v-for="item in securityResult.launch_items"
@@ -316,9 +319,11 @@ async function handleRemove(item: LaunchItem) {
         </div>
 
         <div v-if="expandedSections.has('trust')" class="section-body">
-          <div v-if="securityResult.app_trust.length === 0" class="card empty-state">
-            <p class="text-muted">No app trust issues found</p>
-          </div>
+          <EmptyState
+            v-if="securityResult.app_trust.length === 0"
+            title="No app trust issues found"
+            description="Applications with code signing or notarization concerns will appear here."
+          />
 
           <div
             v-for="app in securityResult.app_trust"
@@ -419,9 +424,11 @@ async function handleRemove(item: LaunchItem) {
         </div>
 
         <div v-if="expandedSections.has('shell')" class="section-body">
-          <div v-if="securityResult.shell_findings.length === 0" class="card empty-state">
-            <p class="text-muted">No suspicious shell configuration found</p>
-          </div>
+          <EmptyState
+            v-if="securityResult.shell_findings.length === 0"
+            title="No suspicious shell configuration found"
+            description="Shell init file findings will appear here if any are detected."
+          />
 
           <div
             v-for="sf in securityResult.shell_findings"

@@ -12,6 +12,7 @@ import {
   totalLogSize,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
@@ -158,9 +159,11 @@ function shortPath(path: string): string {
       <span>Scanning log files...</span>
     </div>
 
-    <div v-else-if="logsScanned && logs.length === 0" class="card empty-state">
-      <p>No log files found</p>
-    </div>
+    <EmptyState
+      v-else-if="logsScanned && logs.length === 0"
+      title="No log files found"
+      description="System and application log files will appear here after scanning."
+    />
 
     <template v-else-if="logs.length > 0">
       <div class="results-bar">
@@ -185,7 +188,7 @@ function shortPath(path: string): string {
           <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.source)" @click="toggleGroup(group.source)" @keydown.enter="toggleGroup(group.source)" @keydown.space.prevent="toggleGroup(group.source)">
             <div class="category-header-left">
               <span class="category-chevron" :class="{ expanded: !collapsedGroups.has(group.source) }">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
               <span class="category-label">{{ group.source }}</span>
               <span class="category-count text-muted">{{ group.entries.length }}</span>
@@ -268,7 +271,7 @@ function shortPath(path: string): string {
 
 .log-category {
   background: rgba(255, 255, 255, 0.4);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -279,7 +282,7 @@ function shortPath(path: string): string {
   align-items: center;
   padding: 10px 16px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s ease;
 }
 
 .category-header:hover { background: rgba(255, 255, 255, 0.3); }
@@ -335,13 +338,13 @@ function shortPath(path: string): string {
   gap: 12px;
   padding: 8px 16px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s ease;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .log-item:last-child { border-bottom: none; }
 .log-item:hover { background: rgba(255, 255, 255, 0.3); }
-.log-item--selected { background: rgba(59, 199, 232, 0.06); }
+.log-item--selected { background: var(--accent-light); }
 
 .log-icon {
   display: flex;

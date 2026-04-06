@@ -12,6 +12,7 @@ import {
 } from "../stores/scanStore";
 import type { BrowserInfo, BrowserDataCategory } from "../types";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 // ── Browser app icons via NSWorkspace ─────────────────────────────────
 const browserIcons = ref<Record<string, string>>({});
@@ -259,12 +260,11 @@ function selectAllSafe(browser: BrowserInfo) {
     </div>
 
     <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="browserScanned && (!browserResult || browserResult.browsers.length === 0)"
-      class="card empty-state"
-    >
-      <p class="text-muted">No browsers with cleanable data found</p>
-    </div>
+      title="No browsers with cleanable data found"
+      description="Browser cache, cookies, and history data will appear here after scanning."
+    />
 
     <!-- Results -->
     <template v-else-if="browserResult && browserResult.browsers.length > 0">

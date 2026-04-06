@@ -9,6 +9,7 @@ import {
   scanMemory,
 } from "../stores/scanStore";
 import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS, memoryPressureLevel } from "../utils";
+import EmptyState from "../components/EmptyState.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh
@@ -294,9 +295,11 @@ const sortedGroups = computed((): ProcessGroup[] => {
     </template>
 
     <!-- Empty state -->
-    <div v-if="!memoryScanning && !memoryResult && !memoryError" class="empty-state card">
-      <p class="text-muted">Loading memory data...</p>
-    </div>
+    <EmptyState
+      v-if="!memoryScanning && !memoryResult && !memoryError"
+      title="Loading memory data..."
+      description="Memory usage details will appear here momentarily."
+    />
   </div>
 </template>
 

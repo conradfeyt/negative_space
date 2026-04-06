@@ -13,6 +13,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
@@ -132,9 +133,11 @@ function sourceLabel(source: string): string {
       <span>Scanning applications and detecting leftovers...</span>
     </div>
 
-    <div v-else-if="appsScanned && apps.length === 0" class="card empty-state">
-      <p class="text-muted">No applications found</p>
-    </div>
+    <EmptyState
+      v-else-if="appsScanned && apps.length === 0"
+      title="No applications found"
+      description="Installed applications and their disk footprint will appear here after scanning."
+    />
 
     <template v-else-if="apps.length > 0">
       <!-- Summary stats -->

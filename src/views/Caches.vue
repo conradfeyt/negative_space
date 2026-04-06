@@ -12,6 +12,7 @@ import {
   totalCacheSize,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 // Native macOS blue folder icon via NSWorkspace.shared.icon(forFile:)
 const folderIcon = ref("");
@@ -181,9 +182,11 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
       <span>Scanning caches...</span>
     </div>
 
-    <div v-else-if="cachesScanned && caches.length === 0" class="card empty-state">
-      <p>No caches found</p>
-    </div>
+    <EmptyState
+      v-else-if="cachesScanned && caches.length === 0"
+      title="No caches found"
+      description="Application and system caches will appear here after scanning."
+    />
 
     <template v-else-if="caches.length > 0">
       <div class="summary-bar">
@@ -214,7 +217,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
           <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedCategories.has(group.id)" @click="toggleCategory(group.id)" @keydown.enter="toggleCategory(group.id)" @keydown.space.prevent="toggleCategory(group.id)">
             <div class="category-header-left">
               <span class="category-chevron" :class="{ expanded: !collapsedCategories.has(group.id) }">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
               <span class="category-label">{{ group.label }}</span>
               <span class="category-count text-muted">{{ group.entries.length }}</span>
@@ -270,7 +273,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
 
 .cache-category {
   background: rgba(255, 255, 255, 0.4);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -281,7 +284,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   align-items: center;
   padding: 10px 16px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s ease;
 }
 
 .category-header:hover {
@@ -342,7 +345,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   padding: 10px 16px;
   cursor: pointer;
   border-radius: 10px;
-  transition: background 0.12s;
+  transition: background 0.15s ease;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 

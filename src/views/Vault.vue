@@ -19,6 +19,7 @@ import {
   removeCandidates,
 } from "../stores/scanStore";
 import { useCompressionQueue } from "../composables/useCompressionQueue";
+import EmptyState from "../components/EmptyState.vue";
 
 // ---------------------------------------------------------------------------
 // UI state
@@ -314,20 +315,11 @@ onMounted(loadVaultSummary);
     </div>
 
     <!-- Empty state (compress tab) -->
-    <div
+    <EmptyState
       v-if="!vaultScanning && vaultCandidates.length === 0 && queue.length === 0"
-      class="empty-state-card"
-    >
-      <div class="empty-icon">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v3m18 0v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8m18 0H3m7 4h4"/>
-        </svg>
-      </div>
-      <p class="empty-title">Compress files to free up space</p>
-      <p class="empty-desc text-muted">
-        Add folders to compress, or scan for large stale files that can be archived.
-      </p>
-    </div>
+      title="Compress files to free up space"
+      description="Add folders to compress, or scan for large stale files that can be archived."
+    />
 
     </template>
 
@@ -383,17 +375,11 @@ onMounted(loadVaultSummary);
       </div>
     </div>
 
-    <div v-else class="empty-state-card">
-      <div class="empty-icon">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v3m18 0v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8m18 0H3m7 4h4"/>
-        </svg>
-      </div>
-      <p class="empty-title">Nothing archived yet</p>
-      <p class="empty-desc text-muted">
-        Compressed files and folders will appear here. You can restore them to their original location at any time.
-      </p>
-    </div>
+    <EmptyState
+      v-else
+      title="Nothing archived yet"
+      description="Compressed files and folders will appear here. You can restore them to their original location at any time."
+    />
 
     </template>
 
@@ -842,33 +828,4 @@ onMounted(loadVaultSummary);
   border-radius: var(--radius-sm);
 }
 
-/* ----------------------------------------------------------------
-   Empty state
-   ---------------------------------------------------------------- */
-.empty-state-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 64px 32px;
-}
-
-.empty-icon {
-  color: var(--muted);
-  opacity: 0.4;
-  margin-bottom: var(--sp-4);
-}
-
-.empty-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: var(--sp-2);
-}
-
-.empty-desc {
-  font-size: 13px;
-  max-width: 380px;
-  line-height: 1.6;
-}
 </style>

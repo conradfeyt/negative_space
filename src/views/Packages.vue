@@ -9,6 +9,7 @@ import {
   scanPackages,
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
+import EmptyState from "../components/EmptyState.vue";
 
 const expandedManagers = ref<Set<string>>(new Set());
 const expandedRuntimes = ref<Set<string>>(new Set());
@@ -258,12 +259,11 @@ const totalRuntimeSize = computed(() =>
       </div>
 
       <!-- Empty state -->
-      <div
+      <EmptyState
         v-if="packagesResult.managers.length === 0 && packagesResult.runtimes.length === 0"
-        class="card empty-state"
-      >
-        <p class="text-muted">No package managers or runtimes detected</p>
-      </div>
+        title="No package managers or runtimes detected"
+        description="Homebrew, npm, pip, Cargo, and other package managers will appear here if installed."
+      />
     </div>
   </section>
 </template>

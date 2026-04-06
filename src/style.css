@@ -654,12 +654,6 @@ tr:last-child td {
   font-size: 14px;
 }
 
-.empty-state {
-  text-align: center;
-  padding: var(--sp-12);
-  color: var(--muted);
-  font-size: 15px;
-}
 
 .success-message {
   background: var(--success-tint);
