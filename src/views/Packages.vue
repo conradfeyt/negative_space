@@ -8,6 +8,7 @@ import {
   packagesError,
   scanPackages,
 } from "../stores/scanStore";
+import StatCard from "../components/StatCard.vue";
 
 const expandedManagers = ref<Set<string>>(new Set());
 const expandedRuntimes = ref<Set<string>>(new Set());
@@ -87,18 +88,9 @@ const totalRuntimeSize = computed(() =>
     <div v-else-if="packagesScanned && packagesResult">
       <!-- Summary -->
       <div class="stats-row">
-        <div class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ packagesResult.managers.length }}</span>
-          <span class="stat-card-label">Package managers</span>
-        </div>
-        <div class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ packagesResult.runtimes.length }}</span>
-          <span class="stat-card-label">Runtimes</span>
-        </div>
-        <div class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ formatSize(packagesResult.total_size) }}</span>
-          <span class="stat-card-label">Total disk usage</span>
-        </div>
+        <StatCard :value="String(packagesResult.managers.length)" label="Package managers" />
+        <StatCard :value="String(packagesResult.runtimes.length)" label="Runtimes" />
+        <StatCard :value="formatSize(packagesResult.total_size)" label="Total disk usage" />
       </div>
 
       <!-- Package Managers -->
@@ -289,29 +281,6 @@ const totalRuntimeSize = computed(() =>
   flex-wrap: wrap;
 }
 
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--sp-3) var(--sp-4);
-  min-width: 100px;
-  flex: 1;
-}
-
-.stat-card-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-
-.stat-card-label {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
 /* Sections */
 .section {

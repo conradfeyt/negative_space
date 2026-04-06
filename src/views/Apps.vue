@@ -12,6 +12,7 @@ import {
   hasFullDiskAccess,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import StatCard from "../components/StatCard.vue";
 
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
@@ -138,26 +139,11 @@ function sourceLabel(source: string): string {
     <template v-else-if="apps.length > 0">
       <!-- Summary stats -->
       <div class="stats-row">
-        <div class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ apps.length }}</span>
-          <span class="stat-card-label">Apps found</span>
-        </div>
-        <div class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ formatSize(totalFootprint) }}</span>
-          <span class="stat-card-label">Total footprint</span>
-        </div>
-        <div v-if="totalLeftovers > 0" class="stat-card card-flush">
-          <span class="stat-card-value mono stat-warning">{{ formatSize(totalLeftovers) }}</span>
-          <span class="stat-card-label">Leftover data</span>
-        </div>
-        <div v-if="homebrewCount > 0" class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ homebrewCount }}</span>
-          <span class="stat-card-label">via Homebrew</span>
-        </div>
-        <div v-if="appStoreCount > 0" class="stat-card card-flush">
-          <span class="stat-card-value mono">{{ appStoreCount }}</span>
-          <span class="stat-card-label">via App Store</span>
-        </div>
+        <StatCard :value="String(apps.length)" label="Apps found" />
+        <StatCard :value="formatSize(totalFootprint)" label="Total footprint" />
+        <StatCard v-if="totalLeftovers > 0" :value="formatSize(totalLeftovers)" label="Leftover data" value-color="var(--warning)" />
+        <StatCard v-if="homebrewCount > 0" :value="String(homebrewCount)" label="via Homebrew" />
+        <StatCard v-if="appStoreCount > 0" :value="String(appStoreCount)" label="via App Store" />
       </div>
 
       <!-- Search -->
@@ -322,33 +308,6 @@ function sourceLabel(source: string): string {
   flex-wrap: wrap;
 }
 
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--sp-3) var(--sp-4);
-  min-width: 100px;
-  flex: 1;
-}
-
-.stat-card-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-
-.stat-card-label {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.stat-warning {
-  color: var(--warning);
-}
 
 /* Search bar */
 .search-bar {

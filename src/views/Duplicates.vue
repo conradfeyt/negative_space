@@ -18,6 +18,7 @@ import {
   previewFile,
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
+import StatCard from "../components/StatCard.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
   useDuplicateFilters,
@@ -351,30 +352,10 @@ function shortPath(p: string): string {
     <template v-else-if="duplicateResult && duplicateResult.groups.length > 0">
       <!-- Scan stats -->
       <div class="stats-bar">
-        <div class="stat">
-          <span class="stat-value">
-            {{ duplicateResult.files_scanned.toLocaleString() }}
-          </span>
-          <span class="stat-label">files scanned</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">
-            {{ duplicateResult.groups.length }}
-          </span>
-          <span class="stat-label">duplicate groups</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">
-            {{ duplicateResult.total_duplicate_files }}
-          </span>
-          <span class="stat-label">duplicate files</span>
-        </div>
-        <div class="stat stat-highlight">
-          <span class="stat-value">
-            {{ formatSize(duplicateResult.total_wasted_bytes) }}
-          </span>
-          <span class="stat-label">wasted space</span>
-        </div>
+        <StatCard :value="duplicateResult.files_scanned.toLocaleString()" label="files scanned" />
+        <StatCard :value="String(duplicateResult.groups.length)" label="duplicate groups" />
+        <StatCard :value="String(duplicateResult.total_duplicate_files)" label="duplicate files" />
+        <StatCard :value="formatSize(duplicateResult.total_wasted_bytes)" label="wasted space" highlight />
       </div>
 
       <!-- Skipped paths -->
@@ -580,22 +561,10 @@ function shortPath(p: string): string {
       <!-- Results -->
       <template v-else-if="similarResult && similarResult.groups.length > 0">
         <div class="stats-bar">
-          <div class="stat">
-            <span class="stat-value">{{ similarResult.images_scanned.toLocaleString() }}</span>
-            <span class="stat-label">images scanned</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ similarResult.groups.length }}</span>
-            <span class="stat-label">similar groups</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ similarResult.total_similar_files }}</span>
-            <span class="stat-label">similar files</span>
-          </div>
-          <div class="stat stat-highlight">
-            <span class="stat-value">{{ formatSize(similarResult.total_wasted_bytes) }}</span>
-            <span class="stat-label">reclaimable</span>
-          </div>
+          <StatCard :value="similarResult.images_scanned.toLocaleString()" label="images scanned" />
+          <StatCard :value="String(similarResult.groups.length)" label="similar groups" />
+          <StatCard :value="String(similarResult.total_similar_files)" label="similar files" />
+          <StatCard :value="formatSize(similarResult.total_wasted_bytes)" label="reclaimable" highlight />
         </div>
 
         <!-- Batch actions -->
@@ -861,37 +830,6 @@ function shortPath(p: string): string {
   margin-bottom: var(--sp-4);
 }
 
-.stat {
-  flex: 1;
-  background: var(--glass);
-  border-radius: var(--radius-md);
-  padding: 14px var(--sp-4);
-  box-shadow: var(--shadow-sm);
-  text-align: center;
-}
-
-.stat-highlight {
-  border: 1px solid var(--accent);
-  background: var(--accent-glow);
-}
-
-.stat-value {
-  display: block;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.stat-highlight .stat-value {
-  color: var(--accent);
-}
-
-.stat-label {
-  display: block;
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
 
 .skipped-note {
   font-size: 12px;

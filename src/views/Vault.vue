@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { formatSize } from "../utils";
 import Toast from "../components/Toast.vue";
+import StatCard from "../components/StatCard.vue";
 import {
   vaultSummary,
   vaultEntries,
@@ -183,18 +184,9 @@ onMounted(loadVaultSummary);
 
     <!-- Vault Summary -->
     <div v-if="vaultSummary && vaultSummary.file_count > 0" class="vault-summary">
-      <div class="summary-stat">
-        <span class="summary-stat-value">{{ vaultSummary.file_count }}</span>
-        <span class="summary-stat-label">Archived</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-stat-value">{{ formatSize(vaultSummary.total_savings) }}</span>
-        <span class="summary-stat-label">Saved</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-stat-value">{{ formatSize(vaultSummary.total_compressed_size) }}</span>
-        <span class="summary-stat-label">Vault Size</span>
-      </div>
+      <StatCard :value="String(vaultSummary.file_count)" label="Archived" />
+      <StatCard :value="formatSize(vaultSummary.total_savings)" label="Saved" />
+      <StatCard :value="formatSize(vaultSummary.total_compressed_size)" label="Vault Size" />
     </div>
 
     <!-- ================================================================
@@ -509,32 +501,6 @@ onMounted(loadVaultSummary);
   margin-bottom: var(--sp-6);
 }
 
-.summary-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 14px 12px;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.summary-stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.summary-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
 /* Sections */
 .section {

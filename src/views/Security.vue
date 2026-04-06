@@ -10,6 +10,7 @@ import {
   disableLaunchItem,
   removeLaunchItem,
 } from "../stores/scanStore";
+import StatCard from "../components/StatCard.vue";
 
 type SectionId = "launch" | "trust" | "shell";
 
@@ -175,26 +176,11 @@ async function handleRemove(item: LaunchItem) {
     <template v-else-if="securityScanned && securityResult">
       <!-- Summary Cards -->
       <div class="summary-row">
-        <div class="summary-card">
-          <span class="summary-count">{{ securityResult.summary.total_findings }}</span>
-          <span class="summary-label text-muted">Total Findings</span>
-        </div>
-        <div class="summary-card summary-malicious">
-          <span class="summary-count">{{ securityResult.summary.malicious }}</span>
-          <span class="summary-label">Malicious</span>
-        </div>
-        <div class="summary-card summary-unwanted">
-          <span class="summary-count">{{ securityResult.summary.likely_unwanted }}</span>
-          <span class="summary-label">Likely Unwanted</span>
-        </div>
-        <div class="summary-card summary-suspicious">
-          <span class="summary-count">{{ securityResult.summary.suspicious }}</span>
-          <span class="summary-label">Suspicious</span>
-        </div>
-        <div class="summary-card summary-info">
-          <span class="summary-count">{{ securityResult.summary.informational }}</span>
-          <span class="summary-label">Informational</span>
-        </div>
+        <StatCard :value="String(securityResult.summary.total_findings)" label="Total Findings" />
+        <StatCard :value="String(securityResult.summary.malicious)" label="Malicious" border-color="var(--danger-text)" value-color="var(--danger-text)" label-color="var(--danger-text)" />
+        <StatCard :value="String(securityResult.summary.likely_unwanted)" label="Likely Unwanted" border-color="var(--warning-text)" value-color="var(--warning-text)" label-color="var(--warning-text)" />
+        <StatCard :value="String(securityResult.summary.suspicious)" label="Suspicious" border-color="var(--warning)" value-color="var(--warning-text)" label-color="var(--warning-text)" />
+        <StatCard :value="String(securityResult.summary.informational)" label="Informational" border-color="var(--accent)" value-color="var(--info-text)" label-color="var(--info-text)" />
       </div>
 
       <!-- Launch Items Section -->
@@ -500,83 +486,6 @@ async function handleRemove(item: LaunchItem) {
   margin-bottom: var(--sp-6);
 }
 
-.summary-card {
-  flex: 1;
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-1);
-  transition: box-shadow 0.2s ease;
-}
-
-.summary-card:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.summary-count {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.summary-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.summary-malicious {
-  border-bottom: 3px solid var(--danger-text);
-}
-
-.summary-malicious .summary-count {
-  color: var(--danger-text);
-}
-
-.summary-malicious .summary-label {
-  color: var(--danger-text);
-}
-
-.summary-unwanted {
-  border-bottom: 3px solid var(--warning-text);
-}
-
-.summary-unwanted .summary-count {
-  color: var(--warning-text);
-}
-
-.summary-unwanted .summary-label {
-  color: var(--warning-text);
-}
-
-.summary-suspicious {
-  border-bottom: 3px solid var(--warning);
-}
-
-.summary-suspicious .summary-count {
-  color: var(--warning-text);
-}
-
-.summary-suspicious .summary-label {
-  color: var(--warning-text);
-}
-
-.summary-info {
-  border-bottom: 3px solid var(--accent);
-}
-
-.summary-info .summary-count {
-  color: var(--info-text);
-}
-
-.summary-info .summary-label {
-  color: var(--info-text);
-}
 
 /* Sections */
 .section {
