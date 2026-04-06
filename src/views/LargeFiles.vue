@@ -22,6 +22,8 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
+import SegmentedControl from "../components/SegmentedControl.vue";
+import type { SegmentOption } from "../components/SegmentedControl.vue";
 import {
   useFileGrouping,
   collectFiles,
@@ -48,6 +50,18 @@ const {
   files: largeFiles,
   getClassification: (path: string) => fileClassifications.value.get(path),
   isVaulted,
+});
+
+const sortOptions = computed<SegmentOption[]>(() => {
+  const opts: SegmentOption[] = [
+    { value: "size", label: "Size" },
+    { value: "directory", label: "Directory" },
+  ];
+  if (fileClassifications.value.size > 0) {
+    opts.push({ value: "safety", label: "Safety" });
+  }
+  opts.push({ value: "type", label: "Type" });
+  return opts;
 });
 
 async function scan() {
@@ -395,12 +409,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
           </span>
         </div>
         <div class="results-actions">
-          <div class="sort-toggle">
-            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'size' }" @click="sortMode = 'size'">Size</button>
-            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'directory' }" @click="sortMode = 'directory'">Directory</button>
-            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'safety' }" @click="sortMode = 'safety'" v-if="fileClassifications.size > 0">Safety</button>
-            <button class="sort-btn" :class="{ 'sort-btn--active': sortMode === 'type' }" @click="sortMode = 'type'">Type</button>
-          </div>
+          <SegmentedControl
+            :options="sortOptions"
+            v-model="sortMode"
+          />
           <button class="btn-secondary protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Protect
@@ -927,36 +939,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 /* ---- Sort toggle ---- */
-.sort-toggle {
-  display: flex;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.sort-btn {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 5px 14px;
-  border-radius: 0;
-  background: rgba(255, 255, 255, 0.3);
-  color: var(--text-secondary);
-  border: none;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.sort-btn:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.sort-btn--active {
-  background: var(--accent);
-  color: white;
-}
-
-.sort-btn--active:hover {
-  background: var(--accent-hover);
-}
 
 /* ---- Category group ---- */
 .file-group {

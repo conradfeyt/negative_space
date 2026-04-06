@@ -20,6 +20,8 @@ import {
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
+import SegmentedControl from "../components/SegmentedControl.vue";
+import type { SegmentOption } from "../components/SegmentedControl.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
   useDuplicateFilters,
@@ -83,6 +85,15 @@ const {
   filteredGroups,
 } = useDuplicateFilters(duplicateResult);
 
+const ALL_KINDS: FileKind[] = ["all", "images", "documents", "audio", "video", "archives", "code", "other"];
+
+const kindOptions = computed<SegmentOption[]>(() =>
+  ALL_KINDS.map((kind) => ({
+    value: kind,
+    label: KIND_LABELS[kind],
+    disabled: kind !== "all" && !kindCounts.value[kind],
+  }))
+);
 
 // File icon cache (same pattern as LargeFiles)
 const fileIconCache = ref<Record<string, string>>({});
@@ -366,18 +377,25 @@ function shortPath(p: string): string {
 
       <!-- Kind filter pills -->
       <div class="kind-filter-bar">
-        <button
-          v-for="kind in (['all', 'images', 'documents', 'audio', 'video', 'archives', 'code', 'other'] as FileKind[])"
-          :key="kind"
-          class="kind-pill"
-          :class="{ active: activeKindFilter === kind, empty: kind !== 'all' && !kindCounts[kind] }"
-          @click="activeKindFilter = kind"
-          :disabled="kind !== 'all' && !kindCounts[kind]"
+        <SegmentedControl
+          :options="kindOptions"
+          v-model="activeKindFilter"
+          pill
         >
-          {{ KIND_LABELS[kind] }}
-          <span v-if="kind !== 'all' && kindCounts[kind]" class="kind-count">{{ kindCounts[kind].groups }}</span>
-          <span v-if="kind === 'all'" class="kind-count">{{ duplicateResult!.groups.length }}</span>
-        </button>
+          <template #default="{ option, active }">
+            {{ option.label }}
+            <span
+              v-if="option.value === 'all'"
+              class="kind-count"
+              :class="{ 'kind-count--active': active }"
+            >{{ duplicateResult!.groups.length }}</span>
+            <span
+              v-else-if="kindCounts[option.value as FileKind]"
+              class="kind-count"
+              :class="{ 'kind-count--active': active }"
+            >{{ kindCounts[option.value as FileKind].groups }}</span>
+          </template>
+        </SegmentedControl>
       </div>
 
       <!-- Action bar -->
@@ -741,35 +759,6 @@ function shortPath(p: string): string {
   margin-bottom: var(--sp-3);
 }
 
-.kind-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border: none;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, opacity 0.15s;
-}
-
-.kind-pill:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.kind-pill.active {
-  background: var(--accent-glow);
-  color: var(--accent-deep);
-}
-
-.kind-pill.empty {
-  opacity: 0.35;
-  cursor: default;
-}
-
 .kind-count {
   font-size: 10px;
   font-weight: 600;
@@ -779,9 +768,9 @@ function shortPath(p: string): string {
   color: var(--muted);
 }
 
-.kind-pill.active .kind-count {
-  background: var(--accent-glow);
-  color: var(--accent-deep);
+.kind-count--active {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
 }
 
 .scan-controls {

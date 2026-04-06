@@ -10,6 +10,7 @@ import {
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
+import SegmentedControl from "../components/SegmentedControl.vue";
 
 const expandedManagers = ref<Set<string>>(new Set());
 const expandedRuntimes = ref<Set<string>>(new Set());
@@ -102,14 +103,13 @@ const totalRuntimeSize = computed(() =>
         </div>
 
         <div class="section-toolbar">
-          <button
-            :class="['filter-btn', { active: filter === 'top-level' }]"
-            @click="filter = 'top-level'"
-          >Top-level</button>
-          <button
-            :class="['filter-btn', { active: filter === 'all' }]"
-            @click="filter = 'all'"
-          >All packages</button>
+          <SegmentedControl
+            :options="[
+              { value: 'top-level', label: 'Top-level' },
+              { value: 'all', label: 'All packages' },
+            ]"
+            v-model="filter"
+          />
         </div>
 
         <div v-for="mgr in packagesResult.managers" :key="mgr.id" class="card-flush manager-card">
@@ -306,29 +306,6 @@ const totalRuntimeSize = computed(() =>
   display: flex;
   gap: 4px;
   margin-bottom: var(--sp-3);
-}
-
-.filter-btn {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, font-weight 0.15s;
-}
-
-.filter-btn.active {
-  background: rgba(59, 199, 232, 0.12);
-  border-color: rgba(59, 199, 232, 0.25);
-  color: var(--accent-deep);
-  font-weight: 600;
-}
-
-.filter-btn:hover:not(.active) {
-  background: rgba(0, 0, 0, 0.03);
 }
 
 /* Manager cards */
