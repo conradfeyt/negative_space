@@ -24,6 +24,7 @@ import {
   scanThermal,
 } from "../stores/scanStore";
 import ChipSchematic from "../components/ChipSchematic.vue";
+import LiveIndicator from "../components/LiveIndicator.vue";
 
 // ---------------------------------------------------------------------------
 // Schematic responsive width — measure container, update on resize
@@ -185,9 +186,7 @@ const orderedSummaries = computed(() => {
         <button class="btn-ghost btn-sm" @click="togglePause">
           {{ paused ? "Resume" : "Pause" }}
         </button>
-        <span v-if="lastUpdated" class="update-time text-muted">
-          Updated {{ lastUpdated.toLocaleTimeString() }}
-        </span>
+        <LiveIndicator :paused="paused" />
       </div>
     </div>
 
@@ -349,10 +348,6 @@ const orderedSummaries = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.update-time {
-  font-size: 11px;
 }
 
 /* Loading / error */

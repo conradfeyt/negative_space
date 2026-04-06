@@ -33,6 +33,7 @@ import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
 import CpuCard from "../components/CpuCard.vue";
 import MemoryCard from "../components/MemoryCard.vue";
+import LiveIndicator from "../components/LiveIndicator.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -186,10 +187,6 @@ const storageColor = computed(() => {
 const uptime = computed(() => vitalsResult.value?.load.uptime_display ?? "—");
 const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 0);
 
-const timeAgo = computed(() => {
-  if (!lastUpdated.value) return "";
-  return "Live";
-});
 </script>
 
 <template>
@@ -206,10 +203,7 @@ const timeAgo = computed(() => {
           <button class="btn-ghost btn-sm" @click="togglePause">
             {{ paused ? "Resume" : "Pause" }}
           </button>
-          <span class="live-badge" :class="{ paused }">
-            <span class="live-dot"></span>
-            {{ paused ? "Paused" : timeAgo }}
-          </span>
+          <LiveIndicator :paused="paused" />
         </div>
       </div>
     </div>
@@ -348,41 +342,6 @@ const timeAgo = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.live-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--success-text);
-  padding: 3px 10px;
-  background: var(--success-tint);
-  border-radius: var(--radius-pill);
-}
-
-.live-badge.paused {
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.live-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--success);
-  animation: pulse 2s infinite;
-}
-
-.live-badge.paused .live-dot {
-  background: var(--muted);
-  animation: none;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
 }
 
 /* ---------------------------------------------------------------------------

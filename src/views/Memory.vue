@@ -10,6 +10,7 @@ import {
 } from "../stores/scanStore";
 import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS, memoryPressureLevel } from "../utils";
 import EmptyState from "../components/EmptyState.vue";
+import LiveIndicator from "../components/LiveIndicator.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh
@@ -92,31 +93,6 @@ function formatPercent(pct: number): string {
   return pct.toFixed(1) + "%";
 }
 
-function timeAgo(d: Date | null): string {
-  if (!d) return "";
-  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 2) return "just now";
-  if (sec < 60) return `${sec}s ago`;
-  return `${Math.floor(sec / 60)}m ago`;
-}
-
-// Re-compute "time ago" string every second
-const timeAgoStr = ref("");
-let clockTimer: ReturnType<typeof setInterval> | null = null;
-function startClock() {
-  if (clockTimer) return;
-  clockTimer = setInterval(() => {
-    timeAgoStr.value = timeAgo(lastUpdated.value);
-  }, 1000);
-}
-function stopClock() {
-  if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
-}
-onMounted(() => startClock());
-onActivated(() => startClock());
-onDeactivated(() => stopClock());
-onUnmounted(() => stopClock());
-
 // Memory bar segments
 const memoryBarSegments = computed(() => {
   if (!memoryResult.value) return [];
@@ -158,28 +134,11 @@ const sortedGroups = computed((): ProcessGroup[] => {
           Live process memory usage and system memory breakdown
         </p>
       </div>
-      <div class="header-controls">
-        <div class="live-indicator" v-if="memoryResult">
-          <span :class="['live-dot', { paused: paused }]"></span>
-          <span class="live-label">{{ paused ? "Paused" : "Live" }}</span>
-          <span class="live-updated text-muted" v-if="timeAgoStr">{{ timeAgoStr }}</span>
-        </div>
-        <button
-          :class="['btn-pause', { active: paused }]"
-          @click="togglePause"
-          v-if="memoryResult"
-          :title="paused ? 'Resume live updates' : 'Pause live updates'"
-        >
-          <!-- Pause icon -->
-          <svg v-if="!paused" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="4" width="4" height="16" rx="1"/>
-            <rect x="14" y="4" width="4" height="16" rx="1"/>
-          </svg>
-          <!-- Play icon -->
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="6,4 20,12 6,20"/>
-          </svg>
+      <div class="header-actions" v-if="memoryResult">
+        <button class="btn-ghost btn-sm" @click="togglePause">
+          {{ paused ? "Resume" : "Pause" }}
         </button>
+        <LiveIndicator :paused="paused" />
       </div>
     </div>
 
@@ -308,79 +267,17 @@ const sortedGroups = computed((): ProcessGroup[] => {
   max-width: 1440px;
 }
 
-/* Header layout — extends global .view-header with flex for controls */
+/* Header layout */
 .view-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
 }
 
-/* Header controls — live indicator + pause button */
-.header-controls {
+.header-actions {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-}
-
-.live-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: 12px;
-}
-
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.live-dot.paused {
-  background: var(--muted);
-  animation: none;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.live-label {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.live-updated {
-  font-size: 11px;
-}
-
-.btn-pause {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--sp-2);
-  background: var(--surface);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  padding: 0;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.btn-pause:hover {
-  background: var(--accent-light);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.btn-pause.active {
-  background: var(--accent-light);
-  border-color: var(--accent);
-  color: var(--accent);
+  gap: 10px;
 }
 
 .scanning-state {

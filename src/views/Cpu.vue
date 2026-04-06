@@ -20,6 +20,7 @@ import {
   quitProcessGroup,
 } from "../stores/scanStore";
 import { formatSize, cpuLoadClass } from "../utils";
+import LiveIndicator from "../components/LiveIndicator.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -78,12 +79,6 @@ const idleApps = computed(() => {
   return vitalsResult.value.groups
     .filter(g => g.likely_idle && g.total_rss_bytes > 100 * 1024 * 1024)
     .sort((a, b) => b.total_rss_bytes - a.total_rss_bytes);
-});
-
-const timeAgo = computed(() => {
-  if (!lastUpdated.value) return "";
-  const s = Math.round((Date.now() - lastUpdated.value.getTime()) / 1000);
-  return s < 2 ? "just now" : `${s}s ago`;
 });
 
 // ---------------------------------------------------------------------------
@@ -145,10 +140,7 @@ function fmtCpu(pct: number): string {
           <button class="btn-ghost btn-sm" @click="togglePause">
             {{ paused ? "Resume" : "Pause" }}
           </button>
-          <span class="live-badge" :class="{ paused }">
-            <span class="live-dot"></span>
-            {{ paused ? "Paused" : timeAgo }}
-          </span>
+          <LiveIndicator :paused="paused" />
         </div>
       </div>
     </div>
@@ -298,41 +290,6 @@ function fmtCpu(pct: number): string {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.live-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--success-text);
-  padding: 3px 10px;
-  background: var(--success-tint);
-  border-radius: var(--radius-pill);
-}
-
-.live-badge.paused {
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.live-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--success);
-  animation: pulse 2s infinite;
-}
-
-.live-badge.paused .live-dot {
-  background: var(--muted);
-  animation: none;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
 }
 
 /* Summary bar */
