@@ -244,7 +244,7 @@ const timeAgo = computed(() => {
               </div>
               <div class="thermal-source" v-if="hottestName">{{ hottestName }}</div>
               <div class="thermal-state">
-                <span class="thermal-dot" :style="{ background: thermalColor }"></span>
+                <span class="status-dot" :style="{ background: thermalColor }"></span>
                 {{ thermalLabel }}
               </div>
             </div>
@@ -479,13 +479,6 @@ const timeAgo = computed(() => {
   font-weight: 500;
   color: var(--text-secondary);
   margin-top: 6px;
-}
-
-.thermal-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 /* Thermal bars now in ThermalCard.vue */

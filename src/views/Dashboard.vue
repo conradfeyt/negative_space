@@ -383,7 +383,7 @@ onUnmounted(() => stopPolling());
         </div>
         <div class="stat-hero" v-else :style="{ color: thermalColor }">{{ thermalLabel }}</div>
         <div class="thermal-meta">
-          <span class="thermal-dot" :style="{ background: thermalColor }"></span>
+          <span class="status-dot" :style="{ background: thermalColor }"></span>
           <span>{{ thermalLabel }}</span>
           <span v-if="hottestName" class="thermal-source">{{ hottestName }}</span>
         </div>
@@ -848,7 +848,7 @@ onUnmounted(() => stopPolling());
 .thermal-meta { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 500; color: var(--text-secondary); margin-top: 2px; }
 .thermal-source { color: var(--muted); }
 .thermal-source::before { content: "\00b7"; margin-right: 5px; }
-.thermal-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+/* status-dot now in style.css */
 /* Thermal strips now in ThermalCard.vue */
 
 /* CPU */

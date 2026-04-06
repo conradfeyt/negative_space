@@ -88,7 +88,7 @@ const batteryConditionClass = computed(() => {
     </span>
     <span class="bat-meta-divider"></span>
     <span class="bat-meta-item">
-      <span :class="['thermal-dot', batteryConditionClass]"></span>
+      <span :class="['status-dot', batteryConditionClass]"></span>
       <span class="bat-meta-value">{{ battery.condition }}</span>
     </span>
   </div>
@@ -149,7 +149,7 @@ const batteryConditionClass = computed(() => {
   font-weight: 500;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 .bat-meta-value {
@@ -164,10 +164,5 @@ const batteryConditionClass = computed(() => {
   background: rgba(0, 0, 0, 0.08);
 }
 
-.thermal-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+/* status-dot base + dot-success/warning/danger now in style.css */
 </style>

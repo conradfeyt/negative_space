@@ -165,6 +165,35 @@
   --kind-video: #27AE60;
   --kind-default: #95A5A6;
 
+  /* --- Vault feature --- */
+  --vault: hsla(280, 40%, 50%, 1);
+  --vault-tint: hsla(280, 30%, 70%, 0.08);
+  --vault-text: hsla(280, 40%, 45%, 0.9);
+  --vault-muted: hsla(280, 30%, 30%, 0.7);
+  --vault-border: hsla(280, 40%, 60%, 0.15);
+
+  /* --- File protection --- */
+  --protect-green: hsla(145, 55%, 45%, 1);
+
+  /* --- Thermal scale --- */
+  --temp-cool: hsla(195, 40%, 40%, 1);
+  --temp-warm: hsla(40, 50%, 40%, 1);
+  --temp-hot: hsla(25, 45%, 40%, 1);
+  --temp-critical: hsla(0, 45%, 42%, 1);
+
+  /* --- Source badges (extended) --- */
+  --source-appstore: #2563eb;
+  --source-appstore-tint: rgba(59, 130, 246, 0.12);
+
+  /* --- Viz dark canvas --- */
+  --viz-dark-base: rgba(15, 18, 45, 1);
+  --viz-dark-fill: rgba(22, 28, 58, 1);
+  --viz-stroke: rgba(12, 16, 42, 0.82);
+
+  /* --- Small radii --- */
+  --radius-xs: 6px;
+  --radius-2xs: 4px;
+
   /* Legacy aliases */
   --content-bg: var(--app-bg);
   --card-bg: var(--surface);
@@ -234,7 +263,7 @@ button {
   font-size: 13px;
   font-weight: 500;
   border-radius: var(--radius-sm);
-  padding: 9px 18px;
+  padding: 8px 20px;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, color 0.2s ease;
   letter-spacing: -0.1px;
 }
@@ -303,22 +332,38 @@ button {
   transform: scale(0.98);
 }
 
+.btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Ghost / text button */
 .btn-ghost {
   background: transparent;
   color: var(--accent);
-  padding: 7px 14px;
+  padding: 8px 12px;
 }
 
 .btn-ghost:hover {
   background: var(--accent-light);
 }
 
+.btn-ghost:active {
+  transform: scale(0.98);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Small button variant */
 .btn-sm {
   font-size: 12px;
-  padding: 6px 14px;
-  border-radius: 10px;
+  padding: 4px 12px;
+  border-radius: var(--radius-xs);
 }
 
 /* Scan button — used across many views */
@@ -338,7 +383,7 @@ input {
   font-size: 13px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 9px 14px;
+  padding: 8px 16px;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
   background: rgba(255, 255, 255, 0.5);
@@ -356,7 +401,7 @@ select {
   font-size: 12px;
   padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.5);
   color: var(--text);
   cursor: pointer;
@@ -495,10 +540,31 @@ tr:last-child td {
   font-size: 10px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
+
+/* --------------------------------------------------------------------------
+   7b. Status dots — small colored circles for state indication
+   -------------------------------------------------------------------------- */
+.status-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot--success { background: var(--success); }
+.status-dot--warning { background: var(--warning); }
+.status-dot--danger  { background: var(--danger); }
+.status-dot--accent  { background: var(--accent); }
+.status-dot--muted   { background: var(--muted); }
+
+/* Aliases for backward compatibility (used by MemoryCard, BatteryCard) */
+.dot-success { background: var(--success); }
+.dot-warning { background: var(--warning); }
+.dot-danger  { background: var(--danger); }
 
 /* --------------------------------------------------------------------------
    8. Spinner
@@ -590,7 +656,7 @@ tr:last-child td {
   background: var(--success-tint);
   border: 1px solid rgba(30, 142, 90, 0.12);
   color: var(--success-text);
-  padding: 14px 18px;
+  padding: 12px 20px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
@@ -602,7 +668,7 @@ tr:last-child td {
   background: var(--danger-tint);
   border: 1px solid rgba(217, 75, 75, 0.12);
   color: var(--danger-text);
-  padding: 14px 18px;
+  padding: 12px 20px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
@@ -855,6 +921,7 @@ tr:last-child td {
 /* --------------------------------------------------------------------------
    Keyboard focus indicators (a11y)
    -------------------------------------------------------------------------- */
+button:focus-visible,
 [tabindex="0"]:focus-visible,
 [role="button"]:focus-visible {
   outline: 2px solid var(--accent);

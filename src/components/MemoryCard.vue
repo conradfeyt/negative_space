@@ -87,7 +87,7 @@ const memPressure = computed(() => {
     </span>
   </div>
   <div class="mem-pressure-row">
-    <span :class="['thermal-dot', memPressure.class]"></span>
+    <span :class="['status-dot', memPressure.class]"></span>
     {{ memPressure.label }} pressure
   </div>
 </template>
@@ -164,10 +164,5 @@ const memPressure = computed(() => {
   color: var(--text-secondary);
 }
 
-.thermal-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+/* status-dot base + dot-success/warning/danger now in style.css */
 </style>
