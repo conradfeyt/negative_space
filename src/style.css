@@ -397,6 +397,38 @@ button {
   background: rgba(0, 0, 0, 0.06);
 }
 
+/* Reveal in Finder — small icon button (used by LargeFiles, SpaceMap) */
+.btn-reveal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-reveal svg,
+.btn-reveal img {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-reveal:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.btn-reveal:active {
+  transform: scale(0.92);
+}
+
 /* --------------------------------------------------------------------------
    4. Inputs — glassy
    -------------------------------------------------------------------------- */

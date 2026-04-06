@@ -1158,7 +1158,7 @@ onBeforeUnmount(() => {
             <div class="dir-row-right">
               <button
                 v-if="child.path"
-                class="dir-reveal-btn"
+                class="btn-reveal"
                 @click="revealInFinder(child.path)"
                 title="Reveal in Finder"
               >
@@ -1594,26 +1594,7 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 
-/* dir-reveal-btn in the directory list */
-.dir-reveal-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 0.12s, background 0.12s;
-  flex-shrink: 0;
-}
-
-.dir-reveal-btn:hover {
-  color: var(--accent);
-  background: var(--accent-light);
-}
+/* btn-reveal uses global .btn-reveal from style.css */
 
 /* ---- Tooltip ---- */
 .sunburst-tooltip {

@@ -448,7 +448,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
             <span class="vault-badge">Vaulted</span>
             <span class="vault-file-name">{{ vaultDisplayName(file.name) }}</span>
             <span class="vault-file-size mono">{{ formatSize(diskSize(file)) }}</span>
-            <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+            <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
               <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
             </button>
           </div>
@@ -517,7 +517,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
               </div>
-              <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+              <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
               <div class="file-row-check">
@@ -678,7 +678,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           </div>
                                           <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-                                          <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+                                          <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                             <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                                           </button>
                                         </div>
@@ -716,7 +716,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       </div>
                                       <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-                                      <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+                                      <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                         <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                                       </button>
                                     </div>
@@ -756,7 +756,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               </div>
                               <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-                              <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+                              <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                               </button>
                             </div>
@@ -796,7 +796,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       </div>
                       <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
-                      <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+                      <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                         <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
                       </button>
                     </div>
@@ -837,7 +837,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
               </div>
-              <button class="reveal-btn" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+              <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
               <div class="file-row-check">
@@ -1122,7 +1122,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: none;
 }
 
-.file-row--tree .reveal-btn {
+.file-row--tree .btn-reveal {
   grid-column: 4;
 }
 
@@ -1490,42 +1490,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   opacity: 1;
 }
 
-/* ---- Reveal in Finder button ---- */
-.reveal-btn {
+/* ---- Reveal in Finder button (LargeFiles-specific grid + hover-reveal) ---- */
+.btn-reveal {
   grid-column: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
   opacity: 0;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s;
-  flex-shrink: 0;
 }
 
-.reveal-btn svg,
-.reveal-btn img {
-  width: 16px;
-  height: 16px;
-}
-
-.file-row:hover .reveal-btn {
+.file-row:hover .btn-reveal {
   opacity: 0.8;
 }
 
-.reveal-btn:hover {
-  background: rgba(255, 255, 255, 0.5);
+.file-row .btn-reveal:hover {
   opacity: 1;
-}
-
-.reveal-btn:active {
-  transform: scale(0.92);
 }
 
 .file-list-indented { padding-left: var(--sp-5); }
