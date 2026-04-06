@@ -178,10 +178,10 @@ async function handleRemove(item: LaunchItem) {
       <!-- Summary Cards -->
       <div class="summary-row">
         <StatCard :value="String(securityResult.summary.total_findings)" label="Total Findings" />
-        <StatCard :value="String(securityResult.summary.malicious)" label="Malicious" border-color="var(--danger-text)" value-color="var(--danger-text)" label-color="var(--danger-text)" />
-        <StatCard :value="String(securityResult.summary.likely_unwanted)" label="Likely Unwanted" border-color="var(--warning-text)" value-color="var(--warning-text)" label-color="var(--warning-text)" />
-        <StatCard :value="String(securityResult.summary.suspicious)" label="Suspicious" border-color="var(--warning)" value-color="var(--warning-text)" label-color="var(--warning-text)" />
-        <StatCard :value="String(securityResult.summary.informational)" label="Informational" border-color="var(--accent)" value-color="var(--info-text)" label-color="var(--info-text)" />
+        <StatCard :value="String(securityResult.summary.malicious)" label="Malicious" value-color="var(--danger-text)" label-color="var(--danger-text)" />
+        <StatCard :value="String(securityResult.summary.likely_unwanted)" label="Likely Unwanted" value-color="var(--warning-text)" label-color="var(--warning-text)" />
+        <StatCard :value="String(securityResult.summary.suspicious)" label="Suspicious" value-color="var(--warning-text)" label-color="var(--warning-text)" />
+        <StatCard :value="String(securityResult.summary.informational)" label="Informational" value-color="var(--info-text)" label-color="var(--info-text)" />
       </div>
 
       <!-- Launch Items Section -->

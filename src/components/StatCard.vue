@@ -5,7 +5,6 @@ defineProps<{
   highlight?: boolean
   valueColor?: string
   labelColor?: string
-  borderColor?: string
 }>()
 </script>
 
@@ -13,7 +12,6 @@ defineProps<{
   <div
     class="stat-card"
     :class="{ 'stat-card--highlight': highlight }"
-    :style="borderColor ? { borderBottom: `3px solid ${borderColor}` } : undefined"
   >
     <span
       class="stat-card__value"
@@ -52,11 +50,6 @@ defineProps<{
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-top: 2px;
-}
-
-.stat-card--highlight {
-  border: 1px solid var(--accent);
-  background: var(--accent-glow);
 }
 
 .stat-card--highlight .stat-card__value {

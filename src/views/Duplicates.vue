@@ -797,7 +797,7 @@ function shortPath(p: string): string {
 }
 
 .group-card {
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--glass);
   border-radius: var(--radius-lg, 16px);
   border: 1px solid rgba(0, 0, 0, 0.06);
   overflow: hidden;

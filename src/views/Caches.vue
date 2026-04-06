@@ -272,7 +272,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
 }
 
 .cache-category {
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--glass);
   border-radius: var(--radius-md);
   border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;

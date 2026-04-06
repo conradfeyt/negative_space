@@ -357,14 +357,9 @@ const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 
 .stat-card {
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 0.5px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    0 0.5px 0 0 rgba(255, 255, 255, 0.7) inset,
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 12px rgba(0, 0, 0, 0.03);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -529,8 +524,8 @@ const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 
   gap: 16px;
   padding: 10px 16px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.3);
-  border: 0.5px solid rgba(255, 255, 255, 0.4);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   margin-bottom: var(--sp-6);
 }
 

@@ -782,14 +782,9 @@ onUnmounted(() => stopPolling());
 .stat-card {
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 0.5px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    0 0.5px 0 0 rgba(255, 255, 255, 0.7) inset,
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 12px rgba(0, 0, 0, 0.03);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -800,10 +795,7 @@ onUnmounted(() => stopPolling());
 }
 
 .stat-card:hover {
-  box-shadow:
-    0 0.5px 0 0 rgba(255, 255, 255, 0.7) inset,
-    0 2px 6px rgba(0, 0, 0, 0.06),
-    0 8px 20px rgba(0, 0, 0, 0.05);
+  background: var(--glass-hover);
 }
 
 .stat-label {
@@ -919,7 +911,7 @@ onUnmounted(() => stopPolling());
 /* ======================================================================
    Info strip
    ====================================================================== */
-.info-strip { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.3); border: 0.5px solid rgba(255, 255, 255, 0.4); margin-bottom: var(--sp-6); }
+.info-strip { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: var(--radius-sm); background: var(--glass); border: 1px solid var(--glass-border); margin-bottom: var(--sp-6); }
 .info-strip-item { display: flex; align-items: baseline; gap: 6px; }
 .info-strip-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .info-strip-value { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -931,8 +923,8 @@ onUnmounted(() => stopPolling());
 .ai-summary-card {
   padding: 14px 18px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.35);
-  border: 0.5px solid rgba(255, 255, 255, 0.45);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   margin-bottom: var(--sp-6);
   display: flex;
   align-items: flex-start;

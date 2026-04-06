@@ -15,15 +15,15 @@
   --app-bg-gradient: transparent;
 
   /* --- Glass surfaces (more opaque cards on native vibrancy) --- */
-  --glass: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.80);
-  --glass-hover: rgba(255, 255, 255, 0.82);
+  --glass: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-hover: rgba(255, 255, 255, 0.55);
   --glass-strong: rgba(255, 255, 255, 0.88);
   --glass-blur: 20px;
   --glass-blur-heavy: 32px;
 
   /* --- Surfaces --- */
-  --surface: rgba(255, 255, 255, 0.75);
+  --surface: rgba(255, 255, 255, 0.45);
   --surface-alt: rgba(248, 250, 252, 0.60);
   --surface-hover: rgba(255, 255, 255, 0.85);
 

@@ -299,8 +299,8 @@ function fmtCpu(pct: number): string {
   margin-bottom: var(--sp-6);
   padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.35);
-  border: 0.5px solid rgba(255, 255, 255, 0.45);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
 }
 
 .summary-item {
@@ -350,8 +350,8 @@ function fmtCpu(pct: number): string {
 .hog-card {
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.32);
-  border: 0.5px solid rgba(255, 255, 255, 0.45);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
@@ -547,8 +547,8 @@ function fmtCpu(pct: number): string {
   gap: 0;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.28);
-  border: 0.5px solid rgba(255, 255, 255, 0.4);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 

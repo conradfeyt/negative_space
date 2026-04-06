@@ -392,13 +392,9 @@ const orderedSummaries = computed(() => {
   margin-bottom: var(--sp-6);
   padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 0.5px solid rgba(255, 255, 255, 0.5);
-  box-shadow:
-    0 0.5px 0 0 rgba(255, 255, 255, 0.6) inset,
-    0 1px 3px rgba(0, 0, 0, 0.03);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .sensor-count {
@@ -421,20 +417,15 @@ const orderedSummaries = computed(() => {
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.35);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .summary-card:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: var(--glass-hover);
 }
 
 .sc-icon {
@@ -515,13 +506,9 @@ const orderedSummaries = computed(() => {
 .fan-card {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.35);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .fan-header {
@@ -568,6 +555,9 @@ const orderedSummaries = computed(() => {
 
 .sensor-category {
   margin-bottom: 2px;
+  background: var(--glass);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
 }
 
 .cat-header {
