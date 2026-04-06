@@ -202,7 +202,7 @@ onMounted(loadVaultSummary);
          ================================================================ -->
     <div v-if="queue.length > 0" class="section">
       <div class="section-header">
-        <h3>Compression Queue</h3>
+        <h3 class="section-title">Compression Queue</h3>
         <div class="section-actions">
           <span class="section-meta">{{ queue.length }} item(s) &middot; {{ formatSize(totalQueueSize) }}</span>
           <button class="btn-ghost btn-sm" @click="clearQueue">Clear</button>
@@ -264,7 +264,7 @@ onMounted(loadVaultSummary);
          ================================================================ -->
     <div v-if="!vaultScanning && vaultCandidates.length > 0" class="section">
       <div class="section-header">
-        <h3>Compressible Files</h3>
+        <h3 class="section-title">Compressible Files</h3>
         <span class="section-meta">{{ vaultCandidates.length }} file(s)</span>
       </div>
 
@@ -548,9 +548,8 @@ onMounted(loadVaultSummary);
   margin-bottom: var(--sp-3);
 }
 
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
+.section-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-actions {

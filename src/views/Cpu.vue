@@ -190,7 +190,7 @@ function fmtCpu(pct: number): string {
       <!-- CPU Activity -->
       <div class="section" v-if="cpuHogs.length > 0">
         <div class="section-header">
-          <h3 class="section-title">CPU Activity</h3>
+          <h3 class="section-label">CPU Activity</h3>
           <span class="section-meta">{{ cpuHogs.length }} active</span>
         </div>
 
@@ -260,7 +260,7 @@ function fmtCpu(pct: number): string {
       <!-- Idle Apps -->
       <div class="section" v-if="idleApps.length > 0">
         <div class="section-header">
-          <h3 class="section-title">Idle Apps</h3>
+          <h3 class="section-label">Idle Apps</h3>
           <span class="section-meta">{{ idleApps.length }} apps using memory</span>
         </div>
 
@@ -370,7 +370,7 @@ function fmtCpu(pct: number): string {
   margin-bottom: var(--sp-4);
 }
 
-.section-title {
+.section-label {
   font-size: 11px;
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);

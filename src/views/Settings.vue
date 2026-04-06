@@ -153,7 +153,7 @@ onMounted(() => {
     <!-- Full Disk Access status -->
     <div class="card fda-section">
       <div class="section-header">
-        <h3>Full Disk Access</h3>
+        <h3 class="section-title">Full Disk Access</h3>
         <button class="btn-secondary btn-sm" @click="checkAllAccess" :disabled="checking">
           {{ checking ? "Checking..." : "Re-check" }}
         </button>
@@ -184,7 +184,7 @@ onMounted(() => {
     <!-- Window behavior -->
     <div class="card behavior-section">
       <div class="section-header">
-        <h3>Window Drag</h3>
+        <h3 class="section-title">Window Drag</h3>
       </div>
       <p class="text-muted section-desc">
         Smooth drag keeps gradients visually anchored during movement. Native drag can feel more macOS-like but may show gradient jitter.
@@ -205,7 +205,7 @@ onMounted(() => {
     <!-- Scan Areas -->
     <div class="card areas-section">
       <div class="section-header">
-        <h3>Scan Areas</h3>
+        <h3 class="section-title">Scan Areas</h3>
         <span class="area-summary text-muted">
           {{ enabledCount }} of {{ scanAreas.length }} enabled
         </span>
@@ -255,7 +255,7 @@ onMounted(() => {
 
     <!-- Debug -->
     <div class="card mt-6">
-      <h3>Debug</h3>
+      <h3 class="section-title">Debug</h3>
       <button class="btn-secondary mt-2" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
     </div>
   </section>
@@ -273,9 +273,8 @@ onMounted(() => {
   margin-bottom: var(--sp-3);
 }
 
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
+.section-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-desc {
@@ -407,6 +406,10 @@ onMounted(() => {
 
 .area-item:last-child {
   border-bottom: none;
+}
+
+.area-item:not(.disabled):hover {
+  background: var(--surface-alt);
 }
 
 .area-item.disabled {

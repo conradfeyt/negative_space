@@ -104,7 +104,7 @@ const totalRuntimeSize = computed(() =>
       <!-- Package Managers -->
       <div v-if="packagesResult.managers.length > 0" class="section">
         <div class="section-header">
-          <h3>Package Managers</h3>
+          <h3 class="section-title">Package Managers</h3>
           <span class="section-size mono text-muted">{{ formatSize(totalManagerSize) }}</span>
         </div>
 
@@ -208,7 +208,7 @@ const totalRuntimeSize = computed(() =>
       <!-- Runtimes -->
       <div v-if="packagesResult.runtimes.length > 0" class="section">
         <div class="section-header">
-          <h3>Runtimes</h3>
+          <h3 class="section-title">Runtimes</h3>
           <span class="section-size mono text-muted">{{ formatSize(totalRuntimeSize) }}</span>
         </div>
 
@@ -325,11 +325,8 @@ const totalRuntimeSize = computed(() =>
   margin-bottom: var(--sp-3);
 }
 
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.2px;
+.section-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-size {

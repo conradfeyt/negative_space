@@ -243,7 +243,7 @@ const orderedSummaries = computed(() => {
 
       <!-- Fan status — semicircle gauge (matches Dashboard thermal gauge) -->
       <div v-if="thermalResult.fans.length > 0" class="fans-section">
-        <h3 class="section-title">Fans</h3>
+        <h3 class="section-label">Fans</h3>
         <div class="fans-grid">
           <div v-for="fan in thermalResult.fans" :key="fan.id" class="fan-card">
             <div class="fan-header">
@@ -283,7 +283,7 @@ const orderedSummaries = computed(() => {
 
       <!-- Expandable sensor list by category -->
       <div class="sensors-section">
-        <h3 class="section-title">All Sensors</h3>
+        <h3 class="section-label">All Sensors</h3>
 
         <div
           v-for="s in orderedSummaries"
@@ -502,7 +502,7 @@ const orderedSummaries = computed(() => {
   margin-bottom: var(--sp-6);
 }
 
-.section-title {
+.section-label {
   font-size: 11px;
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);

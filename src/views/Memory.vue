@@ -196,7 +196,7 @@ const sortedGroups = computed((): ProcessGroup[] => {
       <!-- System memory overview -->
       <div class="card stats-card">
         <div class="stats-header">
-          <h3>System Memory</h3>
+          <h3 class="section-title">System Memory</h3>
           <div :class="['pressure-badge', memoryPressure.class]">
             Memory Pressure: {{ memoryPressure.label }}
           </div>
@@ -400,10 +400,8 @@ const sortedGroups = computed((): ProcessGroup[] => {
   margin-bottom: var(--sp-4);
 }
 
-.stats-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
+.stats-header .section-title {
+  margin-bottom: 0;
 }
 
 .pressure-badge {

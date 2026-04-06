@@ -203,7 +203,7 @@ async function handleRemove(item: LaunchItem) {
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('launch') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
-          <h3>Launch Items</h3>
+          <h3 class="section-title">Launch Items</h3>
           <span class="badge badge-accent">
             {{ securityResult.launch_items.length }}
           </span>
@@ -317,7 +317,7 @@ async function handleRemove(item: LaunchItem) {
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('trust') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
-          <h3>App Trust</h3>
+          <h3 class="section-title">App Trust</h3>
           <span class="badge badge-accent">
             {{ securityResult.app_trust.length }}
           </span>
@@ -426,7 +426,7 @@ async function handleRemove(item: LaunchItem) {
           <span class="expand-chevron" :class="{ expanded: expandedSections.has('shell') }">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
           </span>
-          <h3>Shell Init</h3>
+          <h3 class="section-title">Shell Init</h3>
           <span class="badge badge-accent">
             {{ securityResult.shell_findings.length }}
           </span>
@@ -598,10 +598,8 @@ async function handleRemove(item: LaunchItem) {
   background: var(--surface-alt);
 }
 
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
+.section-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-body {

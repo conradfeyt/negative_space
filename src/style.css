@@ -635,6 +635,15 @@ tr:last-child td {
   align-items: flex-start;
 }
 
+/* Standard section title — used on h3 sub-headers within views */
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: var(--sp-4);
+  color: var(--text);
+  letter-spacing: -0.1px;
+}
+
 /* Loading / empty / error states */
 .loading-state {
   display: flex;
