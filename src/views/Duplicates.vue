@@ -461,7 +461,7 @@ function shortPath(p: string): string {
                 <label class="card-checkbox" @click.stop>
                   <input type="checkbox" :checked="selected.has(file.path)" @change="toggleFile(file.path)" />
                 </label>
-                <span v-if="idx === 0" class="card-badge-keep">Keep</span>
+                <span v-if="idx === 0" class="badge-pill badge-accent card-badge-keep">Keep</span>
 
                 <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
                   <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" alt="" class="card-thumb-img" />
@@ -626,7 +626,7 @@ function shortPath(p: string): string {
                   <label class="card-checkbox" @click.stop>
                     <input type="checkbox" :checked="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
                   </label>
-                  <span v-if="idx === group.representative_idx" class="card-badge-keep">Keep</span>
+                  <span v-if="idx === group.representative_idx" class="badge-pill badge-accent card-badge-keep">Keep</span>
 
                   <div class="card-face card-face--thumb">
                     <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" alt="" class="card-thumb-img" />
@@ -661,18 +661,6 @@ function shortPath(p: string): string {
   max-width: 1440px;
 }
 
-
-.badge-keep {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--accent-glow);
-  color: var(--accent);
-  margin-left: 6px;
-  vertical-align: middle;
-}
 
 .similar-progress {
   padding: var(--sp-4);
@@ -910,20 +898,12 @@ function shortPath(p: string): string {
   cursor: pointer;
 }
 
-/* Keep badge */
+/* Keep badge — positioning only; visual style from global .badge-pill .badge-accent */
 .card-badge-keep {
   position: absolute;
   top: 6px;
   right: 6px;
   z-index: 2;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(59, 199, 232, 0.85);
-  color: white;
-  letter-spacing: 0.03em;
-  backdrop-filter: blur(4px);
 }
 
 /* ── Card face (thumbnail/icon area) ───────────────────── */

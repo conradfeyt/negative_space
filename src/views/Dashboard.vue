@@ -493,7 +493,7 @@ onUnmounted(() => stopPolling());
          ================================================================ -->
     <div v-if="scanSummary && scanSummary.summary" class="ai-summary-card">
       <p class="ai-summary-text">{{ scanSummary.summary }}</p>
-      <span v-if="scanSummary.ai_generated" class="ai-badge">AI</span>
+      <span v-if="scanSummary.ai_generated" class="badge-pill badge-accent ai-badge">AI</span>
     </div>
 
     <!-- ================================================================
@@ -938,16 +938,11 @@ onUnmounted(() => stopPolling());
   flex: 1;
 }
 
+/* ai-badge: visual style from global .badge-pill .badge-accent */
 .ai-badge {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 180, 216, 0.12);
-  color: var(--accent-deep);
+  flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  flex-shrink: 0;
 }
 
 /* ======================================================================

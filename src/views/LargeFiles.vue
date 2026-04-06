@@ -102,15 +102,15 @@ function getClassification(path: string) {
   return fileClassifications.value.get(path);
 }
 
-function safetyColor(safety: string): string {
+function safetyBadgeClass(safety: string): string {
   switch (safety) {
     case "safe":
-    case "safe_stale": return "var(--success)";
-    case "safe_rebuild": return "hsla(195, 55%, 42%, 0.85)";
-    case "probably_safe": return "var(--accent)";
-    case "risky": return "var(--danger)";
-    case "vaulted": return "var(--vault)";
-    default: return "var(--muted)";
+    case "safe_stale": return "badge-success";
+    case "safe_rebuild":
+    case "probably_safe": return "badge-accent";
+    case "risky": return "badge-danger";
+    case "vaulted": return "badge-info";
+    default: return "badge-neutral";
   }
 }
 
@@ -510,7 +510,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 </div>
                 <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
-              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :data-tooltip="getClassification(file.path)?.explanation || ''" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :data-tooltip="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
@@ -676,7 +676,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                             <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                                           </div>
-                                          <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+                                          <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
                                           <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                             <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
@@ -714,7 +714,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                                       </div>
-                                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+                                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
                                       <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                         <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
@@ -754,7 +754,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                 <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                               </div>
-                              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+                              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
                               <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
@@ -794,7 +794,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                         <span v-if="isSparse(file)" class="sparse-logical text-muted">{{ formatSize(file.apparent_size) }} logical</span>
                 <span v-if="file.modified" class="file-time-ago text-muted">{{ timeAgo(file.modified) }}</span>
                       </div>
-                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+                      <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :title="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
                       <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
                         <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
@@ -830,7 +830,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 </div>
                 <div class="file-row-path">{{ parentFolder(file.path) }}</div>
               </div>
-              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="safety-pill" :data-tooltip="getClassification(file.path)?.explanation || ''" :style="{ background: safetyColor(getClassification(file.path)?.safety ?? 'unknown') }">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
+              <span v-if="getClassification(file.path) && safetyLabel(getClassification(file.path)?.safety ?? 'unknown')" class="badge safety-pill" :class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')" :data-tooltip="getClassification(file.path)?.explanation || ''">{{ safetyLabel(getClassification(file.path)?.safety ?? 'unknown') }}</span>
               <span v-else class="safety-pill-placeholder"></span>
               <div class="file-row-size mono">
                 <span class="size-value">{{ formatSize(diskSize(file)) }}</span>
@@ -1340,22 +1340,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   flex-shrink: 0;
 }
 
-.safety-badge {
-  display: none;
-}
-
 .safety-pill {
   grid-column: 3;
   justify-self: end;
   position: relative;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
-  color: white;
-  line-height: 1.4;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
   cursor: default;
 }
 

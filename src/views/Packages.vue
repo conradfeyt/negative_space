@@ -150,13 +150,13 @@ const totalRuntimeSize = computed(() =>
                   <div class="pkg-info">
                     <span class="pkg-name">{{ pkg.name }}</span>
                     <span class="pkg-version mono text-muted">{{ pkg.version }}</span>
-                    <span v-if="!pkg.is_top_level" class="dep-badge">dep</span>
+                    <span v-if="!pkg.is_top_level" class="badge-pill badge-neutral">dep</span>
                   </div>
                   <div class="pkg-right">
                     <span v-if="pkg.size > 0" class="pkg-size mono">{{ formatSize(pkg.size) }}</span>
                     <button
                       v-if="pkg.dependencies.length > 0"
-                      class="deps-toggle"
+                      class="badge-pill badge-accent deps-toggle"
                       @click.stop="toggleDeps(mgr.id + '/' + pkg.name)"
                     >
                       {{ showDeps.has(mgr.id + '/' + pkg.name) ? 'hide deps' : pkg.dependencies.length + ' deps' }}
@@ -236,7 +236,7 @@ const totalRuntimeSize = computed(() =>
               >
                 <div class="version-info">
                   <span class="version-name">{{ ver.version }}</span>
-                  <span v-if="ver.active" class="active-badge">active</span>
+                  <span v-if="ver.active" class="badge-pill badge-accent">active</span>
                 </div>
                 <div class="version-right">
                   <span v-if="ver.size > 0" class="version-size mono">{{ formatSize(ver.size) }}</span>
@@ -428,16 +428,7 @@ const totalRuntimeSize = computed(() =>
   font-size: 11px;
 }
 
-.dep-badge {
-  font-size: 9px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* dep-badge: uses global .badge-pill .badge-neutral */
 
 .pkg-right {
   display: flex;
@@ -455,20 +446,13 @@ const totalRuntimeSize = computed(() =>
 }
 
 .deps-toggle {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--accent-deep);
   cursor: pointer;
-  transition: background 0.15s;
-  white-space: nowrap;
+  border: none;
+  transition: opacity 0.15s;
 }
 
 .deps-toggle:hover {
-  background: rgba(59, 199, 232, 0.08);
+  opacity: 0.75;
 }
 
 .pkg-deps {
@@ -565,16 +549,7 @@ const totalRuntimeSize = computed(() =>
   color: var(--text);
 }
 
-.active-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: rgba(59, 199, 232, 0.12);
-  color: var(--accent-deep);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* active-badge: uses global .badge-pill .badge-accent */
 
 .version-right {
   flex-shrink: 0;

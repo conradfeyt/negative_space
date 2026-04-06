@@ -45,10 +45,10 @@ export type MemoryPressureLevel = { label: string; cssClass: string };
 
 /** Memory pressure level based on used percentage (4-tier). */
 export function memoryPressureLevel(usedPct: number): MemoryPressureLevel {
-  if (usedPct >= 90) return { label: "Critical", cssClass: "pressure-critical" };
-  if (usedPct >= 75) return { label: "High", cssClass: "pressure-high" };
-  if (usedPct >= 50) return { label: "Moderate", cssClass: "pressure-moderate" };
-  return { label: "Low", cssClass: "pressure-low" };
+  if (usedPct >= 90) return { label: "Critical", cssClass: "badge-danger" };
+  if (usedPct >= 75) return { label: "High", cssClass: "badge-danger" };
+  if (usedPct >= 50) return { label: "Moderate", cssClass: "badge-warning" };
+  return { label: "Low", cssClass: "badge-success" };
 }
 
 /** Memory pressure status-dot variant based on used percentage. */

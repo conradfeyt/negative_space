@@ -220,7 +220,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
               <span class="category-label">{{ group.label }}</span>
-              <span class="category-count text-muted">{{ group.entries.length }}</span>
+              <span class="badge-pill badge-neutral">{{ group.entries.length }}</span>
             </div>
             <div class="category-header-right">
               <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
@@ -313,12 +313,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   color: var(--text);
 }
 
-.category-count {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06);
-}
+/* category-count: uses global .badge-pill .badge-neutral */
 
 .category-header-right {
   display: flex;

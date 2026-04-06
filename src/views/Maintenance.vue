@@ -86,33 +86,33 @@ function statusLabel(status: string): string {
               <span class="task-name">{{ task.name }}</span>
               <span
                 v-if="task.requires_admin"
-                class="badge-pill badge-admin"
+                class="badge-pill badge-warning"
                 title="Requires administrator password"
               >
                 Admin
               </span>
               <span
                 v-if="task.destructive"
-                class="badge-pill badge-destructive"
+                class="badge-pill badge-danger"
                 title="Deletes or modifies data"
               >
                 Modifies data
               </span>
               <span
                 v-else
-                class="badge-pill badge-safe"
+                class="badge-pill badge-success"
               >
                 No data changed
               </span>
               <span
                 v-if="task.reversible_info"
-                class="badge-pill badge-reversible"
+                class="badge-pill badge-accent"
               >
                 Reversible
               </span>
               <span
                 v-else
-                class="badge-pill badge-not-reversible"
+                class="badge-pill badge-neutral"
               >
                 Not reversible
               </span>
@@ -312,32 +312,6 @@ function statusLabel(status: string): string {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-}
-
-/* Badge color variants (pill shape from global) */
-.badge-admin {
-  background: rgba(255, 159, 10, 0.12);
-  color: var(--warning);
-}
-
-.badge-destructive {
-  background: rgba(255, 69, 58, 0.15);
-  color: var(--danger);
-}
-
-.badge-safe {
-  background: rgba(48, 209, 88, 0.15);
-  color: var(--success);
-}
-
-.badge-reversible {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-
-.badge-not-reversible {
-  background: rgba(255, 69, 58, 0.15);
-  color: var(--muted);
 }
 
 .task-description {

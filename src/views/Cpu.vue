@@ -197,7 +197,7 @@ function fmtCpu(pct: number): string {
                 <div class="hog-name-row">
                   <span class="hog-name">{{ group.name }}</span>
                   <span class="hog-category">{{ group.category }}</span>
-                  <span class="hog-procs" v-if="group.process_count > 1">
+                  <span class="badge-pill badge-neutral" v-if="group.process_count > 1">
                     {{ group.process_count }}
                   </span>
                 </div>
@@ -393,14 +393,7 @@ function fmtCpu(pct: number): string {
   color: var(--muted);
 }
 
-.hog-procs {
-  font-size: 10px;
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 0 5px;
-  border-radius: 4px;
-  line-height: 1.6;
-}
+/* hog-procs: uses global .badge-pill .badge-neutral */
 
 .hog-metrics {
   display: flex;
