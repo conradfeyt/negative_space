@@ -7,7 +7,7 @@
  * and a pressure indicator.
  */
 import { computed } from "vue";
-import { formatSize } from "../utils";
+import { formatSize, memoryPressureDotClass, memoryPressureLevel } from "../utils";
 import type { MemoryStats } from "../types";
 
 const props = defineProps<{
@@ -24,9 +24,9 @@ const memUsedPct = computed(() => {
 const memRingSegments = computed(() => {
   const t = props.stats.total_bytes || 1;
   const segs = [
-    { label: "App", bytes: props.stats.app_bytes, color: "hsla(195, 55%, 42%, 0.75)" },
-    { label: "Wired", bytes: props.stats.wired_bytes, color: "hsla(35, 55%, 45%, 0.7)" },
-    { label: "Compressed", bytes: props.stats.compressed_bytes, color: "hsla(280, 35%, 50%, 0.65)" },
+    { label: "App", bytes: props.stats.app_bytes, color: "var(--mem-app)" },
+    { label: "Wired", bytes: props.stats.wired_bytes, color: "var(--mem-wired)" },
+    { label: "Compressed", bytes: props.stats.compressed_bytes, color: "var(--mem-compressed)" },
   ].filter(seg => seg.bytes > 0);
 
   let cumulative = 0;
@@ -48,19 +48,17 @@ const memRingSegments = computed(() => {
 const memSegments = computed(() => {
   const t = props.stats.total_bytes || 1;
   return [
-    { label: "App", bytes: props.stats.app_bytes, pct: (props.stats.app_bytes / t) * 100, color: "hsla(195, 45%, 42%, 0.65)" },
-    { label: "Wired", bytes: props.stats.wired_bytes, pct: (props.stats.wired_bytes / t) * 100, color: "hsla(35, 50%, 45%, 0.6)" },
-    { label: "Compressed", bytes: props.stats.compressed_bytes, pct: (props.stats.compressed_bytes / t) * 100, color: "hsla(280, 30%, 50%, 0.5)" },
-    { label: "Free", bytes: props.stats.free_bytes, pct: (props.stats.free_bytes / t) * 100, color: "hsla(140, 20%, 70%, 0.4)" },
+    { label: "App", bytes: props.stats.app_bytes, pct: (props.stats.app_bytes / t) * 100, color: "var(--mem-app)" },
+    { label: "Wired", bytes: props.stats.wired_bytes, pct: (props.stats.wired_bytes / t) * 100, color: "var(--mem-wired)" },
+    { label: "Compressed", bytes: props.stats.compressed_bytes, pct: (props.stats.compressed_bytes / t) * 100, color: "var(--mem-compressed)" },
+    { label: "Free", bytes: props.stats.free_bytes, pct: (props.stats.free_bytes / t) * 100, color: "var(--mem-free)" },
   ].filter(seg => seg.pct > 0.5);
 });
 
 const memPressure = computed(() => {
   const pct = memUsedPct.value;
-  if (pct >= 90) return { label: "Critical", class: "dot-danger" };
-  if (pct >= 75) return { label: "High", class: "dot-warning" };
-  if (pct >= 50) return { label: "Moderate", class: "dot-success" };
-  return { label: "Low", class: "dot-success" };
+  const level = memoryPressureLevel(pct);
+  return { label: level.label, class: memoryPressureDotClass(pct) };
 });
 </script>
 

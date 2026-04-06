@@ -6,6 +6,7 @@
  * plus a simple percent bar row beneath.
  */
 import type { FanReading } from "../types";
+import { fanSpeedColor, fanSpeedZone } from "../utils";
 
 defineProps<{
   fans: FanReading[];
@@ -27,11 +28,8 @@ function fanNeedle(cx: number, cy: number, r: number, t: number): { x: number; y
   return { x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle) };
 }
 
-function fanGaugeColor(pct: number): string {
-  if (pct > 70) return "hsla(0, 45%, 45%, 0.7)";
-  if (pct > 40) return "hsla(40, 50%, 42%, 0.7)";
-  return "hsla(195, 40%, 40%, 0.6)";
-}
+// Alias for template — uses canonical thresholds from utils.ts
+const fanGaugeColor = fanSpeedColor;
 </script>
 
 <template>
@@ -46,9 +44,9 @@ function fanGaugeColor(pct: number): string {
           <path :d="fanArc(24, 27, 19, 91, 134)" stroke="hsla(25, 30%, 40%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           <path :d="fanArc(24, 27, 19, 136, 180)" stroke="hsla(0, 30%, 42%, 0.15)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           <!-- Active zone -->
-          <path v-if="fan.percent <= 25" :d="fanArc(24, 27, 19, 0, 44)" stroke="hsla(140, 35%, 35%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-          <path v-else-if="fan.percent <= 50" :d="fanArc(24, 27, 19, 46, 89)" stroke="hsla(45, 45%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-          <path v-else-if="fan.percent <= 75" :d="fanArc(24, 27, 19, 91, 134)" stroke="hsla(25, 50%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path v-if="fanSpeedZone(fan.percent) === 'nominal'" :d="fanArc(24, 27, 19, 0, 44)" stroke="hsla(140, 35%, 35%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path v-else-if="fanSpeedZone(fan.percent) === 'fair'" :d="fanArc(24, 27, 19, 46, 89)" stroke="hsla(45, 45%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path v-else-if="fanSpeedZone(fan.percent) === 'serious'" :d="fanArc(24, 27, 19, 91, 134)" stroke="hsla(25, 50%, 38%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           <path v-else :d="fanArc(24, 27, 19, 136, 180)" stroke="hsla(0, 45%, 42%, 0.65)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
           <!-- Needle -->
           <line x1="24" y1="27"

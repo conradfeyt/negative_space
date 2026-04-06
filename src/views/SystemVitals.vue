@@ -27,7 +27,7 @@ import {
   diskUsage,
   loadDiskUsage,
 } from "../stores/scanStore";
-import { formatSize, tempToColor } from "../utils";
+import { formatSize, tempToColor, cpuLoadColor as cpuLoadColorFn, storageColor as storageColorFn } from "../utils";
 import ThermalCard from "../components/ThermalCard.vue";
 import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
@@ -90,7 +90,7 @@ const thermalColor = computed(() => {
   switch (vitalsResult.value.thermal_state) {
     case "Nominal": return "var(--success)";
     case "Fair": return "var(--warning)";
-    case "Serious": return "#E5700F";
+    case "Serious": return "var(--thermal-serious)";
     case "Critical": return "var(--danger)";
     default: return "var(--muted)";
   }
@@ -107,13 +107,8 @@ const cpuLoadWidth = computed(() => {
   return Math.min(100, vitalsResult.value.load.cpu_usage_percent);
 });
 
-// CPU load bar color
-const cpuLoadColor = computed(() => {
-  const pct = cpuLoadWidth.value;
-  if (pct > 80) return "var(--danger)";
-  if (pct > 50) return "var(--warning)";
-  return "var(--accent)";
-});
+// CPU load bar color (canonical thresholds from utils.ts)
+const cpuLoadColor = computed(() => cpuLoadColorFn(cpuLoadWidth.value));
 
 // ---------------------------------------------------------------------------
 // Thermal card: hottest sensor + 4 category bars
@@ -181,10 +176,7 @@ const storagePct = computed(() => {
 });
 
 const storageColor = computed(() => {
-  const p = storagePct.value;
-  if (p > 90) return "var(--danger)";
-  if (p > 75) return "var(--warning)";
-  return "var(--accent)";
+  return storageColorFn(storagePct.value);
 });
 
 // ---------------------------------------------------------------------------
@@ -404,7 +396,7 @@ const timeAgo = computed(() => {
 }
 
 .stat-card {
-  padding: 14px 16px 12px;
+  padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(20px) saturate(1.2);
@@ -425,7 +417,7 @@ const timeAgo = computed(() => {
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   margin-bottom: 6px;
 }
 
@@ -601,7 +593,7 @@ const timeAgo = computed(() => {
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 .info-strip-value {
@@ -623,7 +615,7 @@ const timeAgo = computed(() => {
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
 }
 
 .section-meta {

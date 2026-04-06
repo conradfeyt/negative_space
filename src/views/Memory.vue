@@ -8,7 +8,7 @@ import {
   memoryError,
   scanMemory,
 } from "../stores/scanStore";
-import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS } from "../utils";
+import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS, memoryPressureLevel } from "../utils";
 
 // ---------------------------------------------------------------------------
 // Live refresh
@@ -137,9 +137,8 @@ const memoryPressure = computed(() => {
   if (!memoryResult.value) return { label: "Unknown", class: "" };
   const stats = memoryResult.value.stats;
   const usedPct = (stats.used_bytes / stats.total_bytes) * 100;
-  if (usedPct > 85) return { label: "High", class: "pressure-high" };
-  if (usedPct > 65) return { label: "Moderate", class: "pressure-moderate" };
-  return { label: "Low", class: "pressure-low" };
+  const level = memoryPressureLevel(usedPct);
+  return { label: level.label, class: level.cssClass };
 });
 
 // Top groups by memory
@@ -416,17 +415,22 @@ const sortedGroups = computed((): ProcessGroup[] => {
 }
 
 .pressure-low {
-  background: rgba(48, 209, 88, 0.18);
+  background: var(--success-tint);
   color: var(--success);
 }
 
 .pressure-moderate {
-  background: rgba(255, 159, 10, 0.18);
+  background: var(--warning-tint);
   color: var(--warning);
 }
 
 .pressure-high {
-  background: rgba(255, 69, 58, 0.18);
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.pressure-critical {
+  background: var(--danger-tint);
   color: var(--danger);
 }
 

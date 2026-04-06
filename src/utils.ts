@@ -23,6 +23,63 @@ export function tempToColor(t: number): string {
   return "hsla(195, 35%, 42%, 0.85)";
 }
 
+// ---------------------------------------------------------------------------
+// Health thresholds — single source of truth for color mapping
+// ---------------------------------------------------------------------------
+
+/** CPU load color based on usage percentage. */
+export function cpuLoadColor(pct: number): string {
+  if (pct > 80) return "var(--danger)";
+  if (pct > 50) return "var(--warning)";
+  return "var(--accent)";
+}
+
+/** CPU load CSS class based on usage percentage. */
+export function cpuLoadClass(pct: number): string {
+  if (pct > 80) return "cpu-hot";
+  if (pct > 50) return "cpu-warm";
+  return "";
+}
+
+export type MemoryPressureLevel = { label: string; cssClass: string };
+
+/** Memory pressure level based on used percentage (4-tier). */
+export function memoryPressureLevel(usedPct: number): MemoryPressureLevel {
+  if (usedPct >= 90) return { label: "Critical", cssClass: "pressure-critical" };
+  if (usedPct >= 75) return { label: "High", cssClass: "pressure-high" };
+  if (usedPct >= 50) return { label: "Moderate", cssClass: "pressure-moderate" };
+  return { label: "Low", cssClass: "pressure-low" };
+}
+
+/** Memory pressure status-dot variant based on used percentage. */
+export function memoryPressureDotClass(usedPct: number): string {
+  if (usedPct >= 90) return "dot-danger";
+  if (usedPct >= 75) return "dot-warning";
+  return "dot-success";
+}
+
+/** Fan speed color based on percentage of max RPM. */
+export function fanSpeedColor(pct: number): string {
+  if (pct >= 80) return "var(--temp-critical)";
+  if (pct >= 50) return "var(--temp-warm)";
+  return "var(--temp-cool)";
+}
+
+/** Fan gauge zone name based on percentage. */
+export function fanSpeedZone(pct: number): string {
+  if (pct >= 80) return "critical";
+  if (pct >= 50) return "serious";
+  if (pct >= 25) return "fair";
+  return "nominal";
+}
+
+/** Storage usage color based on percentage. */
+export function storageColor(pct: number): string {
+  if (pct > 90) return "var(--danger)";
+  if (pct > 75) return "var(--warning)";
+  return "var(--accent)";
+}
+
 /** Format a date string or Date as a human-readable relative time. */
 export function timeAgo(modified: string | Date | null): string {
   if (!modified) return "";

@@ -15,7 +15,7 @@
  * Refreshes every 5 seconds for a live feel.
  */
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
-import { tempToColor } from "../utils";
+import { tempToColor, fanSpeedColor, fanSpeedZone } from "../utils";
 import {
   thermalResult,
   thermalScanning,
@@ -128,20 +128,9 @@ const sensorsByCategory = computed(() => {
 // Color for a temperature value
 const tempColor = tempToColor;
 
-// Color for a fan percentage
-function fanColor(pct: number): string {
-  if (pct >= 80) return "hsla(0, 45%, 42%, 0.85)";
-  if (pct >= 50) return "hsla(40, 50%, 40%, 0.85)";
-  return "hsla(195, 35%, 38%, 0.85)";
-}
-
-// Fan gauge zone (matches Dashboard thermal gauge style)
-function fanZone(pct: number): string {
-  if (pct >= 80) return "critical";
-  if (pct >= 50) return "serious";
-  if (pct >= 25) return "fair";
-  return "nominal";
-}
+// Fan color and zone — canonical thresholds from utils.ts
+const fanColor = fanSpeedColor;
+const fanZone = fanSpeedZone;
 
 // Semicircle arc path (same as Dashboard)
 function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
@@ -303,7 +292,7 @@ const orderedSummaries = computed(() => {
         >
           <div class="cat-header" @click="toggleCategory(s.category)">
             <span class="cat-chevron" :class="{ expanded: expandedCategories.has(s.category) }">
-              <svg width="10" height="10" viewBox="0 0 10 10">
+              <svg width="12" height="12" viewBox="0 0 10 10">
                 <path d="M3 2l4 3-4 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
@@ -480,7 +469,7 @@ const orderedSummaries = computed(() => {
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
 }
 
 .sc-value {
@@ -518,7 +507,7 @@ const orderedSummaries = computed(() => {
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   margin-bottom: var(--sp-3);
 }
 

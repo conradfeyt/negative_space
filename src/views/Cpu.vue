@@ -19,7 +19,7 @@ import {
   quitProcess,
   quitProcessGroup,
 } from "../stores/scanStore";
-import { formatSize } from "../utils";
+import { formatSize, cpuLoadClass } from "../utils";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -210,10 +210,7 @@ function fmtCpu(pct: number): string {
                   </span>
                 </div>
                 <div class="hog-metrics">
-                  <span class="hog-cpu" :class="{
-                    'cpu-hot': group.total_cpu_percent > 50,
-                    'cpu-warm': group.total_cpu_percent > 20 && group.total_cpu_percent <= 50,
-                  }">{{ fmtCpu(group.total_cpu_percent) }}</span>
+                  <span class="hog-cpu" :class="cpuLoadClass(group.total_cpu_percent)">{{ fmtCpu(group.total_cpu_percent) }}</span>
                   <span class="hog-mem">{{ formatSize(group.total_rss_bytes) }}</span>
                 </div>
               </div>
@@ -378,7 +375,7 @@ function fmtCpu(pct: number): string {
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
 }
 
 .section-meta {

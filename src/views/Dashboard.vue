@@ -11,7 +11,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
-import { formatSize, fileDiskSize, tempToColor, revealInFinder, getFileExtension, DASHBOARD_CATEGORY_COLORS } from "../utils";
+import { formatSize, fileDiskSize, tempToColor, revealInFinder, getFileExtension, DASHBOARD_CATEGORY_COLORS, storageColor as storageColorFn } from "../utils";
 import ThermalCard from "../components/ThermalCard.vue";
 import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
@@ -225,11 +225,7 @@ const battery = computed(() => vitalsResult.value?.battery ?? null);
 // Storage card
 // ---------------------------------------------------------------------------
 const storagePct = computed(() => diskUsage.value?.percentage ?? 0);
-const storageColor = computed(() => {
-  if (storagePct.value > 90) return "var(--danger)";
-  if (storagePct.value > 75) return "var(--warning)";
-  return "var(--accent)";
-});
+const storageColor = computed(() => storageColorFn(storagePct.value));
 
 // ---------------------------------------------------------------------------
 // Storage card — waffle chart
@@ -663,7 +659,7 @@ onUnmounted(() => stopPolling());
 .side-card-title {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text);
   opacity: 0.45;
@@ -784,7 +780,7 @@ onUnmounted(() => stopPolling());
 }
 
 .stat-card {
-  padding: 14px 16px 12px;
+  padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(20px) saturate(1.2);
@@ -815,7 +811,7 @@ onUnmounted(() => stopPolling());
   font-weight: 600;
   color: rgba(60, 65, 80, 0.55);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   margin-bottom: 6px;
 }
 
@@ -925,7 +921,7 @@ onUnmounted(() => stopPolling());
    ====================================================================== */
 .info-strip { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.3); border: 0.5px solid rgba(255, 255, 255, 0.4); margin-bottom: var(--sp-6); }
 .info-strip-item { display: flex; align-items: baseline; gap: 6px; }
-.info-strip-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.info-strip-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .info-strip-value { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .info-strip-divider { width: 1px; height: 14px; background: rgba(0, 0, 0, 0.08); }
 
