@@ -21,6 +21,8 @@ import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
+import TabBar from "../components/TabBar.vue";
+import type { TabOption } from "../components/TabBar.vue";
 import type { SegmentOption } from "../components/SegmentedControl.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
@@ -35,6 +37,11 @@ const PREVIEW_FILES_PER_GROUP = 10;
 
 // Tab state
 const activeTab = ref<"exact" | "similar">("exact");
+
+const tabOptions: TabOption[] = [
+  { value: "exact", label: "Exact Duplicates" },
+  { value: "similar", label: "Similar Images" },
+];
 
 // Similar images state
 const similarThreshold = ref(10);
@@ -282,10 +289,7 @@ function shortPath(p: string): string {
             {{ activeTab === 'exact' ? 'Find identical files wasting disk space' : 'Find visually similar images' }}
           </p>
         </div>
-        <div class="tab-switcher" role="tablist">
-          <button class="tab-btn" :class="{ active: activeTab === 'exact' }" role="tab" :aria-selected="activeTab === 'exact'" @click="activeTab = 'exact'">Exact Duplicates</button>
-          <button class="tab-btn" :class="{ active: activeTab === 'similar' }" role="tab" :aria-selected="activeTab === 'similar'" @click="activeTab = 'similar'">Similar Images</button>
-        </div>
+        <TabBar :tabs="tabOptions" v-model="activeTab" />
         <div v-if="activeTab === 'exact'" class="scan-controls">
           <div class="min-size-control">
             <label for="dup-min-size" class="text-muted">Min size</label>
@@ -657,35 +661,6 @@ function shortPath(p: string): string {
   max-width: 1440px;
 }
 
-.tab-switcher {
-  display: flex;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 8px;
-  padding: 2px;
-}
-
-.tab-btn {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.tab-btn.active {
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.tab-btn:hover:not(.active) {
-  color: var(--text);
-}
 
 .badge-keep {
   display: inline-block;

@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from "vue";
 import { formatSize } from "../utils";
 import Toast from "../components/Toast.vue";
 import StatCard from "../components/StatCard.vue";
+import TabBar from "../components/TabBar.vue";
+import type { TabOption } from "../components/TabBar.vue";
 import {
   vaultSummary,
   vaultEntries,
@@ -27,6 +29,11 @@ import EmptyState from "../components/EmptyState.vue";
 
 type Tab = "compress" | "archived";
 const activeTab = ref<Tab>("compress");
+
+const tabOptions = computed<TabOption[]>(() => [
+  { value: "compress", label: "Compress" },
+  { value: "archived", label: "Archived", badge: vaultEntries.value.length > 0 ? vaultEntries.value.length : undefined },
+]);
 
 const toast = ref<{ message: string; type: "success" | "error" | "info" } | null>(null);
 const restoring = ref<string | null>(null);
@@ -162,21 +169,7 @@ onMounted(loadVaultSummary);
     </div>
 
     <!-- Tab bar -->
-    <div class="tab-bar">
-      <button
-        :class="['tab-btn', { active: activeTab === 'compress' }]"
-        @click="activeTab = 'compress'"
-      >
-        Compress
-      </button>
-      <button
-        :class="['tab-btn', { active: activeTab === 'archived' }]"
-        @click="activeTab = 'archived'"
-      >
-        Archived
-        <span v-if="vaultEntries.length > 0" class="tab-count">{{ vaultEntries.length }}</span>
-      </button>
-    </div>
+    <TabBar :tabs="tabOptions" v-model="activeTab" class="vault-tab-bar" />
 
     <!-- ================================================================
          TAB: COMPRESS
@@ -397,51 +390,13 @@ onMounted(loadVaultSummary);
 }
 
 /* Tab bar */
-.tab-bar {
+.vault-tab-bar {
   display: flex;
-  gap: 2px;
   margin-bottom: var(--sp-6);
-  padding: 3px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.04);
 }
 
-.tab-btn {
+.vault-tab-bar :deep(.tab-btn) {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.tab-btn:hover:not(.active) {
-  color: var(--text-secondary);
-}
-
-.tab-btn.active {
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-
-.tab-count {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--accent-light);
-  color: var(--accent-deep);
-  line-height: 1.6;
 }
 
 /* Error banner (dismissible) */
