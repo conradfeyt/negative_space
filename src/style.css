@@ -232,7 +232,7 @@
 
   /* Legacy aliases */
   --content-bg: var(--app-bg);
-  --card-bg: var(--surface);
+  --card-bg: var(--glass);
 }
 
 /* --------------------------------------------------------------------------

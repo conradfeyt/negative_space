@@ -1832,9 +1832,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   margin-top: var(--sp-2);
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--glass);
   border-radius: 12px;
-  border: 0.5px solid rgba(255, 255, 255, 0.5);
+  border: 0.5px solid var(--glass-border);
   padding: 4px 0;
 }
 

@@ -425,7 +425,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       </div>
 
       <!-- Vaulted archives — locked section at top -->
-      <div v-if="vaultedFiles.length > 0" class="file-group vault-group">
+      <div v-if="vaultedFiles.length > 0" class="card-flush file-group vault-group">
         <div class="group-header vault-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has('vaulted')" @click="toggleGroup('vaulted')" @keydown.enter="toggleGroup('vaulted')" @keydown.space.prevent="toggleGroup('vaulted')">
           <div class="group-header-left">
             <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has('vaulted') }">
@@ -455,7 +455,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       </div>
 
       <!-- Category groups -->
-      <div v-for="group in activeGroups" :key="group.id" class="file-group">
+      <div v-for="group in activeGroups" :key="group.id" class="card-flush file-group">
 
         <!-- Category header -->
         <div class="group-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.id)" @click="toggleGroup(group.id)" @keydown.enter="toggleGroup(group.id)" @keydown.space.prevent="toggleGroup(group.id)">
@@ -921,10 +921,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 /* ---- Category group ---- */
 .file-group {
   margin-bottom: var(--sp-4);
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 12px;
-  border: 0.5px solid rgba(255, 255, 255, 0.5);
-  overflow: hidden;
 }
 
 .group-header {
@@ -1245,9 +1241,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
 /* Vault section */
 .vault-group {
-  border: 1px solid var(--vault-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.55);
   padding: 4px 0;
   margin-bottom: var(--sp-4);
 }

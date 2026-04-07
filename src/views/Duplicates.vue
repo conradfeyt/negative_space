@@ -658,7 +658,7 @@ function shortPath(p: string): string {
 
 .similar-progress {
   padding: var(--sp-4);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--glass);
   border-radius: var(--radius-lg);
   margin-bottom: var(--sp-3);
 }
@@ -752,7 +752,7 @@ function shortPath(p: string): string {
   padding: 6px var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--glass);
   color: var(--text);
   cursor: pointer;
 }
@@ -847,7 +847,7 @@ function shortPath(p: string): string {
   flex-shrink: 0;
   width: 140px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--glass);
   border: 2px solid transparent;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;

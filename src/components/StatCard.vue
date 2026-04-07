@@ -26,7 +26,7 @@ defineProps<{
 
 <style scoped>
 .stat-card {
-  background: var(--surface);
+  background: var(--glass);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: 14px 16px;
