@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
-  { path: "/", redirect: "/showcase" },
+  { path: "/", redirect: "/dashboard" },
   { path: "/dashboard", name: "dashboard", component: () => import("./views/Dashboard.vue") },
   { path: "/large-files", name: "large-files", component: () => import("./views/LargeFiles.vue") },
   { path: "/caches", name: "caches", component: () => import("./views/Caches.vue") },
