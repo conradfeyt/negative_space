@@ -5,17 +5,15 @@
  */
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
-import SegmentedControl from "../components/SegmentedControl.vue";
 import TabBar from "../components/TabBar.vue";
 import LiveIndicator from "../components/LiveIndicator.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import Checkbox from "../components/Checkbox.vue";
-import type { SegmentOption } from "../components/SegmentedControl.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import { ref } from "vue";
 
 const segValue = ref("size");
-const segOptions: SegmentOption[] = [
+const segOptions: TabOption[] = [
   { value: "size", label: "Size" },
   { value: "dir", label: "Directory" },
   { value: "safety", label: "Safety" },
@@ -23,7 +21,7 @@ const segOptions: SegmentOption[] = [
 ];
 
 const pillValue = ref("all");
-const pillOptions: SegmentOption[] = [
+const pillOptions: TabOption[] = [
   { value: "all", label: "All" },
   { value: "images", label: "Images" },
   { value: "docs", label: "Documents" },
@@ -38,6 +36,10 @@ const tabOptions: TabOption[] = [
 ];
 
 const toggleValue = ref(true);
+
+const sliderValue = ref(50);
+const radioValue = ref("auto");
+const radioScroll = ref("next-page");
 const toggleOff = ref(false);
 </script>
 
@@ -390,6 +392,68 @@ const toggleOff = ref(false);
         </div>
       </div>
 
+      <h4 class="showcase-subtitle">Sliders</h4>
+      <div class="showcase-row" style="gap: 24px;">
+        <div class="input-group" style="flex: 1; max-width: 300px;">
+          <label class="input-label">Size ({{ sliderValue }})</label>
+          <div class="slider-wrapper">
+            <input type="range" v-model.number="sliderValue" min="0" max="100" class="slider"
+              :style="{ '--fill': sliderValue + '%' }" />
+            <div class="slider-labels">
+              <span>Small</span>
+              <span>Large</span>
+            </div>
+          </div>
+        </div>
+        <div class="input-group" style="flex: 1; max-width: 300px;">
+          <label class="input-label">Min file size (MB)</label>
+          <div class="slider-wrapper">
+            <input type="range" v-model.number="sliderValue" min="1" max="500" step="1" class="slider"
+              :style="{ '--fill': ((sliderValue / 500) * 100) + '%' }" />
+            <div class="slider-labels">
+              <span>1 MB</span>
+              <span>500 MB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="showcase-subtitle">Radio buttons</h4>
+      <div class="card" style="padding: 0;">
+        <div class="radio-section">
+          <div class="radio-section-label">Show scroll bars</div>
+          <label class="radio-item">
+            <input type="radio" v-model="radioValue" value="auto" />
+            <span class="radio-dot"></span>
+            <span>Automatically based on mouse or trackpad</span>
+          </label>
+          <label class="radio-item">
+            <input type="radio" v-model="radioValue" value="scrolling" />
+            <span class="radio-dot"></span>
+            <span>When scrolling</span>
+          </label>
+          <label class="radio-item">
+            <input type="radio" v-model="radioValue" value="always" />
+            <span class="radio-dot"></span>
+            <span>Always</span>
+          </label>
+        </div>
+        <div class="radio-divider"></div>
+        <div class="radio-section">
+          <div class="radio-section-label">Click in the scroll bar to</div>
+          <label class="radio-item">
+            <input type="radio" v-model="radioScroll" value="next-page" />
+            <span class="radio-dot"></span>
+            <span>Jump to the next page</span>
+          </label>
+          <label class="radio-item">
+            <input type="radio" v-model="radioScroll" value="spot" />
+            <span class="radio-dot"></span>
+            <span>Jump to the spot that's clicked</span>
+          </label>
+        </div>
+      </div>
+
       <h4 class="showcase-subtitle">Checkboxes</h4>
       <div class="showcase-row" style="gap:8px">
         <Checkbox :model-value="true">Select all</Checkbox>
@@ -490,22 +554,22 @@ const toggleOff = ref(false);
     </section>
 
     <!-- ================================================================= -->
-    <!-- SEGMENTED CONTROL + TAB BAR -->
+    <!-- TAB BAR -->
     <!-- ================================================================= -->
     <section class="showcase-section">
-      <h3 class="section-title">SegmentedControl</h3>
+      <h3 class="section-title">TabBar</h3>
 
-      <h4 class="showcase-subtitle">Default</h4>
+      <h4 class="showcase-subtitle">Default (options prop)</h4>
       <div class="showcase-row">
-        <SegmentedControl :options="segOptions" v-model="segValue" />
+        <TabBar :options="segOptions" v-model="segValue" />
       </div>
 
-      <h4 class="showcase-subtitle">Pill variant</h4>
+      <h4 class="showcase-subtitle">With disabled item</h4>
       <div class="showcase-row">
-        <SegmentedControl :options="pillOptions" v-model="pillValue" pill />
+        <TabBar :options="pillOptions" v-model="pillValue" />
       </div>
 
-      <h3 class="section-title" style="margin-top: var(--sp-6)">TabBar</h3>
+      <h4 class="showcase-subtitle">With badge (tabs prop)</h4>
       <div class="showcase-row">
         <TabBar :tabs="tabOptions" v-model="tabValue" />
       </div>
@@ -776,6 +840,133 @@ const toggleOff = ref(false);
 .list-item:last-child { border-bottom: none; }
 .list-item-name { flex: 1; font-weight: 500; font-size: 13px; }
 .list-item-meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+/* ===== SLIDER ===== */
+.slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  outline: none;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--fill, 0%),
+    rgba(0, 0, 0, 0.1) var(--fill, 0%),
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  margin-top: -7px;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ===== RADIO BUTTONS ===== */
+.radio-section {
+  padding: 14px 18px;
+}
+
+.radio-section-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.radio-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 0 18px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.radio-item input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radio-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  background: white;
+  flex-shrink: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.radio-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.15s ease;
+}
+
+.radio-item input:checked + .radio-dot {
+  border-color: var(--accent);
+}
+
+.radio-item input:checked + .radio-dot::after {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.radio-item:hover .radio-dot {
+  border-color: var(--accent);
+}
 
 /* ===== PROGRESS BARS ===== */
 .progress-track {

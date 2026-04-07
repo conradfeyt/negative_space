@@ -470,7 +470,7 @@ button {
 /* --------------------------------------------------------------------------
    4. Inputs — glassy
    -------------------------------------------------------------------------- */
-input {
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
   font-family: inherit;
   font-size: 13px;
   border: 1px solid var(--border);
@@ -482,7 +482,7 @@ input {
   color: var(--text);
 }
 
-input:focus {
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus {
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.7);
   box-shadow: 0 0 0 3px var(--accent-light);

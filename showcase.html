@@ -256,56 +256,35 @@ button {
   margin-top: 2px;
 }
 
-/* ===== SEGMENTED CONTROL ===== */
-.segmented-control {
-  display: inline-flex;
-  gap: 2px;
-  background: rgba(0,0,0,0.04);
-  padding: 2px;
-  border-radius: 8px;
-}
-.segmented-control--pill { border-radius: 22px; }
-.segmented-control button {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 12px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.segmented-control--pill button { border-radius: 20px; }
-.segmented-control button:hover:not(.active):not(:disabled) { background: rgba(0,0,0,0.04); }
-.segmented-control button.active { background: var(--accent); color: white; font-weight: 600; }
-.segmented-control button:disabled { opacity: 0.35; pointer-events: none; }
-
-/* ===== TAB BAR ===== */
+/* ===== TAB BAR (unified — replaces segmented control) ===== */
 .tab-bar {
   display: inline-flex;
-  background: rgba(0,0,0,0.05);
-  padding: 3px;
-  border-radius: 10px;
-  gap: 2px;
+  background: rgb(216 216 216 / 50%);
+  padding: 5px;
+  border-radius: 20px;
+  gap: 5px;
 }
 .tab-bar button {
   padding: 7px 16px;
   font-size: 13px;
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: 18px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: #212430;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 .tab-bar button.active {
-  background: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.6);
   color: var(--text);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
+.tab-bar button:hover:not(.active):not(:disabled) {
+  background: rgba(0,0,0,0.1);
+}
+.tab-bar button:disabled { opacity: 0.35; pointer-events: none; }
 .tab-bar .tab-badge {
   font-size: 10px;
   font-weight: 600;
@@ -1234,14 +1213,14 @@ select:focus {
 </div>
 
 <!-- ================================================================= -->
-<!-- SEGMENTED CONTROL + TAB BAR -->
+<!-- TAB BAR -->
 <!-- ================================================================= -->
 <div class="section">
-  <h3 class="section-title">SegmentedControl</h3>
+  <h3 class="section-title">TabBar</h3>
 
   <p class="section-subtitle">Default</p>
   <div class="row">
-    <div class="segmented-control">
+    <div class="tab-bar">
       <button class="active">Size</button>
       <button>Directory</button>
       <button>Safety</button>
@@ -1249,9 +1228,9 @@ select:focus {
     </div>
   </div>
 
-  <p class="section-subtitle">Pill variant</p>
+  <p class="section-subtitle">With disabled option</p>
   <div class="row">
-    <div class="segmented-control segmented-control--pill">
+    <div class="tab-bar">
       <button class="active">All</button>
       <button>Images</button>
       <button>Documents</button>
@@ -1260,7 +1239,7 @@ select:focus {
     </div>
   </div>
 
-  <h3 class="section-title" style="margin-top: 24px">TabBar</h3>
+  <p class="section-subtitle">With badge</p>
   <div class="row">
     <div class="tab-bar">
       <button class="active">Exact Duplicates</button>

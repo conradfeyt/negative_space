@@ -1338,6 +1338,7 @@ pub fn run() {
                 .get_webview_window("main")
                 .expect("main window must exist per tauri.conf.json");
 
+
             // The sidebar gradient is a standalone background NSWindow that
             // never moves (see gradient.rs). We manage its visibility based
             // on the main window's focus state — show when Negative _ is

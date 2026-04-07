@@ -23,8 +23,8 @@ import {
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import Checkbox from "../components/Checkbox.vue";
-import SegmentedControl from "../components/SegmentedControl.vue";
-import type { SegmentOption } from "../components/SegmentedControl.vue";
+import TabBar from "../components/TabBar.vue";
+import type { TabOption } from "../components/TabBar.vue";
 import {
   useFileGrouping,
   collectFiles,
@@ -53,8 +53,8 @@ const {
   isVaulted,
 });
 
-const sortOptions = computed<SegmentOption[]>(() => {
-  const opts: SegmentOption[] = [
+const sortOptions = computed<TabOption[]>(() => {
+  const opts: TabOption[] = [
     { value: "size", label: "Size" },
     { value: "directory", label: "Directory" },
   ];
@@ -408,7 +408,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
           </span>
         </div>
         <div class="results-actions">
-          <SegmentedControl
+          <TabBar
             :options="sortOptions"
             v-model="sortMode"
           />

@@ -100,26 +100,25 @@ onUpdated(syncInput);
 }
 
 .checkbox label:hover .checkbox__box {
-  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .checkbox__box {
   position: relative;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 4px;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: none;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 1px rgba(0, 16, 75, 0.05);
 }
 
 /* Check mark — hidden by default */
 .checkbox__check {
   position: absolute;
-  top: 3px;
-  left: 2px;
+  top: 2px;
+  left: 1px;
   fill: none;
   stroke: #fff;
   stroke-width: 2;
@@ -180,7 +179,7 @@ onUpdated(syncInput);
 
 .checkbox__label {
   padding-left: 8px;
-  line-height: 18px;
+  line-height: 16px;
   font-size: 13px;
 }
 

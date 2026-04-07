@@ -10,7 +10,7 @@ import {
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
-import SegmentedControl from "../components/SegmentedControl.vue";
+import TabBar from "../components/TabBar.vue";
 
 const expandedManagers = ref<Set<string>>(new Set());
 const expandedRuntimes = ref<Set<string>>(new Set());
@@ -103,7 +103,7 @@ const totalRuntimeSize = computed(() =>
         </div>
 
         <div class="section-toolbar">
-          <SegmentedControl
+          <TabBar
             :options="[
               { value: 'top-level', label: 'Top-level' },
               { value: 'all', label: 'All packages' },

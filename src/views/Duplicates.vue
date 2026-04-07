@@ -21,10 +21,8 @@ import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
 import Checkbox from "../components/Checkbox.vue";
 import EmptyState from "../components/EmptyState.vue";
-import SegmentedControl from "../components/SegmentedControl.vue";
 import TabBar from "../components/TabBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
-import type { SegmentOption } from "../components/SegmentedControl.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
   useDuplicateFilters,
@@ -95,7 +93,7 @@ const {
 
 const ALL_KINDS: FileKind[] = ["all", "images", "documents", "audio", "video", "archives", "code", "other"];
 
-const kindOptions = computed<SegmentOption[]>(() =>
+const kindOptions = computed<TabOption[]>(() =>
   ALL_KINDS.map((kind) => ({
     value: kind,
     label: KIND_LABELS[kind],
@@ -382,10 +380,9 @@ function shortPath(p: string): string {
 
       <!-- Kind filter pills -->
       <div class="kind-filter-bar">
-        <SegmentedControl
+        <TabBar
           :options="kindOptions"
           v-model="activeKindFilter"
-          pill
         >
           <template #default="{ option, active }">
             {{ option.label }}
@@ -400,7 +397,7 @@ function shortPath(p: string): string {
               :class="{ 'kind-count--active': active }"
             >{{ kindCounts[option.value as FileKind].groups }}</span>
           </template>
-        </SegmentedControl>
+        </TabBar>
       </div>
 
       <!-- Action bar -->
