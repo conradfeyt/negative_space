@@ -46,33 +46,77 @@
   --sidebar-hover: rgba(255, 255, 255, 0.12);
   --sidebar-divider: rgba(255, 255, 255, 0.12);
 
-  /* --- Brand accent (Aqua) --- */
-  --accent: #3BC7E8;
-  --accent-hover: #2AAFCD;
-  --accent-deep: #1697A6;
-  --accent-fresh: #62E0C1;
-  --accent-light: rgba(59, 199, 232, 0.10);
-  --accent-glow: rgba(59, 199, 232, 0.18);
+  /* --- Blue --- */
+  --blue: #0088FF;
+  --blue-hover: #0391FF;
+  --blue-deep: #1D6FF4;
+  --blue-light: rgba(2, 117, 244, 0.10);
+  --blue-glow: rgba(2, 117, 244, 0.18);
 
-  /* --- State colors (opaque enough for vibrancy context) --- */
-  --info-tint: rgba(232, 248, 252, 0.85);
-  --info-text: #148AA0;
-  --success-tint: rgba(234, 248, 241, 0.85);
-  --success-text: #1E8E5A;
-  --success: #34C759;
-  --warning-tint: rgba(255, 252, 240, 0.85);
-  --warning-text: #B06E0E;
-  --warning: #E5A30F;
-  --danger-tint: rgba(253, 238, 238, 0.85);
-  --danger-text: #C94444;
-  --danger: #D94B4B;
-  --danger-hover: #C03A3A;
+  /* --- Green --- */
+  --green: #038933;
+  --green-light: #34C759;
+  --green-tint: #4BD968;
+
+  /* --- Yellow --- */
+  --yellow: #FFCC02;
+  --yellow-tint: #FEDF43;
+  --yellow-text: #A16B00;
+
+  /* --- Red --- */
+  --red: #FF393C;
+  --red-tint: #FF6165;
+  --red-hover: #E9152D;
+
+  /* --- Orange --- */
+  --orange: #FF8D28;
+  --orange-dark: #C55301;
+
+  /* --- Purple --- */
+  --purple: #B02FC2;
+  --purple-light: #EA8EFF;
+
+  /* --- Teal --- */
+  --teal: #00C8B3;
+  --teal-deep: #028199;
+  --teal-dark: #007EAE;
+
+  /* --- Cyan --- */
+  --cyan: #07C0E8;
+
+  /* --- Neutral --- */
+  --slate: #94a3b8;
+  --grey: #78909c;
+  --pink: #ad1457;
+
+  /* --- Semantic aliases (reference color tokens above) --- */
+  --accent: var(--blue);
+  --accent-hover: var(--blue-hover);
+  --accent-deep: var(--blue-deep);
+  --accent-light: var(--blue-light);
+  --accent-glow: var(--blue-glow);
+
+  --success: var(--green-light);
+  --success-tint: var(--green-tint);
+  --success-text: white;
+
+  --warning: var(--yellow);
+  --warning-tint: var(--yellow-tint);
+  --warning-text: var(--yellow-text);
+
+  --danger: var(--red);
+  --danger-tint: var(--red-tint);
+  --danger-hover: var(--red-hover);
+  --danger-text: white;
+
+  --info-tint: var(--teal);
+  --info-text: var(--teal-deep);
 
   /* --- Shadows (layered, diffused, more depth) --- */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-glow: 0 0 20px rgba(59, 199, 232, 0.08);
+  --shadow-glow: 0 0 20px rgba(2, 117, 244, 0.08);
 
   /* --- Radii (generous, organic) --- */
   --radius-sm: 12px;
@@ -98,11 +142,7 @@
   --font-mono: "SF Mono", ui-monospace, "Fira Code", "Cascadia Code", monospace;
 
   /* --- Thermal state (Dashboard) --- */
-  --thermal-serious: #E5700F;
-
-  /* --- Source badge colors (Packages, Apps) --- */
-  --source-homebrew: #c2410c;
-  --source-success: #15803d;
+  --temp-serious: var(--orange);
 
   /* --- Code preview (Duplicates dark theme) --- */
   --preview-bg: #1e1e2e;
@@ -115,24 +155,24 @@
   --recency-legend-unknown: #90a4ae;
 
   /* --- Memory bar segments --- */
-  --mem-app: #00b4d8;
-  --mem-wired: #f97316;
-  --mem-compressed: #a78bfa;
-  --mem-inactive: #94a3b8;
-  --mem-free: #30d158;
+  --mem-app: var(--cyan);
+  --mem-wired: var(--orange);
+  --mem-compressed: var(--purple-light);
+  --mem-inactive: var(--slate);
+  --mem-free: var(--success);
 
   /* --- Memory process category colors --- */
-  --cat-app: #00b4d8;
+  --cat-app: var(--cyan);
   --cat-system: #6c7086;
   --cat-display: #a78bfa;
   --cat-networking: #38bdf8;
-  --cat-security: #f97316;
+  --cat-security: var(--orange);
   --cat-storage: #84cc16;
   --cat-icloud: #60a5fa;
   --cat-audio: #e879f9;
   --cat-input: #a3a3a3;
   --cat-developer: #34d399;
-  --cat-background: #94a3b8;
+  --cat-background: var(--slate);
 
   /* --- SpaceMap / overview category fills --- */
   --space-applications: #e53935;
@@ -145,17 +185,17 @@
   --space-messages: #43a047;
   --space-music: #e53935;
   --space-music-creation: #78909c;
-  --space-photos: #ad1457;
+  --space-photos: var(--pink);
   --space-media: #8e24aa;
-  --space-bin: #78909c;
+  --space-bin: var(--grey);
   --space-podcasts: #7b1fa2;
-  --space-other-users: #78909c;
+  --space-other-users: var(--grey);
   --space-docker: #00acc1;
   --space-caches: #fb8c00;
   --space-macos: #5c6bc0;
   --space-system-data: #546e7a;
   --space-system: #5c6bc0;
-  --space-other: #78909c;
+  --space-other: var(--grey);
 
   /* --- Duplicate / file-kind colors --- */
   --kind-documents: #E74C3C;
@@ -166,7 +206,7 @@
   --kind-default: #95A5A6;
 
   /* --- Vault feature --- */
-  --vault: hsla(280, 40%, 50%, 1);
+  --vault: var(--purple);
   --vault-tint: hsla(280, 30%, 70%, 0.08);
   --vault-text: hsla(280, 40%, 45%, 0.9);
   --vault-muted: hsla(280, 30%, 30%, 0.7);
@@ -176,14 +216,10 @@
   --protect-green: hsla(145, 55%, 45%, 1);
 
   /* --- Thermal scale --- */
-  --temp-cool: hsla(195, 40%, 40%, 1);
-  --temp-warm: hsla(40, 50%, 40%, 1);
-  --temp-hot: hsla(25, 45%, 40%, 1);
-  --temp-critical: hsla(0, 45%, 42%, 1);
-
-  /* --- Source badges (extended) --- */
-  --source-appstore: #2563eb;
-  --source-appstore-tint: rgba(59, 130, 246, 0.12);
+  --temp-cool: var(--teal-dark);
+  --temp-warm: var(--purple);
+  --temp-hot: var(--red-tint);
+  --temp-critical: var(--red-hover);
 
   /* --- Viz dark canvas --- */
   --viz-dark-base: rgba(15, 18, 45, 1);
@@ -271,18 +307,14 @@ button {
 .btn-primary {
   background: var(--accent);
   color: white;
-  box-shadow: 0 1px 3px rgba(59, 199, 232, 0.25), 0 2px 8px rgba(59, 199, 232, 0.15);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 2px 6px rgba(59, 199, 232, 0.3), 0 4px 12px rgba(59, 199, 232, 0.2);
-  transform: translateY(-0.5px);
 }
 
 .btn-primary:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: 0 1px 2px rgba(59, 199, 232, 0.2);
+  transform: scale(0.98);
 }
 
 .btn-primary:disabled {
@@ -292,18 +324,16 @@ button {
   box-shadow: none;
 }
 
-/* Danger: calm tint, escalates to red on hover */
+/* Danger button */
 .btn-danger {
-  background: var(--danger-tint);
-  color: var(--danger-text);
-  border: 1px solid rgba(217, 75, 75, 0.12);
+  background: var(--danger);
+  color: white;
+  border: none;
 }
 
 .btn-danger:hover {
-  background: var(--danger);
+  background: var(--danger-hover);
   color: white;
-  border-color: transparent;
-  box-shadow: 0 2px 8px rgba(217, 75, 75, 0.25);
 }
 
 .btn-danger:active {
@@ -318,14 +348,13 @@ button {
 
 /* Secondary: glass button */
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.5);
+  background: #d2d8e459;
   color: var(--text);
   border: 1px solid var(--glass-border);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 255, 255, 0.8);
+  background: #b8bdc959;
 }
 
 .btn-secondary:active {
@@ -341,12 +370,21 @@ button {
 /* Ghost / text button */
 .btn-ghost {
   background: transparent;
-  color: var(--accent);
+  color: var(--text);
   padding: 8px 12px;
 }
 
 .btn-ghost:hover {
-  background: var(--accent-light);
+  background: #d2d8e459;
+}
+
+.btn-ghost.danger {
+  color: var(--danger);
+}
+
+.btn-ghost.danger:hover {
+  background: var(--danger);
+  color: white;
 }
 
 .btn-ghost:active {
@@ -466,13 +504,6 @@ select:focus {
   border-color: var(--accent);
 }
 
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  padding: 0;
-}
 
 /* --------------------------------------------------------------------------
    5. Cards / surfaces — GLASSMORPHISM
@@ -551,92 +582,32 @@ tr:last-child td {
    -------------------------------------------------------------------------- */
 .badge {
   display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  line-height: 1.4;
-  letter-spacing: 0.1px;
-}
-
-.badge-accent {
-  background: var(--accent-light);
-  color: var(--accent-deep);
-}
-
-.badge-warning {
-  background: var(--warning-tint);
-  color: var(--warning-text);
-}
-
-.badge-success {
-  background: var(--success-tint);
-  color: var(--success-text);
-}
-
-.badge-danger {
-  background: var(--danger-tint);
-  color: var(--danger-text);
-}
-
-.badge-info {
-  background: var(--info-tint);
-  color: var(--info-text);
-}
-
-.badge-neutral {
-  background: rgba(0, 0, 0, 0.08);
-  color: var(--text-secondary);
-}
-
-/* Small pill badge */
-.badge-pill {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 400;
   padding: 2px 8px;
-  border-radius: var(--radius-xs);
+  line-height: 1.4;
   letter-spacing: 0.2px;
-  white-space: nowrap;
-}
-
-/* Source badges — used by Apps, Packages */
-.source-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
+  border: solid thin;
   border-radius: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   white-space: nowrap;
-  flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--muted);
 }
+.pill { border-radius: 10px; }
+.source { border: none; font-weight: 600; }
 
-.source-homebrew {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--source-homebrew);
-}
+.badge-accent  { color: var(--accent-deep); }
+.badge-success { color: var(--green); border-color: var(--green-light); }
+.badge-warning { color: var(--orange-dark); border-color: var(--orange); }
+.badge-danger  { color: var(--red); }
+.badge-info    { color: var(--info-text); }
+.badge-neutral { color: var(--grey); }
 
-.source-app-store {
-  background: var(--source-appstore-tint);
-  color: var(--source-appstore);
-}
-
-.source-nvm {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--source-success);
-}
-
-.source-rustup {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--source-homebrew);
-}
-
-.source-manual {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--muted);
-}
+/* Source badge colors */
+.homebrew   { background: rgba(251,146,60,0.12); color: var(--orange-dark); }
+.app-store  { background: rgba(2,117,244,0.12);  color: var(--blue-deep); }
+.nvm        { background: rgba(34,197,94,0.12);  color: var(--green); }
+.rustup     { background: rgba(251,146,60,0.12); color: var(--orange-dark); }
+.manual     { background: rgba(0,0,0,0.05);      color: var(--grey); }
 
 /* --------------------------------------------------------------------------
    7b. Status dots — small colored circles for state indication
@@ -686,7 +657,7 @@ tr:last-child td {
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(59, 199, 232, 0.15);
+  border: 2px solid rgba(2, 117, 244, 0.15);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -963,7 +934,7 @@ tr:last-child td {
 .fda-warning-banner .btn-fda-secondary {
   background: rgba(255, 255, 255, 0.5);
   color: var(--accent);
-  border: 1px solid rgba(59, 199, 232, 0.25);
+  border: 1px solid rgba(2, 117, 244, 0.25);
 }
 
 .fda-warning-banner .btn-fda-secondary:hover {

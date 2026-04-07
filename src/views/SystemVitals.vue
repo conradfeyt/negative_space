@@ -91,7 +91,7 @@ const thermalColor = computed(() => {
   switch (vitalsResult.value.thermal_state) {
     case "Nominal": return "var(--success)";
     case "Fair": return "var(--warning)";
-    case "Serious": return "var(--thermal-serious)";
+    case "Serious": return "var(--temp-serious)";
     case "Critical": return "var(--danger)";
     default: return "var(--muted)";
   }

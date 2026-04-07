@@ -13,6 +13,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
+import Checkbox from "../components/Checkbox.vue";
 
 // Native macOS blue folder icon via NSWorkspace.shared.icon(forFile:)
 const folderIcon = ref("");
@@ -205,10 +206,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
       </div>
 
       <div class="select-all-row">
-        <label class="select-all-label">
-          <input type="checkbox" :checked="allSelected" @change="toggleAll" />
-          Select all
-        </label>
+        <Checkbox :is-on="allSelected" @change="toggleAll">Select all</Checkbox>
       </div>
 
       <div class="cache-groups">
@@ -220,7 +218,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
               <span class="category-label">{{ group.label }}</span>
-              <span class="badge-pill badge-neutral">{{ group.entries.length }}</span>
+              <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
             </div>
             <div class="category-header-right">
               <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
@@ -251,9 +249,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
                 <span class="cache-size mono">{{ formatSize(entry.size) }}</span>
                 <span class="cache-count text-muted">{{ entry.item_count.toLocaleString() }} items</span>
               </div>
-              <div class="cache-check" @click.stop>
-                <input type="checkbox" :checked="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
-              </div>
+              <Checkbox :is-on="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
             </div>
           </div>
         </div>
@@ -313,7 +309,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   color: var(--text);
 }
 
-/* category-count: uses global .badge-pill .badge-neutral */
+/* category-count: uses global .badge .pill .badge-neutral */
 
 .category-header-right {
   display: flex;
@@ -349,7 +345,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
 }
 
 .cache-item--selected {
-  background: rgba(59, 199, 232, 0.06);
+  background: rgba(2, 117, 244, 0.06);
 }
 
 .cache-icon {
@@ -413,12 +409,5 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   font-size: 10px;
 }
 
-.cache-check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .select-all-row { margin-bottom: var(--sp-2); padding: 0 var(--sp-1); }
-.select-all-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
 </style>

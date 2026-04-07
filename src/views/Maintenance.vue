@@ -86,33 +86,33 @@ function statusLabel(status: string): string {
               <span class="task-name">{{ task.name }}</span>
               <span
                 v-if="task.requires_admin"
-                class="badge-pill badge-warning"
+                class="badge pill badge-warning"
                 title="Requires administrator password"
               >
                 Admin
               </span>
               <span
                 v-if="task.destructive"
-                class="badge-pill badge-danger"
+                class="badge pill badge-danger"
                 title="Deletes or modifies data"
               >
                 Modifies data
               </span>
               <span
                 v-else
-                class="badge-pill badge-success"
+                class="badge pill badge-success"
               >
                 No data changed
               </span>
               <span
                 v-if="task.reversible_info"
-                class="badge-pill badge-accent"
+                class="badge pill badge-accent"
               >
                 Reversible
               </span>
               <span
                 v-else
-                class="badge-pill badge-neutral"
+                class="badge pill badge-neutral"
               >
                 Not reversible
               </span>
@@ -238,7 +238,7 @@ function statusLabel(status: string): string {
   padding: var(--sp-4) var(--sp-5);
   border-radius: var(--radius-md);
   background: var(--accent-light);
-  border: 1px solid rgba(0, 180, 216, 0.1);
+  border: 1px solid rgba(2, 117, 244, 0.1);
   margin-bottom: var(--sp-6);
 }
 
@@ -454,7 +454,7 @@ function statusLabel(status: string): string {
   line-height: 1.6;
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(0, 180, 216, 0.12);
+  background: rgba(2, 117, 244, 0.12);
   border-left: 3px solid var(--accent);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }

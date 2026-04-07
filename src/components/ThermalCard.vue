@@ -76,7 +76,7 @@ const thermalBars = computed<ThermalBar[]>(() => {
   font-size: 9px;
   font-weight: 600;
   color: rgba(60, 65, 80, 0.5);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.5px;
 }
 
 .tstrip-track {

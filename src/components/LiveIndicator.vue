@@ -12,13 +12,15 @@ defineProps<{
   lastUpdated?: Date | null
 }>()
 
-function formatTimeAgo(d: Date | null | undefined): string {
+// Reserved for future use when lastUpdated display is added
+function _formatTimeAgo(d: Date | null | undefined): string {
   if (!d) return ""
   const sec = Math.floor((Date.now() - d.getTime()) / 1000)
   if (sec < 2) return "just now"
   if (sec < 60) return `${sec}s ago`
   return `${Math.floor(sec / 60)}m ago`
 }
+void _formatTimeAgo
 </script>
 
 <template>

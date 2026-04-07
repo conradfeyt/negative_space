@@ -19,6 +19,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
+import Checkbox from "../components/Checkbox.vue";
 import EmptyState from "../components/EmptyState.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import TabBar from "../components/TabBar.vue";
@@ -458,10 +459,8 @@ function shortPath(p: string): string {
                 }"
                 @click="loadPreview(file.path, $event)"
               >
-                <label class="card-checkbox" @click.stop>
-                  <input type="checkbox" :checked="selected.has(file.path)" @change="toggleFile(file.path)" />
-                </label>
-                <span v-if="idx === 0" class="badge-pill badge-accent card-badge-keep">Keep</span>
+                <Checkbox :is-on="selected.has(file.path)" @change="toggleFile(file.path)" />
+                <span v-if="idx === 0" class="badge pill badge-accent card-badge-keep">Keep</span>
 
                 <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
                   <img v-if="group.thumbnail" :src="'data:image/jpeg;base64,' + group.thumbnail" alt="" class="card-thumb-img" />
@@ -623,10 +622,8 @@ function shortPath(p: string): string {
                   }"
                   @click="toggleSimilarFile(file.path)"
                 >
-                  <label class="card-checkbox" @click.stop>
-                    <input type="checkbox" :checked="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
-                  </label>
-                  <span v-if="idx === group.representative_idx" class="badge-pill badge-accent card-badge-keep">Keep</span>
+                  <Checkbox :is-on="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
+                  <span v-if="idx === group.representative_idx" class="badge pill badge-accent card-badge-keep">Keep</span>
 
                   <div class="card-face card-face--thumb">
                     <img v-if="file.thumbnail" :src="'data:image/jpeg;base64,' + file.thumbnail" alt="" class="card-thumb-img" />
@@ -695,7 +692,7 @@ function shortPath(p: string): string {
 
 .similar-progress-fill {
   height: 100%;
-  background: var(--accent, rgba(59, 199, 232, 0.8));
+  background: var(--accent, rgba(2, 117, 244, 0.8));
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -877,28 +874,15 @@ function shortPath(p: string): string {
 }
 
 /* Checkbox overlay */
-.card-checkbox {
+
+.file-card > .checkbox {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 4px;
+  left: 4px;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 5px;
-  cursor: pointer;
-  backdrop-filter: blur(4px);
 }
 
-.card-checkbox input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-/* Keep badge — positioning only; visual style from global .badge-pill .badge-accent */
+/* Keep badge — positioning only; visual style from global .badge .pill .badge-accent */
 .card-badge-keep {
   position: absolute;
   top: 6px;
@@ -960,7 +944,7 @@ function shortPath(p: string): string {
 
 .card-overflow:hover {
   background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(59, 199, 232, 0.4);
+  border-color: rgba(2, 117, 244, 0.4);
 }
 
 .card-overflow-count {
@@ -977,7 +961,7 @@ function shortPath(p: string): string {
 
 .card-overflow-action {
   font-size: 10px;
-  color: var(--accent, rgba(59, 199, 232, 1));
+  color: var(--accent, rgba(2, 117, 244, 1));
   font-weight: 500;
   margin-top: 4px;
 }

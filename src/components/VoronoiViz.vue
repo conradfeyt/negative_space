@@ -1191,7 +1191,7 @@ watch(voronoiMode, () => {
         </mask>
         <filter id="cell-glow" x="-10%" y="-10%" width="120%" height="120%">
           <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur" />
-          <feFlood flood-color="rgba(59, 199, 232, 0.4)" result="color" />
+          <feFlood flood-color="rgba(2, 117, 244, 0.4)" result="color" />
           <feComposite in="color" in2="blur" operator="in" result="shadow" />
           <feMerge>
             <feMergeNode in="shadow" />
@@ -1280,7 +1280,7 @@ watch(voronoiMode, () => {
         </mask>
         <filter id="cell-glow-cluster" x="-10%" y="-10%" width="120%" height="120%">
           <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur" />
-          <feFlood flood-color="rgba(59, 199, 232, 0.4)" result="color" />
+          <feFlood flood-color="rgba(2, 117, 244, 0.4)" result="color" />
           <feComposite in="color" in2="blur" operator="in" result="shadow" />
           <feMerge>
             <feMergeNode in="shadow" />
@@ -1368,7 +1368,7 @@ watch(voronoiMode, () => {
 
     <!-- Expand / Compact button -->
     <button class="voronoi-expand-btn" @click="toggleExpand">
-      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <template v-if="!expanded">
           <path d="M8.5 1.5H12.5V5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M5.5 12.5H1.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1518,7 +1518,7 @@ watch(voronoiMode, () => {
    Labels
    --------------------------------------------------------------------------- */
 .voronoi-label {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family: var(--font-sans);
   text-anchor: middle;
   pointer-events: none;
   dominant-baseline: middle;
@@ -1799,7 +1799,7 @@ watch(voronoiMode, () => {
    Cluster labels (below each circle)
    --------------------------------------------------------------------------- */
 .cluster-label-name {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 650;
   fill: var(--text);
@@ -1807,7 +1807,7 @@ watch(voronoiMode, () => {
 }
 
 .cluster-label-size {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
   fill: var(--text-secondary);

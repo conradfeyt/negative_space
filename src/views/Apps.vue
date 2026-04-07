@@ -192,7 +192,7 @@ function sourceLabel(source: string): string {
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
                 </span>
                 <span class="app-name">{{ app.name }}</span>
-                <span v-if="app.install_source !== 'manual'" class="source-badge" :class="'source-' + app.install_source">
+                <span v-if="app.install_source !== 'manual'" class="badge source pill" :class="app.install_source">
                   {{ sourceLabel(app.install_source) }}
                 </span>
               </div>
@@ -514,7 +514,7 @@ function sourceLabel(source: string): string {
 }
 
 .footprint-bar-app {
-  background: rgba(59, 199, 232, 0.30);
+  background: rgba(2, 117, 244, 0.30);
   display: flex;
   align-items: center;
   justify-content: center;

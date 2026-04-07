@@ -929,12 +929,12 @@ onUnmounted(() => {
   color: white;
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(59, 199, 232, 0.25);
+  box-shadow: 0 2px 8px rgba(2, 117, 244, 0.25);
 }
 
 .btn-gate-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(59, 199, 232, 0.3);
+  box-shadow: 0 4px 12px rgba(2, 117, 244, 0.3);
   transform: translateY(-0.5px);
 }
 
@@ -1039,8 +1039,8 @@ onUnmounted(() => {
 
 /* Active pill — aqua-to-mint gradient */
 .nav-item.active {
-  background: linear-gradient(135deg, rgba(59, 199, 232, 0.60) 0%, rgba(59, 199, 232, 0.40) 100%);
-  box-shadow: 0 1px 6px rgba(59, 199, 232, 0.20);
+  background: linear-gradient(135deg, rgba(2, 117, 244, 0.60) 0%, rgba(2, 117, 244, 0.40) 100%);
+  box-shadow: 0 1px 6px rgba(2, 117, 244, 0.20);
 }
 
 .nav-icon {
@@ -1054,7 +1054,7 @@ onUnmounted(() => {
 }
 
 .nav-item.active .nav-icon {
-  color: #ffffff;
+  color: var(--sidebar-text);
 }
 
 .nav-label {
@@ -1097,7 +1097,7 @@ onUnmounted(() => {
 
 .nav-item.active .nav-badge-scanning :deep(.spinner-xs) {
   border-color: rgba(255, 255, 255, 0.2);
-  border-top-color: #ffffff;
+  border-top-color: var(--sidebar-text);
 }
 
 .nav-badge-result {
@@ -1136,7 +1136,7 @@ onUnmounted(() => {
 
 .version-tag {
   font-size: 11px;
-  color: #ffffff;
+  color: var(--sidebar-text);
   font-family: var(--font-mono);
   opacity: 0.7;
 }

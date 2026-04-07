@@ -22,6 +22,7 @@ import {
 } from "../stores/scanStore";
 import { useCompressionQueue } from "../composables/useCompressionQueue";
 import EmptyState from "../components/EmptyState.vue";
+import Checkbox from "../components/Checkbox.vue";
 
 // ---------------------------------------------------------------------------
 // UI state
@@ -255,14 +256,10 @@ onMounted(loadVaultSummary);
       </div>
 
       <div class="candidates-toolbar">
-        <label class="select-all-label">
-          <input
-            type="checkbox"
-            :checked="selectedCandidates.size === vaultCandidates.length && vaultCandidates.length > 0"
-            @change="toggleAllCandidates"
-          />
-          Select all
-        </label>
+        <Checkbox
+          :is-on="selectedCandidates.size === vaultCandidates.length && vaultCandidates.length > 0"
+          @change="toggleAllCandidates"
+        >Select all</Checkbox>
         <div class="toolbar-right">
           <span v-if="selectedCandidates.size > 0" class="selected-info">
             {{ selectedCandidates.size }} selected &middot; ~{{ formatSize(totalCandidateSavings) }}
@@ -285,10 +282,8 @@ onMounted(loadVaultSummary);
           @click="toggleCandidate(candidate.path)"
         >
           <div class="candidate-main">
-            <input
-              type="checkbox"
-              :checked="selectedCandidates.has(candidate.path)"
-              @click.stop
+            <Checkbox
+              :is-on="selectedCandidates.has(candidate.path)"
               @change="toggleCandidate(candidate.path)"
             />
             <div class="candidate-info">
@@ -649,14 +644,6 @@ onMounted(loadVaultSummary);
   margin-bottom: var(--sp-3);
 }
 
-.select-all-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
 
 .toolbar-right {
   display: flex;
@@ -697,7 +684,7 @@ onMounted(loadVaultSummary);
   gap: var(--sp-3);
 }
 
-.candidate-main input[type="checkbox"] { flex-shrink: 0; }
+.candidate-main > .checkbox { flex-shrink: 0; }
 
 .candidate-info {
   flex: 1;

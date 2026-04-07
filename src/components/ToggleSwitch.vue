@@ -23,9 +23,10 @@ defineEmits<{
 .toggle {
   position: relative;
   display: inline-block;
-  width: 40px;
-  height: 22px;
+  width: 37px;
+  height: 16px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .toggle input {
@@ -36,26 +37,23 @@ defineEmits<{
 
 .toggle-slider {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.20);
-  border-radius: 22px;
-  transition: background 0.2s;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  transition: background 0.2s ease;
 }
 
 .toggle-slider::before {
   content: "";
   position: absolute;
-  height: 18px;
-  width: 18px;
+  height: 12px;
+  width: 21px;
   left: 2px;
-  bottom: 2px;
+  top: 2px;
   background: white;
-  border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-radius: 7px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .toggle input:checked + .toggle-slider {
@@ -63,6 +61,6 @@ defineEmits<{
 }
 
 .toggle input:checked + .toggle-slider::before {
-  transform: translateX(18px);
+  transform: translateX(12px);
 }
 </style>

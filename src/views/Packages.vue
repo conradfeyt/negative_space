@@ -150,13 +150,13 @@ const totalRuntimeSize = computed(() =>
                   <div class="pkg-info">
                     <span class="pkg-name">{{ pkg.name }}</span>
                     <span class="pkg-version mono text-muted">{{ pkg.version }}</span>
-                    <span v-if="!pkg.is_top_level" class="badge-pill badge-neutral">dep</span>
+                    <span v-if="!pkg.is_top_level" class="badge pill badge-neutral">dep</span>
                   </div>
                   <div class="pkg-right">
                     <span v-if="pkg.size > 0" class="pkg-size mono">{{ formatSize(pkg.size) }}</span>
                     <button
                       v-if="pkg.dependencies.length > 0"
-                      class="badge-pill badge-accent deps-toggle"
+                      class="badge pill badge-accent deps-toggle"
                       @click.stop="toggleDeps(mgr.id + '/' + pkg.name)"
                     >
                       {{ showDeps.has(mgr.id + '/' + pkg.name) ? 'hide deps' : pkg.dependencies.length + ' deps' }}
@@ -215,7 +215,7 @@ const totalRuntimeSize = computed(() =>
             </span>
             <div class="runtime-title">
               <span class="runtime-name">{{ rt.name }}</span>
-              <span class="source-badge" :class="'source-' + rt.install_method">
+              <span class="badge source pill" :class="rt.install_method">
                 {{ rt.install_method }}
               </span>
             </div>
@@ -236,7 +236,7 @@ const totalRuntimeSize = computed(() =>
               >
                 <div class="version-info">
                   <span class="version-name">{{ ver.version }}</span>
-                  <span v-if="ver.active" class="badge-pill badge-accent">active</span>
+                  <span v-if="ver.active" class="badge pill badge-accent">active</span>
                 </div>
                 <div class="version-right">
                   <span v-if="ver.size > 0" class="version-size mono">{{ formatSize(ver.size) }}</span>
@@ -428,7 +428,7 @@ const totalRuntimeSize = computed(() =>
   font-size: 11px;
 }
 
-/* dep-badge: uses global .badge-pill .badge-neutral */
+/* dep-badge: uses global .badge .pill .badge-neutral */
 
 .pkg-right {
   display: flex;
@@ -549,7 +549,7 @@ const totalRuntimeSize = computed(() =>
   color: var(--text);
 }
 
-/* active-badge: uses global .badge-pill .badge-accent */
+/* active-badge: uses global .badge .pill .badge-accent */
 
 .version-right {
   flex-shrink: 0;

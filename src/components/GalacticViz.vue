@@ -951,7 +951,7 @@ watch(() => props.expanded, () => {
 
     <!-- Expand / Compact button — top-right -->
     <button class="galactic-expand-btn" @click="toggleExpand">
-      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <template v-if="!expanded">
           <path d="M8.5 1.5H12.5V5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M5.5 12.5H1.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>

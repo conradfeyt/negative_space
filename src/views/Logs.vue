@@ -13,6 +13,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
+import Checkbox from "../components/Checkbox.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
@@ -168,10 +169,7 @@ function shortPath(path: string): string {
     <template v-else-if="logs.length > 0">
       <div class="results-bar">
         <div class="results-bar-left">
-          <label class="select-all-label">
-            <input type="checkbox" :checked="allSelected" @change="toggleAll" />
-            Select all
-          </label>
+          <Checkbox :is-on="allSelected" @change="toggleAll">Select all</Checkbox>
           <span class="results-count text-muted">{{ logs.length }} log(s) &mdash; {{ formatSize(totalLogSize) }} total</span>
         </div>
         <div class="results-bar-right">
@@ -191,7 +189,7 @@ function shortPath(path: string): string {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
               </span>
               <span class="category-label">{{ group.source }}</span>
-              <span class="badge-pill badge-neutral">{{ group.entries.length }}</span>
+              <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
             </div>
             <div class="category-header-right">
               <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
@@ -220,9 +218,7 @@ function shortPath(path: string): string {
                 <span class="log-size mono">{{ formatSize(log.size) }}</span>
                 <span v-if="log.modified" class="log-time text-muted">{{ timeAgo(log.modified) }}</span>
               </div>
-              <div class="log-check" @click.stop>
-                <input type="checkbox" :checked="selected.has(log.path)" @change="toggleSelect(log.path)" />
-              </div>
+              <Checkbox :is-on="selected.has(log.path)" @change="toggleSelect(log.path)" />
             </div>
           </div>
         </div>
@@ -253,13 +249,6 @@ function shortPath(path: string): string {
   gap: var(--sp-3);
 }
 
-.select-all-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  cursor: pointer;
-}
 
 .results-count { font-size: 12px; }
 
@@ -307,7 +296,7 @@ function shortPath(path: string): string {
   color: var(--text);
 }
 
-/* category-count: uses global .badge-pill .badge-neutral */
+/* category-count: uses global .badge .pill .badge-neutral */
 
 .category-header-right {
   display: flex;
@@ -388,9 +377,4 @@ function shortPath(path: string): string {
 
 .log-time { font-size: 10px; }
 
-.log-check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 </style>

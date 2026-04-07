@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
-  { path: "/", redirect: "/dashboard" },
+  { path: "/", redirect: "/showcase" },
   { path: "/dashboard", name: "dashboard", component: () => import("./views/Dashboard.vue") },
   { path: "/large-files", name: "large-files", component: () => import("./views/LargeFiles.vue") },
   { path: "/caches", name: "caches", component: () => import("./views/Caches.vue") },
@@ -22,9 +22,8 @@ const routes: RouteRecordRaw[] = [
   { path: "/settings", name: "settings", component: () => import("./views/Settings.vue") },
 ];
 
-if (import.meta.env.DEV) {
-  routes.push({ path: "/icon-test", name: "icon-test", component: () => import("./views/IconTest.vue") });
-}
+routes.push({ path: "/icon-test", name: "icon-test", component: () => import("./views/IconTest.vue") });
+routes.push({ path: "/showcase", name: "showcase", component: () => import("./views/Showcase.vue") });
 
 routes.push({ path: "/:pathMatch(.*)*", redirect: "/dashboard" });
 

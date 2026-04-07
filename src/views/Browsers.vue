@@ -13,6 +13,7 @@ import {
 import type { BrowserInfo, BrowserDataCategory } from "../types";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
+import Checkbox from "../components/Checkbox.vue";
 
 // ── Browser app icons via NSWorkspace ─────────────────────────────────
 const browserIcons = ref<Record<string, string>>({});
@@ -355,15 +356,10 @@ function selectAllSafe(browser: BrowserInfo) {
               @click="toggleCategory(browser.id, cat)"
             >
               <div class="category-left">
-                <input
-                  type="checkbox"
-                  :checked="isCatSelected(browser.id, cat.id)"
-                  :disabled="
-                    (cat.tcc_protected && !browserResult.has_fda) ||
-                    (cat.size === 0 && !cat.tcc_protected)
-                  "
-                  @change.stop="toggleCategory(browser.id, cat)"
-                  @click.stop
+                <Checkbox
+                  :is-on="isCatSelected(browser.id, cat.id)"
+                  :disabled="(cat.tcc_protected && !browserResult.has_fda) || (cat.size === 0 && !cat.tcc_protected)"
+                  @change="toggleCategory(browser.id, cat)"
                 />
                 <div class="category-info">
                   <div class="category-label-row">
@@ -551,9 +547,6 @@ function selectAllSafe(browser: BrowserInfo) {
   flex: 1;
 }
 
-.category-left input[type="checkbox"] {
-  margin-top: 2px;
-}
 
 .category-info {
   display: flex;

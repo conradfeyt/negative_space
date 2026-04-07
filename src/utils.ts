@@ -131,11 +131,11 @@ export const KIND_COLOR_DEFAULT = cssVar("--kind-default", "#95A5A6");
 
 /** Memory process category colors (Memory.vue group badges + dots). */
 export const MEMORY_CATEGORY_COLORS: Record<string, string> = {
-  app:         cssVar("--cat-app",         "#00b4d8"),
+  app:         cssVar("--cat-app",         "#07C0E8"),
   system:      cssVar("--cat-system",      "#6c7086"),
   display:     cssVar("--cat-display",     "#a78bfa"),
   networking:  cssVar("--cat-networking",  "#38bdf8"),
-  security:    cssVar("--cat-security",    "#f97316"),
+  security:    cssVar("--cat-security",    "#FF8D28"),
   storage:     cssVar("--cat-storage",     "#84cc16"),
   icloud:      cssVar("--cat-icloud",      "#60a5fa"),
   audio:       cssVar("--cat-audio",       "#e879f9"),
@@ -146,11 +146,11 @@ export const MEMORY_CATEGORY_COLORS: Record<string, string> = {
 
 /** Memory bar segment colors (system memory breakdown). */
 export const MEMORY_BAR_COLORS = {
-  app:        cssVar("--mem-app",        "#00b4d8"),
-  wired:      cssVar("--mem-wired",      "#f97316"),
-  compressed: cssVar("--mem-compressed", "#a78bfa"),
+  app:        cssVar("--mem-app",        "#07C0E8"),
+  wired:      cssVar("--mem-wired",      "#FF8D28"),
+  compressed: cssVar("--mem-compressed", "#EA8EFF"),
   inactive:   cssVar("--mem-inactive",   "#94a3b8"),
-  free:       cssVar("--mem-free",       "#30d158"),
+  free:       cssVar("--mem-free",       "#34C759"),
 };
 
 /** SpaceMap category fill colors (sunburst legend). */

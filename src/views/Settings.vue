@@ -252,6 +252,7 @@ onMounted(() => {
     <div class="card mt-6">
       <h3 class="section-title">Debug</h3>
       <button class="btn-secondary mt-2" @click="router.push({ name: 'icon-test' })">Icon Test Page</button>
+      <button class="btn-secondary mt-2" @click="router.push({ name: 'showcase' })">Component Showcase</button>
     </div>
   </section>
 </template>

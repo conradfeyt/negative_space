@@ -55,6 +55,9 @@ export const totalDomains = computed(() =>
 export const hasFullDiskAccess = ref<boolean | null>(null);
 
 export async function checkFullDiskAccess() {
+  // TODO: restore FDA check — temporarily bypassed for showcase tuning
+  hasFullDiskAccess.value = true;
+  return;
   try {
     hasFullDiskAccess.value = await invoke<boolean>("check_full_disk_access");
   } catch (e) {

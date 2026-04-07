@@ -187,7 +187,7 @@ const thermalColor = computed(() => {
   switch (vitalsResult.value.thermal_state) {
     case "Nominal": return "var(--success)";
     case "Fair": return "var(--warning)";
-    case "Serious": return "var(--thermal-serious)";
+    case "Serious": return "var(--temp-serious)";
     case "Critical": return "var(--danger)";
     default: return "var(--muted)";
   }
@@ -493,7 +493,7 @@ onUnmounted(() => stopPolling());
          ================================================================ -->
     <div v-if="scanSummary && scanSummary.summary" class="ai-summary-card">
       <p class="ai-summary-text">{{ scanSummary.summary }}</p>
-      <span v-if="scanSummary.ai_generated" class="badge-pill badge-accent ai-badge">AI</span>
+      <span v-if="scanSummary.ai_generated" class="badge pill badge-accent ai-badge">AI</span>
     </div>
 
     <!-- ================================================================
@@ -938,7 +938,7 @@ onUnmounted(() => stopPolling());
   flex: 1;
 }
 
-/* ai-badge: visual style from global .badge-pill .badge-accent */
+/* ai-badge: visual style from global .badge .pill .badge-accent */
 .ai-badge {
   flex-shrink: 0;
   text-transform: uppercase;
