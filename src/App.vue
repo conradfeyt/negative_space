@@ -964,6 +964,16 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* Subtle white wash over sidebar + gutters to soften the native gradient */
+.app-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 1;
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Sidebar — nav text sits directly on the full-bleed sidebar gradient.
    No backdrop-filter needed — the sidebar gradient IS the background.
