@@ -189,6 +189,52 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
             tinted.draw(in: glyphRect, from: .zero, operation: .sourceOver, fraction: 1.0)
         }
 
+    case "blueGradientBadge":
+        // Blue gradient rounded rect with white glyph (Privacy & Security style)
+        let bluePadding = pixelSize.width * (7.0 / 64.0)
+        let blueRectSize = pixelSize.width - (bluePadding * 2)
+        let blueRectOrigin = NSPoint(x: bluePadding, y: bluePadding)
+        let blueBadgeRect = NSRect(origin: blueRectOrigin, size: NSSize(width: blueRectSize, height: blueRectSize))
+        let blueCornerRadius = blueRectSize * 0.25
+
+        let blueShadow = NSShadow()
+        blueShadow.shadowColor = NSColor(calibratedWhite: 0.0, alpha: 0.2)
+        blueShadow.shadowOffset = NSSize(width: 0, height: -1 * scale)
+        blueShadow.shadowBlurRadius = 2 * scale
+        blueShadow.set()
+
+        // Blue gradient: #47A8FF top → #0690FF bottom
+        let blueBgPath = NSBezierPath(roundedRect: blueBadgeRect, xRadius: blueCornerRadius, yRadius: blueCornerRadius)
+        let blueTopColor = NSColor(srgbRed: 0.278, green: 0.659, blue: 1.0, alpha: 1.0)   // #47A8FF
+        let blueBottomColor = NSColor(srgbRed: 0.024, green: 0.565, blue: 1.0, alpha: 1.0) // #0690FF
+        let blueGradient = NSGradient(starting: blueTopColor, ending: blueBottomColor)!
+        blueGradient.draw(in: blueBgPath, angle: 270)
+
+        NSShadow().set()
+
+        // Draw white glyph
+        let blueGlyphScale = CGFloat(params.glyphScale ?? 1.0)
+        let blueMaxDim = blueRectSize * 0.76 * blueGlyphScale
+        if mode == "sf", let sfImg = NSImage(systemSymbolName: params.name, accessibilityDescription: nil) {
+            let whiteConfig = NSImage.SymbolConfiguration(pointSize: size * 0.65, weight: .medium)
+                .applying(.init(paletteColors: [.white]))
+            let whiteSymbol = sfImg.withSymbolConfiguration(whiteConfig) ?? sfImg
+            let nat = whiteSymbol.size
+            let asp = nat.width / max(nat.height, 1)
+            let gW = asp >= 1 ? blueMaxDim : blueMaxDim * asp
+            let gH = asp >= 1 ? blueMaxDim / asp : blueMaxDim
+            let gRect = NSRect(x: blueBadgeRect.midX - gW/2, y: blueBadgeRect.midY - gH/2, width: gW, height: gH)
+            whiteSymbol.draw(in: gRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        } else {
+            let tinted = tintImage(sourceImage, color: .white)
+            let nat = tinted.size
+            let asp = nat.width / max(nat.height, 1)
+            let gW = asp >= 1 ? blueMaxDim : blueMaxDim * asp
+            let gH = asp >= 1 ? blueMaxDim / asp : blueMaxDim
+            let gRect = NSRect(x: blueBadgeRect.midX - gW/2, y: blueBadgeRect.midY - gH/2, width: gW, height: gH)
+            tinted.draw(in: gRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        }
+
     case "grayBadgeHier":
         // Same gray badge but with hierarchical symbol rendering (preserves depth layers)
         let hierPadding = pixelSize.width * (7.0 / 64.0)
@@ -288,7 +334,25 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
         NSShadow().set()
 
     default: // "plain"
-        sourceImage.draw(in: fullRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        // Preserve aspect ratio — center the image in the square canvas
+        let nat = sourceImage.size
+        let aspect = nat.width / max(nat.height, 1)
+        let drawW: CGFloat
+        let drawH: CGFloat
+        if aspect >= 1.0 {
+            drawW = pixelSize.width
+            drawH = pixelSize.width / aspect
+        } else {
+            drawH = pixelSize.height
+            drawW = pixelSize.height * aspect
+        }
+        let drawRect = NSRect(
+            x: (pixelSize.width - drawW) / 2,
+            y: (pixelSize.height - drawH) / 2,
+            width: drawW,
+            height: drawH
+        )
+        sourceImage.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
     }
 
     NSGraphicsContext.restoreGraphicsState()

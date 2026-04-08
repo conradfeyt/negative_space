@@ -58,10 +58,10 @@ onUpdated(syncInput);
       }"
     >
       <span class="checkbox__box">
-        <svg class="checkbox__check" width="12" height="10" viewBox="0 0 12 10">
+        <svg class="checkbox__check" width="10" height="8" viewBox="0 0 12 10">
           <polyline points="1.5 6 4.5 9 10.5 1" />
         </svg>
-        <svg class="checkbox__dash" width="10" height="2" viewBox="0 0 10 2">
+        <svg class="checkbox__dash" width="8" height="2" viewBox="0 0 10 2">
           <line x1="0" y1="1" x2="10" y2="1" />
         </svg>
       </span>
@@ -117,8 +117,9 @@ onUpdated(syncInput);
 /* Check mark — hidden by default */
 .checkbox__check {
   position: absolute;
-  top: 2px;
-  left: 1px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   fill: none;
   stroke: #fff;
   stroke-width: 2;

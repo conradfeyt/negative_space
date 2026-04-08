@@ -164,6 +164,7 @@ import("./buildNumber").then(m => { buildNumber.value = m.BUILD_NUMBER ?? 0; }).
 const iconSystemSettings = ref("");
 const iconPrivacy = ref("");
 const iconFda = ref("");
+const iconNegativ = ref("");
 
 async function loadFdaIcons() {
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -173,14 +174,18 @@ async function loadFdaIcons() {
         if (b64) iconSystemSettings.value = b64;
       }
       if (!iconPrivacy.value) {
-        const b64 = await invoke<string>("render_sf_symbol", { name: "hand.raised.fill", size: 40, mode: "sf", style: "plain" });
+        const b64 = await invoke<string>("render_sf_symbol", { name: "hand.raised.fill", size: 40, mode: "sf", style: "blueGradientBadge" });
         if (b64) iconPrivacy.value = b64;
       }
       if (!iconFda.value) {
-        const b64 = await invoke<string>("render_sf_symbol", { name: "lock.shield", size: 40, mode: "sf", style: "plain" });
+        const b64 = await invoke<string>("render_sf_symbol", { name: "externaldrive.fill", size: 40, mode: "sf", style: "grayBadge" });
         if (b64) iconFda.value = b64;
       }
-      if (iconSystemSettings.value && iconPrivacy.value && iconFda.value) break;
+      if (!iconNegativ.value) {
+        const b64 = await invoke<string>("render_sf_symbol", { name: "NSApplicationIcon", size: 40, mode: "system", style: "plain" });
+        if (b64) iconNegativ.value = b64;
+      }
+      if (iconSystemSettings.value && iconPrivacy.value && iconFda.value && iconNegativ.value) break;
     } catch (_) { /* retry */ }
     await new Promise(r => setTimeout(r, 500));
   }
@@ -724,7 +729,7 @@ onUnmounted(() => {
       </div>
       <h1>Welcome to Negativ_</h1>
       <p class="fda-gate-subtitle">
-        For the most thorough scan, Negativ_ needs <strong style="color: var(--accent)">Full Disk Access</strong>.
+        Negativ_ needs <strong style="color: var(--accent)">Full Disk Access</strong> to see your whole Mac.
       </p>
       <p class="fda-gate-detail">
         Without it, protected folders like Desktop, Documents, and Downloads
@@ -734,19 +739,27 @@ onUnmounted(() => {
       <div class="fda-gate-steps">
         <div class="fda-step">
           <span class="fda-step-num">1</span>
-          <span>Open <img v-if="iconSystemSettings" :src="iconSystemSettings" alt="" class="fda-step-icon" /><strong>System Settings</strong></span>
+          <span class="fda-step-verb">Open</span>
+          <img v-if="iconSystemSettings" :src="iconSystemSettings" alt="" class="fda-step-icon" />
+          <strong>System Settings</strong>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">2</span>
-          <span>Go to <img v-if="iconPrivacy" :src="iconPrivacy" alt="" class="fda-step-icon" /><strong>Privacy &amp; Security</strong></span>
+          <span class="fda-step-verb">Go to</span>
+          <img v-if="iconPrivacy" :src="iconPrivacy" alt="" class="fda-step-icon" />
+          <strong>Privacy &amp; Security</strong>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">3</span>
-          <span>Find <img v-if="iconFda" :src="iconFda" alt="" class="fda-step-icon" /><strong style="color: var(--accent)">Full Disk Access</strong></span>
+          <span class="fda-step-verb">Find</span>
+          <img v-if="iconFda" :src="iconFda" alt="" class="fda-step-icon" />
+          <strong>Full Disk Access</strong>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">4</span>
-          <span>Toggle <strong>Negativ_</strong> on and click <strong>Re-check</strong></span>
+          <span class="fda-step-verb">Toggle</span>
+          <img v-if="iconNegativ" :src="iconNegativ" alt="" class="fda-step-icon" />
+          <strong>Negativ_</strong> on
         </div>
       </div>
 
@@ -758,9 +771,9 @@ onUnmounted(() => {
           Re-check Access
         </button>
       </div>
-      <button class="btn-ghost btn-sm" @click="skipFda" style="margin-top: 16px;">Skip for now</button>
-      <div class="fda-gate-version">v0.1.0 (build {{ buildNumber }})</div>
+      <button class="btn-gate-skip" @click="skipFda">Skip for now</button>
     </div>
+    <div class="fda-gate-version">v0.1.0 (build {{ buildNumber }})</div>
   </div>
 
   <!-- Main App — sidebar gradient is full-bleed, content panel inset -->
@@ -858,18 +871,39 @@ onUnmounted(() => {
 }
 
 .fda-gate-content {
+  position: relative;
   max-width: 480px;
   text-align: center;
-  padding: 48px;
+  padding: 36px 44px;
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-xl);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+.btn-gate-skip {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-gate-skip:hover {
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .fda-gate-icon {
   color: var(--accent);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .fda-gate-content h1 {
@@ -893,31 +927,34 @@ onUnmounted(() => {
   font-weight: 500;
   color: var(--text-secondary);
   line-height: 1.6;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .fda-gate-steps {
   text-align: left;
-  margin-bottom: 32px;
+  margin: 24px 0;
+  padding: 16px 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .fda-step {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   font-size: 14px;
   color: var(--text);
 }
 
 .fda-step-num {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--accent);
-  color: white;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -926,11 +963,18 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.fda-step-verb {
+  width: 42px;
+  flex-shrink: 0;
+  text-align: left;
+}
+
 .fda-step-icon {
   width: 20px;
   height: 20px;
-  vertical-align: -4px;
-  border-radius: 4px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  margin-right: -4px;
 }
 
 .fda-gate-actions {
@@ -940,9 +984,12 @@ onUnmounted(() => {
 }
 
 .fda-gate-version {
-  margin-top: 20px;
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 11px;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.5);
   font-family: var(--font-mono);
 }
 

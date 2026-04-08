@@ -40,6 +40,10 @@ const testIcons: { key: string; label: string; name: string; mode: string; style
   { key: "docker", label: "Docker", name: "/Applications/Docker.app", mode: "app", style: "plain" },
   { key: "caches", label: "Caches", name: "archivebox.fill", mode: "sf", style: "grayBadge" },
   { key: "other", label: "Other", name: "puzzlepiece.fill", mode: "sf", style: "grayBadge" },
+  // --- FDA gate icons ---
+  { key: "system_settings", label: "System Settings", name: "/System/Applications/System Settings.app", mode: "app", style: "plain" },
+  { key: "privacy_security", label: "Privacy & Security", name: "hand.raised.fill", mode: "sf", style: "blueGradientBadge" },
+  { key: "full_disk_access", label: "Full Disk Access", name: "externaldrive.fill", mode: "sf", style: "grayBadge" },
 ];
 
 onMounted(async () => {
@@ -79,6 +83,7 @@ onMounted(async () => {
         <template v-for="(icon, idx) in icons" :key="icon.key">
           <div v-if="icon.key === 'other_users' && idx > 0" class="icon-list-divider"></div>
           <div v-if="icon.key === 'docker' && idx > 0" class="icon-list-divider"></div>
+          <div v-if="icon.key === 'system_settings' && idx > 0" class="icon-list-divider"></div>
           <div class="icon-list-row">
             <div class="icon-list-preview">
               <img v-if="icon.base64" :src="icon.base64" :alt="icon.label" width="25" height="25" />

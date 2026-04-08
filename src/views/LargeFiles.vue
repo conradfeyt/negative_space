@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
+import { save, open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
 import { formatSize, fileDiskSize, timeAgo, revealInFinder, getFileExtension } from "../utils";
 import {
@@ -36,6 +36,63 @@ const deleting = ref(false);
 const successMsg = ref("");
 const minSizeMb = ref(100);
 const scanPath = ref("~");
+
+// Native icons for known directories
+const knownDirIcons = ref<Record<string, string>>({});
+async function loadKnownDirIcons() {
+  const iconDefs: Record<string, { name: string; mode: string; style: string }> = {
+    "~": { name: "house", mode: "sf", style: "plain" },
+    "/": { name: "externaldrive", mode: "sf", style: "plain" },
+    "~/Documents": { name: "doc", mode: "sf", style: "plain" },
+    "~/Desktop": { name: "menubar.dock.rectangle", mode: "sf", style: "plain" },
+    "~/Downloads": { name: "arrow.down.circle", mode: "sf", style: "plain" },
+    "~/Library/Mobile Documents/com~apple~CloudDocs": { name: "icloud", mode: "sf", style: "plain" },
+    "/Applications": { name: "square.grid.2x2", mode: "sf", style: "plain" },
+    "~/Movies": { name: "film", mode: "sf", style: "plain" },
+    "~/Pictures": { name: "photo", mode: "sf", style: "plain" },
+    "~/Music": { name: "music.note", mode: "sf", style: "plain" },
+  };
+  for (const [key, def] of Object.entries(iconDefs)) {
+    try {
+      const b64 = await invoke<string>("render_sf_symbol", { name: def.name, size: 32, mode: def.mode, style: def.style });
+      if (b64) knownDirIcons.value[key] = b64;
+    } catch { /* non-critical */ }
+  }
+}
+loadKnownDirIcons();
+
+const scanPathIcon = computed(() => {
+  const shortened = scanPath.value.replace(/^\/Users\/[^/]+/, "~");
+  return knownDirIcons.value[shortened] ?? "";
+});
+
+const knownDirs: Record<string, string> = {
+  "~": "Home",
+  "/": "Macintosh HD",
+  "~/Documents": "Documents",
+  "~/Desktop": "Desktop",
+  "~/Downloads": "Downloads",
+  "~/Library/Mobile Documents/com~apple~CloudDocs": "iCloud Drive",
+  "/Applications": "Applications",
+  "~/Movies": "Movies",
+  "~/Pictures": "Pictures",
+  "~/Music": "Music",
+};
+
+const scanPathDisplay = computed(() => {
+  const shortened = scanPath.value.replace(/^\/Users\/[^/]+/, "~");
+  return knownDirs[shortened] ?? shortened;
+});
+
+async function pickScanFolder() {
+  const folder = await openDialog({
+    directory: true,
+    multiple: false,
+    title: "Choose folder to scan",
+    defaultPath: scanPath.value === "~" ? undefined : scanPath.value,
+  });
+  if (folder) scanPath.value = folder as string;
+}
 
 /** Track which groups are collapsed */
 const collapsedGroups = ref<Set<string>>(new Set());
@@ -361,8 +418,12 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         <label for="lf-min-size" class="sr-only">Minimum size (MB)</label>
         <input id="lf-min-size" v-model.number="minSizeMb" type="number" min="1" max="10000" class="size-input" title="Minimum size (MB)" @blur="minSizeMb = Math.max(1, Math.min(10000, minSizeMb || 1))" />
         <span class="lf-controls-label text-muted">MB in</span>
-        <label for="lf-scan-path" class="sr-only">Search path</label>
-        <input id="lf-scan-path" v-model="scanPath" type="text" class="path-input" title="Search path" />
+        <button class="path-picker" @click="pickScanFolder" title="Choose scan folder">
+          <img v-if="scanPathIcon" :src="scanPathIcon" alt="" class="path-picker-icon" />
+          <img v-else-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" />
+          <svg v-else width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
+          <span class="path-picker-label">{{ scanPathDisplay }}</span>
+        </button>
         <button class="btn-primary scan-btn" :disabled="largeFilesScanning" @click="scan">
           <span v-if="largeFilesScanning" class="spinner-sm"></span>
           {{ largeFilesScanning ? "Scanning..." : "Scan" }}
@@ -845,7 +906,28 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 .control-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 .control-label { font-size: 12px; font-weight: 400; color: var(--muted); }
 .size-input { width: 100px; }
-.path-input { width: 240px; }
+
+.path-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #c0c6d24d;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.path-picker:hover { background: #a8aeba66; }
+.path-picker-icon { height: 16px; width: auto; }
+.path-picker-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
 
 /* ---- Scanning progress bar ---- */
 .scan-progress-bar {
@@ -1227,7 +1309,8 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 }
 
 .lf-controls .size-input {
-  width: 60px;
+  width: 72px;
+  padding: 8px 8px;
 }
 
 .lf-controls .path-input {
