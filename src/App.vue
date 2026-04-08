@@ -156,6 +156,37 @@ function skipFda() {
 
 const showApp = () => import.meta.env.DEV || _hasFullDiskAccess.value || fdaDismissed.value;
 
+// Build info for FDA gate footer
+const buildNumber = ref(0);
+import("./buildNumber").then(m => { buildNumber.value = m.BUILD_NUMBER ?? 0; }).catch(() => {});
+
+// FDA gate native icons — retry loading since invoke may not be ready on cold start
+const iconSystemSettings = ref("");
+const iconPrivacy = ref("");
+const iconFda = ref("");
+
+async function loadFdaIcons() {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      if (!iconSystemSettings.value) {
+        const b64 = await invoke<string>("render_sf_symbol", { name: "/System/Applications/System Settings.app", size: 40, mode: "app", style: "plain" });
+        if (b64) iconSystemSettings.value = b64;
+      }
+      if (!iconPrivacy.value) {
+        const b64 = await invoke<string>("render_sf_symbol", { name: "hand.raised.fill", size: 40, mode: "sf", style: "plain" });
+        if (b64) iconPrivacy.value = b64;
+      }
+      if (!iconFda.value) {
+        const b64 = await invoke<string>("render_sf_symbol", { name: "lock.shield", size: 40, mode: "sf", style: "plain" });
+        if (b64) iconFda.value = b64;
+      }
+      if (iconSystemSettings.value && iconPrivacy.value && iconFda.value) break;
+    } catch (_) { /* retry */ }
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+onMounted(loadFdaIcons);
+
 // --- Screen-anchored gradient background ---
 // Queries ALL monitors via Tauri to compute the full virtual screen bounding
 // box, renders a gradient bitmap covering that entire space, then positions it
@@ -684,17 +715,16 @@ onUnmounted(() => {
   <!-- FDA Setup Gate -->
   <div v-if="fdaChecked && !showApp()" class="fda-gate">
     <div class="fda-drag-strip" @mousedown="startDrag"></div>
-    <button class="btn-gate-skip" @click="skipFda">Skip for now</button>
     <div class="fda-gate-content">
       <div class="fda-gate-icon">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
         </svg>
       </div>
       <h1>Welcome to Negativ_</h1>
       <p class="fda-gate-subtitle">
-        For the most thorough scan, Negativ_ needs Full Disk Access.
+        For the most thorough scan, Negativ_ needs <strong style="color: var(--accent)">Full Disk Access</strong>.
       </p>
       <p class="fda-gate-detail">
         Without it, protected folders like Desktop, Documents, and Downloads
@@ -704,30 +734,32 @@ onUnmounted(() => {
       <div class="fda-gate-steps">
         <div class="fda-step">
           <span class="fda-step-num">1</span>
-          <span>Click <strong>Open System Settings</strong> below</span>
+          <span>Open <img v-if="iconSystemSettings" :src="iconSystemSettings" alt="" class="fda-step-icon" /><strong>System Settings</strong></span>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">2</span>
-          <span>Find <strong>Full Disk Access</strong> in the list</span>
+          <span>Go to <img v-if="iconPrivacy" :src="iconPrivacy" alt="" class="fda-step-icon" /><strong>Privacy &amp; Security</strong></span>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">3</span>
-          <span>Toggle <strong>Negativ_</strong> on</span>
+          <span>Find <img v-if="iconFda" :src="iconFda" alt="" class="fda-step-icon" /><strong style="color: var(--accent)">Full Disk Access</strong></span>
         </div>
         <div class="fda-step">
           <span class="fda-step-num">4</span>
-          <span>Come back and click <strong>Re-check</strong></span>
+          <span>Toggle <strong>Negativ_</strong> on and click <strong>Re-check</strong></span>
         </div>
       </div>
 
       <div class="fda-gate-actions">
-        <button class="btn-gate-primary" @click="openSystemSettings">
+        <button class="btn-primary" @click="openSystemSettings" style="padding: 12px 28px; font-size: 14px;">
           Open System Settings
         </button>
-        <button class="btn-gate-secondary" @click="recheckFda">
+        <button class="btn-secondary" @click="recheckFda" style="padding: 12px 28px; font-size: 14px;">
           Re-check Access
         </button>
       </div>
+      <button class="btn-ghost btn-sm" @click="skipFda" style="margin-top: 16px;">Skip for now</button>
+      <div class="fda-gate-version">v0.1.0 (build {{ buildNumber }})</div>
     </div>
   </div>
 
@@ -806,14 +838,14 @@ onUnmounted(() => {
 
 <style scoped>
 /* ==========================================================================
-   FDA Gate — frosted glass onboarding
+   FDA Gate — onboarding screen
    ========================================================================== */
 .fda-gate {
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
   position: relative;
 }
 
@@ -825,40 +857,19 @@ onUnmounted(() => {
   height: 48px;
 }
 
-.btn-gate-skip {
-  position: absolute;
-  top: 52px;
-  right: 24px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid var(--glass-border);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 7px 18px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.btn-gate-skip:hover {
-  background: rgba(255, 255, 255, 0.65);
-  color: var(--text-secondary);
-}
-
 .fda-gate-content {
   max-width: 480px;
   text-align: center;
   padding: 48px;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .fda-gate-icon {
   color: var(--accent);
   margin-bottom: 24px;
-  opacity: 0.85;
 }
 
 .fda-gate-content h1 {
@@ -871,6 +882,7 @@ onUnmounted(() => {
 
 .fda-gate-subtitle {
   font-size: 15px;
+  font-weight: 500;
   color: var(--text-secondary);
   line-height: 1.55;
   margin-bottom: 6px;
@@ -878,7 +890,8 @@ onUnmounted(() => {
 
 .fda-gate-detail {
   font-size: 13px;
-  color: var(--muted);
+  font-weight: 500;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin-bottom: 32px;
 }
@@ -900,11 +913,11 @@ onUnmounted(() => {
 }
 
 .fda-step-num {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--accent-light);
-  color: var(--accent-deep);
+  background: var(--accent);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -913,45 +926,24 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.fda-step-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: -4px;
+  border-radius: 4px;
+}
+
 .fda-gate-actions {
   display: flex;
   gap: 10px;
   justify-content: center;
 }
 
-.btn-gate-primary {
-  padding: 12px 28px;
-  font-size: 14px;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(2, 117, 244, 0.25);
-}
-
-.btn-gate-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(2, 117, 244, 0.3);
-  transform: translateY(-0.5px);
-}
-
-.btn-gate-secondary {
-  padding: 12px 28px;
-  font-size: 14px;
-  font-weight: 600;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.4);
-  color: var(--text);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-gate-secondary:hover {
-  background: rgba(255, 255, 255, 0.65);
+.fda-gate-version {
+  margin-top: 20px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
 }
 
 /* ==========================================================================
