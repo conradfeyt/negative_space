@@ -33,7 +33,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **Backend:** Rust + Tauri v2 (`src-tauri/src/`)
 - **Native:** AppKit via objc2 — custom gradient layer, SMC sensor reading
 - **Image processing:** `image` crate (0.23) + `img_hash` (3.2) for perceptual hashing
-- **Testing:** Vitest (21 unit tests for pure utilities), Rust `#[cfg(test)]` modules
+- **Testing:** Vitest (37 unit tests for pure utilities), Rust `#[cfg(test)]` modules
 - **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance
 
 ## Architecture notes
@@ -79,26 +79,43 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 All views import from `scanStore.ts` (the facade) — no view changes needed when stores are reorganized internally.
 
 ### Shared Vue components
+
+**Shared UI components (extracted during component cohesion audit):**
+- **`Checkbox.vue`** — Custom styled checkbox with animated check mark, indeterminate support, v-model
+- **`StatCard.vue`** — Small metric/stat card (value + label), used by Apps, Packages, Duplicates, Security, Vault
+- **`EmptyState.vue`** — Rich empty state with customizable icon slot, title, description
+- **`TabBar.vue`** — Unified segmented control / tab bar with pill styling, disabled items, badges, scoped slot
+- **`LiveIndicator.vue`** — Pulsing pill badge showing live/paused state (Cpu, SystemVitals, Memory, Thermal)
+- **`ToggleSwitch.vue`** — macOS-style toggle switch with disabled + focus-visible support
+- **`ScanBar.vue`** — Pill-shaped scan controls container with slot for inputs + integrated scan button
+- **`Modal.vue`** — Reusable modal dialog with overlay, ESC dismiss, icon/default/actions slots
+- **`FileRow.vue`** — File list row (icon, name, path, safety badge, size, reveal button, checkbox)
+
+**Existing components (unchanged):**
 - **`FdaWarningBanner.vue`** — FDA permission warning banner (used by 7 views)
-- **`ThermalCard.vue`**, **`FanCard.vue`**, **`BatteryCard.vue`**, **`CpuCard.vue`**, **`MemoryCard.vue`** — health card components (shared between Dashboard and SystemVitals)
+- **`ThermalCard.vue`**, **`FanCard.vue`**, **`BatteryCard.vue`**, **`CpuCard.vue`**, **`MemoryCard.vue`** — health card components
 - **`Toast.vue`** — notification toasts
+- **`ChipSchematic.vue`** — Apple Silicon thermal overlay
+- **`VoronoiViz.vue`**, **`GalacticViz.vue`** — SpaceMap visualizations
 
 ### Shared composables
 - **`useZoomPan.ts`** — drag-state-machine + wheel-zoom (used by VoronoiViz and GalacticViz)
 - **`useScanSettings.ts`** — scan area configuration with localStorage persistence
+- **`useScreenGradient.ts`** — Screen-anchored gradient rendering (blob geometry, bitmap painting, position polling, monitor topology, custom JS drag). Extracted from App.vue (~370 lines).
 
 ### Shared utilities (`src/utils.ts`)
 - `formatSize`, `fileDiskSize`, `timeAgo`, `tempToColor`, `revealInFinder`
 - Temperature threshold constants (`TEMP_CRITICAL/HOT/WARM/COOL`)
 - Shared color maps (`KIND_COLORS`, `MEMORY_CATEGORY_COLORS`, `SPACEMAP_CATEGORY_FILLS`, `DASHBOARD_CATEGORY_COLORS`)
 - `cssVar()` helper for reading CSS custom properties
+- `cpuLoadColor`, `cpuLoadClass`, `memoryPressureLevel`, `memoryPressureDotClass`, `fanSpeedColor`, `fanSpeedZone`, `storageColor` — centralized health thresholds (single source of truth for dashboard cards and detail views)
 
 ### Background gradient
-Two-layer system:
-1. **CSS layer** (content panel) — warm palette JPEG generated on frontend via canvas, set as `--gradient-bg` CSS var on `#app`. Uses `RENDER_SCALE=0.20` (render at 20% then upscale for smooth blending), `BLOB_HOLD=0.35`, `saturate(6.0)`. Lives in `src/App.vue`.
-2. **Native layer** (sidebar) — cool palette JPEG sent to Rust via `invoke('set_native_background', ...)`, rendered as `NSImageView` behind WKWebView. Cannot be changed via CSS.
+Two-layer system, managed by `src/composables/useScreenGradient.ts`:
+1. **CSS layer** (content panel) — warm palette JPEG generated on frontend via canvas, set as `--gradient-bg` CSS var on `#app`. Uses `RENDER_SCALE=0.20`, `BLOB_HOLD=0.35`, `saturate(6.0)`.
+2. **Native layer** (sidebar) — cool palette JPEG sent to Rust via `invoke('set_native_background', ...)`, rendered as `NSImageView` behind WKWebView.
 
-The content panel has a 70% white overlay (`rgba(255,255,255,0.70)`) for readability — this is intentional and should not be changed.
+The content panel has a 70% white overlay for readability. The sidebar + gutters have a 5% white wash overlay.
 
 ### Visualisations (SpaceMap)
 Three modes switchable in-app:
@@ -121,22 +138,28 @@ Thumbnails are generated during the duplicate scan (one per group, since all fil
 ### Native icon system (Swift bridge)
 `src-tauri/swift/Sources/Bridge.swift` `render_sf_symbol` supports multiple modes:
 - `mode: "sf"` — SF Symbols by name (e.g., `"folder"`)
-- `mode: "uttype"` — NSWorkspace icon for UTType identifier (e.g., `"public.folder"`) or file extension (e.g., `"png"`)
-- `mode: "app"` — NSWorkspace icon for app bundle path (e.g., `"/Applications/Google Chrome.app"`)
+- `mode: "uttype"` — NSWorkspace icon for UTType identifier or file extension
+- `mode: "app"` — NSWorkspace icon for app bundle path
 - `mode: "file"` — NSImage from file path
-- `mode: "system"` — NSImage named system image
+- `mode: "system"` — NSImage named system image (e.g., `"NSApplicationIcon"`)
+
+Styles: `plain` (preserves aspect ratio), `grayBadge` (white glyph on grey rounded rect), `grayBadgeHier` (hierarchical), `blueBadge` (blue symbol on white), `blueGradientBadge` (#47A8FF→#0690FF gradient, white glyph), `grayscaleApp`.
 
 ### Native gradient layer
 `src-tauri/src/gradient.rs` — receives JPEG from frontend, creates `NSImageView` behind WKWebView. Do NOT replace with CSS — it's there for zero-lag window drag tracking.
 
 ## Design system
-- Glassmorphism — translucent cards over gradient background
-- Dark text on light frosted glass content panel
-- Sidebar: white text on native gradient (no backdrop-filter)
-- Accent: `rgba(59, 199, 232, ...)` aqua/teal
-- All opacity-based — white-on-dark for sidebar, dark-on-light for content
-- **Design tokens:** `src/style.css` `:root` block with ~110+ CSS custom properties (colors, spacing 4/8px grid, radii, shadows, fonts, visualization palettes). JS color maps in `utils.ts` read tokens via `cssVar()`.
-- **Accessibility:** All `<img>` have alt text, clickable divs have keyboard access + ARIA, tabs/expandable sections/modals have proper roles, semantic `<section>`/`<dl>` elements used
+- Glassmorphism — translucent cards (`var(--glass)` = `rgba(255,255,255,0.45)`) over gradient background
+- Dark text on light frosted glass content panel (70% white overlay)
+- Sidebar: white text on native gradient + 5% white wash overlay
+- **Accent:** `#0088FF` blue (was aqua `#3BC7E8`)
+- **Color tokens:** Named-color-first system — `--blue`, `--green`, `--yellow`, `--red`, `--orange`, `--purple`, `--teal`, `--cyan`, `--slate`, `--grey`, `--pink` with semantic aliases (`--accent`, `--success`, `--warning`, `--danger`, `--info`)
+- **Badges:** Border-based with `text-transform: uppercase`. Modifiers: `.pill` (rounded), `.source` (no border, tinted bg). Classes: `.badge-accent/.badge-success/.badge-warning/.badge-danger/.badge-info/.badge-neutral`
+- **Buttons:** `.btn-primary` (solid blue), `.btn-secondary` (grey fill, no border), `.btn-danger` (solid red), `.btn-ghost` (text only), `.btn-ghost.danger` (red text)
+- **Form controls:** Custom Checkbox, ToggleSwitch, styled select (appearance:none + custom chevron), slider, radio buttons
+- **Design tokens:** `src/style.css` `:root` block with 100+ CSS custom properties. JS color maps in `utils.ts` read tokens via `cssVar()`.
+- **Component showcase:** `src/views/Showcase.vue` + `showcase.html` — all components and tokens visible for tuning (dev-only route at `/showcase`)
+- **Accessibility:** All `<img>` have alt text, clickable divs have keyboard access + ARIA, tabs/expandable sections/modals have proper roles
 
 ## Distribution
 - Homebrew cask at `~/projects/homebrew-negativespace/Casks/negativ_.rb`

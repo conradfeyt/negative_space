@@ -11,6 +11,39 @@
 
 The app has strong foundations — global `.card`, `.card-flush`, `.btn-*`, `.badge-*`, `.empty-state`, and `.loading-state` classes provide good consistency where used. The main problems are: (1) patterns that _should_ use these globals but don't (one-off cards, custom buttons), (2) patterns that have no global class at all (stat cards, section headers, tab bars, toggles, segmented controls), and (3) threshold/color-mapping logic duplicated with inconsistent values across views.
 
+## Resolution Status
+> Updated: 2026-04-10
+
+All critical and high-value items resolved. Summary:
+
+| Item | Status | Component |
+|---|---|---|
+| StatusDot | Resolved | Global `.status-dot` CSS class |
+| SectionHeader | Resolved | Global `.section-title` CSS class |
+| StatCard | Resolved | `StatCard.vue` component |
+| SegmentedControl | Resolved | Merged into `TabBar.vue` |
+| EmptyState | Resolved | `EmptyState.vue` with icon slot |
+| HealthThresholds | Resolved | Centralized in `utils.ts` |
+| LiveIndicator | Resolved | `LiveIndicator.vue` component |
+| TabBar | Resolved | `TabBar.vue` (unified) |
+| ToggleSwitch | Resolved | `ToggleSwitch.vue` component |
+| SourceBadge | Resolved | Global CSS `.source` modifier |
+| CloseButton | Resolved | Global `.btn-close` CSS class |
+| RevealButton | Resolved | Global `.btn-reveal` CSS class |
+| Spinner fix | Resolved | Removed conflicting double class |
+| Card opacity | Resolved | Unified to `var(--glass)` 0.45 |
+| Badge system | Resolved | Border-based with modifiers |
+| Button system | Resolved | Standardized across app |
+| Checkbox | Resolved | `Checkbox.vue` component |
+| FileRow | Resolved | `FileRow.vue` component |
+| ScanBar | Resolved | `ScanBar.vue` component |
+| Modal | Resolved | `Modal.vue` component |
+
+### Remaining tech debt
+- DirTreeNode: LargeFiles directory tree has 4 nested depth levels. FileRow extraction covered the file rows, but the directory node nesting is still manual.
+- Toast redesign: Current Toast.vue needs bottom-right fixed positioning and app-wide adoption.
+- FDA warning → sidebar: Design decision deferred to future work.
+
 ---
 
 ## Pattern Inventory
