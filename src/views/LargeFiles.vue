@@ -407,13 +407,15 @@ const diskSize = fileDiskSize;
 // and collectFiles are all in useFileGrouping composable.
 
 
-// Sticky bar detection
+// Sticky bar detection — reconnects observer when sentinel element appears/changes
 const stickyBarRef = ref<HTMLElement | null>(null);
 const stickyBarSentinel = ref<HTMLElement | null>(null);
 const isStuck = ref(false);
 let stickyObserver: IntersectionObserver | null = null;
 
-onMounted(() => {
+function connectStickyObserver() {
+  stickyObserver?.disconnect();
+  isStuck.value = false;
   if (stickyBarSentinel.value) {
     stickyObserver = new IntersectionObserver(
       ([entry]) => { isStuck.value = !entry.isIntersecting; },
@@ -421,11 +423,11 @@ onMounted(() => {
     );
     stickyObserver.observe(stickyBarSentinel.value);
   }
-});
+}
 
-onUnmounted(() => {
-  stickyObserver?.disconnect();
-});
+watch(stickyBarSentinel, connectStickyObserver);
+onMounted(connectStickyObserver);
+onUnmounted(() => { stickyObserver?.disconnect(); });
 
 function isGroupAllSelected(files: FileInfo[]): boolean {
   return files.length > 0 && files.every((f) => selected.value.has(f.path));
