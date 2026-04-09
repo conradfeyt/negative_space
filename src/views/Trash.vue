@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { formatSize } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   trashInfo,
   trashLoading,
@@ -11,22 +12,20 @@ import {
 
 const emptying = ref(false);
 const confirmEmpty = ref(false);
-const result = ref("");
 
 async function handleEmptyTrash() {
   emptying.value = true;
-  result.value = "";
   confirmEmpty.value = false;
   try {
     const cleanResult = await storeEmptyTrash();
     if (cleanResult.success) {
-      result.value = `Trash emptied, freed ${formatSize(cleanResult.freed_bytes)}`;
+      showToast(`Trash emptied, freed ${formatSize(cleanResult.freed_bytes)}`, "success");
     }
     if (cleanResult.errors.length > 0) {
-      trashError.value = cleanResult.errors.join("; ");
+      showToast(cleanResult.errors.join("; "), "error");
     }
   } catch (e) {
-    trashError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     emptying.value = false;
   }
@@ -62,7 +61,6 @@ onMounted(loadTrashInfo);
     </div>
 
     <div v-if="trashError" class="error-message">{{ trashError }}</div>
-    <div v-if="result" class="success-message">{{ result }}</div>
 
     <div v-if="trashLoading" class="loading-state">
       <span class="spinner"></span>

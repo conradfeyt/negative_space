@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize, timeAgo } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   logs,
   logsScanning,
@@ -16,12 +17,8 @@ import Checkbox from "../components/Checkbox.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
-const successMsg = ref("");
-const deleteError = ref("");
 
 async function scan() {
-  successMsg.value = "";
-  deleteError.value = "";
   selected.value = new Set();
   await scanLogs();
 }
@@ -29,18 +26,16 @@ async function scan() {
 async function cleanSelected() {
   if (selected.value.size === 0) return;
   deleting.value = true;
-  deleteError.value = "";
-  successMsg.value = "";
   try {
     const paths = Array.from(selected.value);
     const result = await deleteFiles(paths);
     if (result.success) {
-      successMsg.value = `Cleaned ${result.deleted_count} log(s), freed ${formatSize(result.freed_bytes)}`;
+      showToast(`Cleaned ${result.deleted_count} log(s), freed ${formatSize(result.freed_bytes)}`, "success");
       logs.value = logs.value.filter((l) => !selected.value.has(l.path));
       selected.value = new Set();
     }
-    if (result.errors.length > 0) deleteError.value = result.errors.join("; ");
-  } catch (e) { deleteError.value = String(e); }
+    if (result.errors.length > 0) showToast(result.errors.join("; "), "error");
+  } catch (e) { showToast(String(e), "error"); }
   finally { deleting.value = false; }
 }
 
@@ -147,8 +142,6 @@ function shortPath(path: string): string {
     </div>
 
     <div v-if="logsError" class="error-message">{{ logsError }}</div>
-    <div v-if="deleteError" class="error-message">{{ deleteError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <div v-if="logsScanning" class="loading-state">
       <span class="spinner"></span>

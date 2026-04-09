@@ -945,27 +945,18 @@ tr:last-child td {
 }
 
 
-.success-message {
-  background: var(--success-tint);
-  border: 1px solid rgba(30, 142, 90, 0.12);
-  color: var(--success-text);
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  margin-top: var(--sp-4);
-  animation: fadeIn 0.3s ease;
-}
-
 .error-message {
-  background: var(--danger-tint);
-  border: 1px solid rgba(217, 75, 75, 0.12);
-  color: var(--danger-text);
-  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  border: 1px solid var(--red);
+  background: rgba(255, 57, 60, 0.06);
+  color: var(--red);
+  font-size: 12px;
   font-weight: 500;
-  margin-top: var(--sp-4);
+  margin-bottom: var(--sp-3);
   animation: fadeIn 0.3s ease;
 }
 

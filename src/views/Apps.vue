@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import type { AppInfo } from "../types";
 import { formatSize } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   apps,
   appsScanning,
@@ -17,7 +18,6 @@ import EmptyState from "../components/EmptyState.vue";
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
 const confirmUninstall = ref<string | null>(null);
-const successMsg = ref("");
 const searchQuery = ref("");
 
 // Summary stats
@@ -47,7 +47,6 @@ const filteredApps = computed(() => {
 });
 
 async function scan() {
-  successMsg.value = "";
   expanded.value = new Set();
   searchQuery.value = "";
   await scanApps();
@@ -64,11 +63,10 @@ function cancelUninstall() {
 async function handleUninstall(app: AppInfo) {
   confirmUninstall.value = null;
   uninstalling.value = app.path;
-  successMsg.value = "";
   try {
     const result = await storeUninstallApp(app.path, true);
     if (result.success) {
-      successMsg.value = `Uninstalled "${app.name}", freed ${formatSize(result.freed_bytes)}`;
+      showToast(`Uninstalled "${app.name}", freed ${formatSize(result.freed_bytes)}`, "success");
       apps.value = apps.value.filter((a) => a.path !== app.path);
     }
     if (result.errors.length > 0) {
@@ -120,7 +118,6 @@ function sourceLabel(source: string): string {
     </div>
 
     <div v-if="appsError" class="error-message">{{ appsError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <div v-if="appsScanning" class="loading-state">
       <span class="spinner"></span>

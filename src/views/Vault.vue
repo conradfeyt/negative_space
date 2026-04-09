@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { formatSize } from "../utils";
-import Toast from "../components/Toast.vue";
+import { showToast } from "../stores/toastStore";
 import StatCard from "../components/StatCard.vue";
 import TabBar from "../components/TabBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
@@ -36,17 +36,12 @@ const tabOptions = computed<TabOption[]>(() => [
   { value: "archived", label: "Archived", badge: vaultEntries.value.length > 0 ? vaultEntries.value.length : undefined },
 ]);
 
-const toast = ref<{ message: string; type: "success" | "error" | "info" } | null>(null);
 const restoring = ref<string | null>(null);
 const confirmDeleteId = ref<string | null>(null);
 const minAgeDays = ref(30);
 
 // Candidates selection
 const selectedCandidates = ref<Set<string>>(new Set());
-
-function showToast(message: string, type: "success" | "error" | "info" = "success") {
-  toast.value = { message, type };
-}
 
 // ---------------------------------------------------------------------------
 // Compression queue (composable)
@@ -152,14 +147,6 @@ onMounted(loadVaultSummary);
         </div>
       </div>
     </div>
-
-    <!-- Toast -->
-    <Toast
-      v-if="toast"
-      :message="toast.message"
-      :type="toast.type"
-      @dismiss="toast = null"
-    />
 
     <!-- Error -->
     <div v-if="vaultError" class="error-banner">

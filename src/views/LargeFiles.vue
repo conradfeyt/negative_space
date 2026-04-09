@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { save, open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
 import { formatSize, fileDiskSize, timeAgo, revealInFinder, getFileExtension } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   largeFiles,
   largeFilesScanning,
@@ -35,7 +36,6 @@ import {
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
-const successMsg = ref("");
 const minSizeMb = ref(100);
 const scanPath = ref("~");
 
@@ -125,7 +125,6 @@ const sortOptions = computed<TabOption[]>(() => {
 });
 
 async function scan() {
-  successMsg.value = "";
   selected.value = new Set();
   collapsedGroups.value = new Set(["vaulted"]);
   await scanLargeFiles(scanPath.value, minSizeMb.value);
@@ -236,9 +235,9 @@ async function exportSelected() {
   if (!path) return;
   try {
     await invoke("export_disk_map", { data: json, path });
-    successMsg.value = `Exported ${totalFiles} file(s) to ${path}`;
+    showToast(`Exported ${totalFiles} file(s) to ${path}`, "success");
   } catch (e) {
-    largeFilesError.value = `Export failed: ${e}`;
+    showToast(`Export failed: ${e}`, "error");
   }
 }
 
@@ -260,22 +259,21 @@ async function deleteSelected() {
     return;
   }
   deleting.value = true;
-  successMsg.value = "";
   try {
     const paths = Array.from(selected.value);
     const result = await deleteFiles(paths);
     if (result.success) {
-      successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
+      showToast(`Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`, "success");
       removeDeletedFiles(selected.value);
       // Update the on-disk cache so deleted files don't reappear on next launch
       invoke("save_scan_cache", { domain: "large-files", data: JSON.stringify(largeFiles.value) }).catch(e => console.warn('[large-files] cache save failed:', e));
       selected.value = new Set();
     }
     if (result.errors.length > 0) {
-      largeFilesError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
   } catch (e) {
-    largeFilesError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     deleting.value = false;
   }
@@ -461,7 +459,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
     </div>
 
     <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <!-- Protected files warning modal -->
     <Modal :visible="showProtectedWarning" title="Protected files selected" @close="showProtectedWarning = false">

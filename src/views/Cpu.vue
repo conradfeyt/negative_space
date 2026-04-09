@@ -20,6 +20,7 @@ import {
   quitProcessGroup,
 } from "../stores/scanStore";
 import { formatSize, cpuLoadClass } from "../utils";
+import { showToast } from "../stores/toastStore";
 import LiveIndicator from "../components/LiveIndicator.vue";
 
 // ---------------------------------------------------------------------------
@@ -86,15 +87,13 @@ const idleApps = computed(() => {
 // ---------------------------------------------------------------------------
 
 const quitting = ref<Set<string>>(new Set());
-const quitSuccess = ref<string | null>(null);
 
 async function handleQuitGroup(group: VitalsGroup) {
   quitting.value.add(group.name);
   try {
     const pids = group.processes.map(p => p.pid);
     const msg = await quitProcessGroup(pids);
-    quitSuccess.value = `${group.name}: ${msg}`;
-    setTimeout(() => { quitSuccess.value = null; }, 3000);
+    showToast(`${group.name}: ${msg}`, "success");
     setTimeout(() => liveRefresh(), 500);
   } finally {
     quitting.value.delete(group.name);
@@ -104,11 +103,10 @@ async function handleQuitGroup(group: VitalsGroup) {
 async function handleQuitProcess(pid: number, name: string) {
   try {
     const msg = await quitProcess(pid);
-    quitSuccess.value = `${name}: ${msg}`;
-    setTimeout(() => { quitSuccess.value = null; }, 3000);
+    showToast(`${name}: ${msg}`, "success");
     setTimeout(() => liveRefresh(), 500);
   } catch (e) {
-    vitalsError.value = String(e);
+    showToast(String(e), "error");
   }
 }
 
@@ -154,8 +152,6 @@ function fmtCpu(pct: number): string {
     <!-- Error state -->
     <div v-if="vitalsError" class="error-message">{{ vitalsError }}</div>
 
-    <!-- Success toast -->
-    <div v-if="quitSuccess" class="success-message">{{ quitSuccess }}</div>
 
     <template v-if="vitalsResult">
 

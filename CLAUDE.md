@@ -92,7 +92,6 @@ All views import from `scanStore.ts` (the facade) — no view changes needed whe
 - **`FileRow.vue`** — File list row (icon, name, path, safety badge, size, reveal button, checkbox)
 
 **Existing components (unchanged):**
-- **`FdaWarningBanner.vue`** — FDA permission warning banner (used by 7 views)
 - **`ThermalCard.vue`**, **`FanCard.vue`**, **`BatteryCard.vue`**, **`CpuCard.vue`**, **`MemoryCard.vue`** — health card components
 - **`Toast.vue`** — notification toasts
 - **`ChipSchematic.vue`** — Apple Silicon thermal overlay

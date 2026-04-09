@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import type { LaunchItem, AppTrustInfo, ShellInitFinding, Severity } from "../types";
+import { showToast } from "../stores/toastStore";
 import {
   securityResult,
   securityScanning,
@@ -20,7 +21,6 @@ const expandedLaunch = ref<Set<string>>(new Set());
 const expandedTrust = ref<Set<string>>(new Set());
 const expandedShell = ref<Set<string>>(new Set());
 const actionInProgress = ref<string | null>(null);
-const successMsg = ref("");
 
 const severityLabel: Record<Severity, string> = {
   malicious: "Malicious",
@@ -47,7 +47,6 @@ const appTrustWithFindings = computed(() => {
 });
 
 async function scan() {
-  successMsg.value = "";
   expandedLaunch.value = new Set();
   expandedTrust.value = new Set();
   expandedShell.value = new Set();
@@ -104,18 +103,17 @@ function highestSeverity(severities: Severity[]): Severity {
 
 async function handleDisable(item: LaunchItem) {
   actionInProgress.value = `disable-${item.path}`;
-  successMsg.value = "";
   try {
     const result = await disableLaunchItem(item.path);
     if (result.success) {
-      successMsg.value = `Disabled "${item.label}"`;
+      showToast(`Disabled "${item.label}"`, "success");
       item.is_enabled = false;
     }
     if (result.errors.length > 0) {
-      securityError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
   } catch (e) {
-    securityError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     actionInProgress.value = null;
   }
@@ -123,11 +121,10 @@ async function handleDisable(item: LaunchItem) {
 
 async function handleRemove(item: LaunchItem) {
   actionInProgress.value = `remove-${item.path}`;
-  successMsg.value = "";
   try {
     const result = await removeLaunchItem(item.path);
     if (result.success) {
-      successMsg.value = `Removed "${item.label}"`;
+      showToast(`Removed "${item.label}"`, "success");
       if (securityResult.value) {
         securityResult.value.launch_items = securityResult.value.launch_items.filter(
           (i) => i.path !== item.path
@@ -135,10 +132,10 @@ async function handleRemove(item: LaunchItem) {
       }
     }
     if (result.errors.length > 0) {
-      securityError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
   } catch (e) {
-    securityError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     actionInProgress.value = null;
   }
@@ -167,7 +164,6 @@ async function handleRemove(item: LaunchItem) {
     </div>
 
     <div v-if="securityError" class="error-message">{{ securityError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <div v-if="securityScanning" class="loading-state">
       <span class="spinner"></span>

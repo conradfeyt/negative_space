@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize, getFileExtension } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   duplicateResult,
   duplicateScanning,
@@ -68,15 +69,13 @@ function selectSimilarDuplicates(group: SimilarGroup) {
 async function deleteSimilarSelected() {
   if (similarSelected.value.size === 0) return;
   cleaning.value = true;
-  cleanError.value = "";
-  successMsg.value = "";
   try {
     const result = await deleteFiles(Array.from(similarSelected.value));
-    successMsg.value = `Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`;
+    showToast(`Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`, "success");
     similarSelected.value = new Set();
     await scanSimilar();
   } catch (e) {
-    cleanError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     cleaning.value = false;
   }
@@ -141,8 +140,6 @@ const minSizeMb = ref(1);
 
 // Cleaning state
 const cleaning = ref(false);
-const successMsg = ref("");
-const cleanError = ref("");
 
 // Preview state
 const previewData = ref<FilePreview | null>(null);
@@ -150,8 +147,6 @@ const previewLoading = ref(false);
 const previewPath = ref<string | null>(null);
 
 async function scan() {
-  successMsg.value = "";
-  cleanError.value = "";
   selected.value = new Set();
   await scanDuplicates("~", minSizeMb.value);
 }
@@ -212,22 +207,20 @@ const totalSelected = computed(() => {
 async function deleteSelected() {
   if (selected.value.size === 0) return;
   cleaning.value = true;
-  cleanError.value = "";
-  successMsg.value = "";
   try {
     const paths = Array.from(selected.value);
     const result = await deleteFiles(paths);
     if (result.success) {
-      successMsg.value = `Deleted ${result.deleted_count} duplicate(s), freed ${formatSize(result.freed_bytes)}`;
+      showToast(`Deleted ${result.deleted_count} duplicate(s), freed ${formatSize(result.freed_bytes)}`, "success");
     }
     if (result.errors.length > 0) {
-      cleanError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
     // Re-scan to show updated results
     selected.value = new Set();
-      await scanDuplicates("~", minSizeMb.value);
+    await scanDuplicates("~", minSizeMb.value);
   } catch (e) {
-    cleanError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     cleaning.value = false;
   }
@@ -334,10 +327,8 @@ function shortPath(p: string): string {
     <!-- ══════ EXACT DUPLICATES TAB ══════ -->
     <template v-if="activeTab === 'exact'">
 
-    <!-- Messages -->
+    <!-- Scan error -->
     <div v-if="duplicateError" class="error-message">{{ duplicateError }}</div>
-    <div v-if="cleanError" class="error-message">{{ cleanError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <!-- Loading -->
     <div v-if="duplicateScanning" class="loading-state">
@@ -522,10 +513,8 @@ function shortPath(p: string): string {
     <!-- ══════ SIMILAR IMAGES TAB ══════ -->
     <template v-if="activeTab === 'similar'">
 
-      <!-- Messages -->
+      <!-- Scan error -->
       <div v-if="similarError" class="error-message">{{ similarError }}</div>
-      <div v-if="cleanError" class="error-message">{{ cleanError }}</div>
-      <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
       <!-- Progress -->
       <div v-if="similarScanning" class="similar-progress">

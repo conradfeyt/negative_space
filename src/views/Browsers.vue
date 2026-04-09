@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   browserResult,
   browserScanning,
@@ -54,16 +55,12 @@ const selected = ref<Set<string>>(new Set());
 
 // Cleaning state
 const cleaning = ref(false);
-const successMsg = ref("");
-const cleanError = ref("");
 
 // Confirmation modal state
 const showConfirmModal = ref(false);
 const confirmMessage = ref("");
 const pendingCleanPaths = ref<string[]>([]);
 async function scan() {
-  successMsg.value = "";
-  cleanError.value = "";
   selected.value = new Set();
   expandedBrowsers.value = new Set();
   await scanBrowsers();
@@ -188,21 +185,19 @@ function cancelClean() {
 
 async function doClean(paths: string[]) {
   cleaning.value = true;
-  cleanError.value = "";
-  successMsg.value = "";
   try {
     const result = await cleanBrowserData(paths);
     if (result.success) {
-      successMsg.value = `Cleaned ${result.deleted_count} item(s), freed ${formatSize(result.freed_bytes)}`;
+      showToast(`Cleaned ${result.deleted_count} item(s), freed ${formatSize(result.freed_bytes)}`, "success");
     }
     if (result.errors.length > 0) {
-      cleanError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
     // Re-scan to update sizes
     selected.value = new Set();
     await scanBrowsers();
   } catch (e) {
-    cleanError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     cleaning.value = false;
   }
@@ -242,10 +237,8 @@ function selectAllSafe(browser: BrowserInfo) {
       </div>
     </div>
 
-    <!-- Error/success messages -->
+    <!-- Scan error -->
     <div v-if="browserError" class="error-message">{{ browserError }}</div>
-    <div v-if="cleanError" class="error-message">{{ cleanError }}</div>
-    <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <!-- Loading state -->
     <div v-if="browserScanning" class="loading-state">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { showToast } from "../stores/toastStore";
 import {
   dockerInfo,
   dockerLoading,
@@ -9,25 +10,26 @@ import {
 } from "../stores/scanStore";
 
 const cleaning = ref(false);
-const cleanResult = ref("");
 
 async function prune(pruneAll: boolean) {
   cleaning.value = true;
-  cleanResult.value = "";
   try {
     const result = await cleanDocker(pruneAll);
     if (result.success) {
-      cleanResult.value = pruneAll
-        ? "Docker system pruned (including unused images)"
-        : "Docker system pruned";
+      showToast(
+        pruneAll
+          ? "Docker system pruned (including unused images)"
+          : "Docker system pruned",
+        "success"
+      );
     }
     if (result.errors.length > 0) {
-      dockerError.value = result.errors.join("; ");
+      showToast(result.errors.join("; "), "error");
     }
     // Refresh info after prune
     await loadDockerInfo();
   } catch (e) {
-    dockerError.value = String(e);
+    showToast(String(e), "error");
   } finally {
     cleaning.value = false;
   }
@@ -56,7 +58,6 @@ onMounted(loadDockerInfo);
     </div>
 
     <div v-if="dockerError" class="error-message">{{ dockerError }}</div>
-    <div v-if="cleanResult" class="success-message">{{ cleanResult }}</div>
 
     <div v-if="dockerLoading" class="loading-state">
       <span class="spinner"></span>

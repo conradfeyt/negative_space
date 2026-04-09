@@ -4,6 +4,7 @@ import { BUILD_NUMBER } from "./buildNumber";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter, useRoute } from "vue-router";
 import { checkFullDiskAccess, hasFullDiskAccess as _hasFullDiskAccess, domainStatus, checkDockerInstalled, dockerInstalled, restoreAllCaches, checkIntelligence } from "./stores/scanStore";
+import Toast from "./components/Toast.vue";
 import { useScreenGradient } from "./composables/useScreenGradient";
 import type { DomainStatus } from "./stores/scanStore";
 
@@ -341,6 +342,7 @@ onMounted(async () => {
           </KeepAlive>
         </router-view>
       </div>
+      <Toast />
     </main>
   </div>
 
