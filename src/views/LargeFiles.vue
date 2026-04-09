@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save, open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
@@ -95,7 +95,7 @@ async function pickScanFolder() {
 }
 
 /** Track which groups are collapsed */
-const collapsedGroups = ref<Set<string>>(new Set());
+const collapsedGroups = ref<Set<string>>(new Set(["vaulted"]));
 
 // File grouping composable — sortMode, activeGroups, vaultedFiles, etc.
 const {
@@ -125,7 +125,7 @@ const sortOptions = computed<TabOption[]>(() => {
 async function scan() {
   successMsg.value = "";
   selected.value = new Set();
-  collapsedGroups.value = new Set();
+  collapsedGroups.value = new Set(["vaulted"]);
   await scanLargeFiles(scanPath.value, minSizeMb.value);
 }
 
@@ -247,8 +247,16 @@ function protectSelected() {
   selected.value = new Set();
 }
 
+const showProtectedWarning = ref(false);
+
 async function deleteSelected() {
   if (selected.value.size === 0) return;
+  // Check if any protected files are selected
+  const protectedSelected = Array.from(selected.value).filter(p => isProtected(p));
+  if (protectedSelected.length > 0) {
+    showProtectedWarning.value = true;
+    return;
+  }
   deleting.value = true;
   successMsg.value = "";
   try {
@@ -277,7 +285,7 @@ function isVaulted(path: string): boolean {
 }
 
 function isLocked(path: string): boolean {
-  return isVaulted(path) || isProtected(path);
+  return isVaulted(path);
 }
 
 // Map vault archive hashes back to original names
@@ -397,6 +405,26 @@ const diskSize = fileDiskSize;
 // and collectFiles are all in useFileGrouping composable.
 
 
+// Sticky bar detection
+const stickyBarRef = ref<HTMLElement | null>(null);
+const stickyBarSentinel = ref<HTMLElement | null>(null);
+const isStuck = ref(false);
+let stickyObserver: IntersectionObserver | null = null;
+
+onMounted(() => {
+  if (stickyBarSentinel.value) {
+    stickyObserver = new IntersectionObserver(
+      ([entry]) => { isStuck.value = !entry.isIntersecting; },
+      { threshold: 0 }
+    );
+    stickyObserver.observe(stickyBarSentinel.value);
+  }
+});
+
+onUnmounted(() => {
+  stickyObserver?.disconnect();
+});
+
 function isGroupAllSelected(files: FileInfo[]): boolean {
   return files.length > 0 && files.every((f) => selected.value.has(f.path));
 }
@@ -414,17 +442,18 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         <h2>Large Files</h2>
         <p class="text-muted">Find and remove large files taking up space</p>
       </div>
-      <div class="lf-controls">
+      <div class="scan-bar">
         <label for="lf-min-size" class="sr-only">Minimum size (MB)</label>
-        <input id="lf-min-size" v-model.number="minSizeMb" type="number" min="1" max="10000" class="size-input" title="Minimum size (MB)" @blur="minSizeMb = Math.max(1, Math.min(10000, minSizeMb || 1))" />
-        <span class="lf-controls-label text-muted">MB in</span>
-        <button class="path-picker" @click="pickScanFolder" title="Choose scan folder">
-          <img v-if="scanPathIcon" :src="scanPathIcon" alt="" class="path-picker-icon" />
+        <input id="lf-min-size" v-model.number="minSizeMb" type="number" min="1" max="10000" class="scan-bar-size" title="Minimum size (MB)" @blur="minSizeMb = Math.max(1, Math.min(10000, minSizeMb || 1))" />
+        <span class="scan-bar-unit">MB</span>
+        <span class="scan-bar-divider"></span>
+        <button class="scan-bar-folder" @click="pickScanFolder" title="Choose scan folder">
+          <img v-if="scanPathIcon" :src="scanPathIcon" alt="" class="scan-bar-folder-icon" />
           <img v-else-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" />
           <svg v-else width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
-          <span class="path-picker-label">{{ scanPathDisplay }}</span>
+          <span>{{ scanPathDisplay }}</span>
         </button>
-        <button class="btn-primary scan-btn" :disabled="largeFilesScanning" @click="scan">
+        <button class="scan-bar-btn" :disabled="largeFilesScanning" @click="scan">
           <span v-if="largeFilesScanning" class="spinner-sm"></span>
           {{ largeFilesScanning ? "Scanning..." : "Scan" }}
         </button>
@@ -438,6 +467,24 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
     <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
+
+    <!-- Protected files warning modal -->
+    <Teleport to="body">
+      <div v-if="showProtectedWarning" class="modal-overlay" @click.self="showProtectedWarning = false">
+        <div class="modal-dialog">
+          <div class="modal-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <h3>Protected files selected</h3>
+          <p>Some of the selected files are protected. Unprotect or deselect them before deleting.</p>
+          <div class="modal-actions">
+            <button class="btn-primary btn-sm" @click="showProtectedWarning = false">OK</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Scanning progress -->
     <div v-if="largeFilesScanning" class="scan-progress-bar">
@@ -455,30 +502,36 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       description="Try lowering the minimum size threshold or scanning a different directory."
     />
 
+    <!-- Sort tabs -->
+    <div v-if="largeFiles.length > 0" class="sort-row">
+      <TabBar
+        :options="sortOptions"
+        v-model="sortMode"
+      />
+    </div>
+
     <!-- Results -->
     <div v-if="largeFiles.length > 0" class="results-container">
 
-      <!-- Summary bar -->
-      <div class="results-summary">
+      <!-- Sentinel for sticky detection -->
+      <div ref="stickyBarSentinel" class="sticky-sentinel"></div>
+      <!-- Sticky action bar -->
+      <div ref="stickyBarRef" class="results-sticky-bar" :class="{ 'is-stuck': isStuck }">
         <div class="summary-left">
           <Checkbox :is-on="allSelected" @change="toggleAll" />
           <span class="results-count">{{ largeFiles.length }} file(s)</span>
-          <span class="results-total-size">{{ formatSize(totalLargeFileSize) }} total</span>
+          <span class="results-total-size">&mdash; {{ formatSize(totalLargeFileSize) }}</span>
           <span v-if="selected.size > 0" class="selected-info">
-            {{ selected.size }} selected ({{ formatSize(totalSelected) }})
+            ({{ selected.size }} selected, {{ formatSize(totalSelected) }})
           </span>
         </div>
         <div class="results-actions">
-          <TabBar
-            :options="sortOptions"
-            v-model="sortMode"
-          />
-          <button class="btn-secondary protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
+          <button class="btn-secondary btn-sm protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Protect
           </button>
-          <button class="btn-secondary export-btn" :disabled="selected.size === 0" @click="exportSelected">Export</button>
-          <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="deleteSelected">
+          <button class="btn-secondary btn-sm export-btn" :disabled="selected.size === 0" @click="exportSelected">Export</button>
+          <button class="btn-danger btn-sm" :disabled="selected.size === 0 || deleting" @click="deleteSelected">
             <span v-if="deleting" class="spinner-sm"></span>
             {{ deleting ? "Deleting..." : "Delete Selected" }}
           </button>
@@ -905,28 +958,105 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 .controls-row { display: flex; align-items: flex-end; gap: var(--sp-4); }
 .control-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 .control-label { font-size: 12px; font-weight: 400; color: var(--muted); }
-.size-input { width: 100px; }
-
-.path-picker {
-  display: inline-flex;
+/* ---- Combined scan bar ---- */
+.scan-bar {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 3px 3px 3px 12px;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.scan-bar-size {
+  width: 80px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 4px 0;
+  outline: none;
+  font-family: var(--font-mono);
+  text-align: right;
+  border-radius: 0;
+  -moz-appearance: textfield;
+}
+
+.scan-bar-size::-webkit-inner-spin-button,
+.scan-bar-size::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.scan-bar-unit {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.scan-bar-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.12);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.scan-bar-folder {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: #c0c6d24d;
+  background: transparent;
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 14px;
+  transition: background 0.15s;
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-bar-folder:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.scan-bar-folder-icon {
+  height: 16px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.scan-bar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 18px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.15s;
 }
-.path-picker:hover { background: #a8aeba66; }
-.path-picker-icon { height: 16px; width: auto; }
-.path-picker-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
+
+.scan-bar-btn:hover {
+  background: var(--accent-hover);
+}
+
+.scan-bar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ---- Scanning progress bar ---- */
@@ -963,21 +1093,46 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   min-width: 0;
 }
 
-/* ---- Results summary bar ---- */
-.results-summary {
+/* ---- Sort row ---- */
+.sort-row {
+  margin-bottom: var(--sp-4);
+}
+
+/* ---- Sticky action bar ---- */
+.sticky-sentinel {
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.results-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 8px 0;
   margin-bottom: var(--sp-4);
-  padding: 0;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
+  transition: background 0.2s, border-color 0.2s;
+  border-bottom: 1px solid transparent;
+}
+
+.results-sticky-bar.is-stuck {
+  margin-left: -40px;
+  margin-right: -40px;
+  width: calc(100% + 80px);
+  padding: 10px 40px;
+  background: rgba(235, 232, 238, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
 .summary-left {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-3);
+  align-items: center;
+  gap: var(--sp-2);
 }
 
 .results-count {
@@ -1251,17 +1406,9 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   display: block;
 }
 
-.file-row--protected > *:not(.file-icon-wrap) {
-  opacity: 0.4;
-}
-
-.file-row--protected .file-row-icon,
-.file-row--protected .file-row-icon-placeholder {
-  opacity: 0.4;
-}
-
-.file-row--protected .icon-shield-badge {
-  opacity: 1;
+.file-row--protected .file-name,
+.file-row--protected .file-row-path {
+  color: var(--green);
 }
 
 .protect-action-btn {
@@ -1301,25 +1448,48 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   gap: 16px;
 }
 
-.lf-controls {
+/* ---- Modal dialog ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: center;
+  z-index: 9999;
 }
 
-.lf-controls .size-input {
-  width: 72px;
-  padding: 8px 8px;
+.modal-dialog {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.lf-controls .path-input {
-  width: 120px;
+.modal-icon {
+  margin-bottom: 16px;
 }
 
-.lf-controls-label {
-  font-size: 11px;
-  white-space: nowrap;
+.modal-dialog h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.modal-dialog p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* Vault section */
