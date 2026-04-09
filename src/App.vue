@@ -168,6 +168,7 @@ const iconSystemSettings = ref("");
 const iconPrivacy = ref("");
 const iconFda = ref("");
 const iconNegativ = ref("");
+const iconFdaSidebar = ref("");
 
 async function loadFdaIcons() {
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -188,7 +189,11 @@ async function loadFdaIcons() {
         const b64 = await invoke<string>("render_sf_symbol", { name: "NSApplicationIcon", size: 40, mode: "system", style: "plain" });
         if (b64) iconNegativ.value = b64;
       }
-      if (iconSystemSettings.value && iconPrivacy.value && iconFda.value && iconNegativ.value) break;
+      if (!iconFdaSidebar.value) {
+        const b64 = await invoke<string>("render_sf_symbol", { name: "exclamationmark.triangle.fill", size: 32, mode: "sf", style: "multicolor" });
+        if (b64) iconFdaSidebar.value = b64;
+      }
+      if (iconSystemSettings.value && iconPrivacy.value && iconFda.value && iconNegativ.value && iconFdaSidebar.value) break;
     } catch (_) { /* retry */ }
     await new Promise(r => setTimeout(r, 500));
   }
@@ -273,6 +278,15 @@ onMounted(async () => {
     <aside class="sidebar" @mousedown="startDrag">
       <div class="sidebar-header" @mousedown="startDrag">
         <h1 class="app-title">Negativ_</h1>
+        <button
+          v-if="_hasFullDiskAccess === false"
+          class="fda-sidebar-icon"
+          title="Full Disk Access not granted — click to open Settings"
+          @click.stop="router.push({ name: 'settings' })"
+        >
+          <img v-if="iconFdaSidebar" :src="iconFdaSidebar" alt="Warning" width="24" height="24" />
+          <span v-else style="font-size: 14px;">&#9888;</span>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
@@ -523,6 +537,32 @@ onMounted(async () => {
 
 .sidebar-header {
   padding: 48px 22px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fda-sidebar-icon {
+  background: none;
+  border: none;
+  color: var(--warning);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+  animation: fda-pulse 3s ease-in-out 2;
+}
+
+.fda-sidebar-icon:hover {
+  opacity: 1;
+}
+
+@keyframes fda-pulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.5; }
 }
 
 .app-title {

@@ -40,7 +40,6 @@ import {
 import type { DiskNode, CacheMetadata } from "../types";
 import GalacticViz from "../components/GalacticViz.vue";
 import VoronoiViz from "../components/VoronoiViz.vue";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 
 // ---------------------------------------------------------------------------
 // View switcher (Phase 4 shell — only Sunburst active)
@@ -926,12 +925,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </div>
-
-    <!-- FDA warning -->
-    <FdaWarningBanner
-      title="Limited view -- Full Disk Access shows all directories"
-      text="Without Full Disk Access, Desktop, Documents, Downloads, and media folders are not included. Sizes shown may not account for all disk usage."
-    />
 
     <!-- Messages -->
     <div v-if="diskMapError" class="error-message">{{ diskMapError }}</div>

@@ -20,7 +20,6 @@ import {
   toggleProtected,
   isProtected,
 } from "../stores/scanStore";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import Modal from "../components/Modal.vue";
 import Checkbox from "../components/Checkbox.vue";
@@ -460,11 +459,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         </button>
       </ScanBar>
     </div>
-
-    <!-- FDA warning -->
-    <FdaWarningBanner
-      text="Without Full Disk Access, Desktop, Documents, Downloads, and other protected folders are skipped to avoid macOS permission prompts."
-    />
 
     <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>

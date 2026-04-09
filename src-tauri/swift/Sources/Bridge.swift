@@ -97,11 +97,20 @@ public func renderSFSymbol(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePo
         image = NSImage(named: NSImage.Name(params.name))
     default: // "sf"
         if let sfImage = NSImage(systemSymbolName: params.name, accessibilityDescription: nil) {
-            // For grayBadge style, render in white. Otherwise use label color.
-            let color: NSColor = (style == "grayBadge") ? .white : .labelColor
-            let config = NSImage.SymbolConfiguration(pointSize: size * 0.65, weight: .medium)
-                .applying(.init(paletteColors: [color]))
-            image = sfImage.withSymbolConfiguration(config) ?? sfImage
+            if style == "multicolor" {
+                // Render in native multicolor (system-defined colors for each layer)
+                var config = NSImage.SymbolConfiguration(pointSize: size * 0.65, weight: .medium)
+                if #available(macOS 12.0, *) {
+                    config = config.applying(.preferringMulticolor())
+                }
+                image = sfImage.withSymbolConfiguration(config) ?? sfImage
+            } else {
+                // For grayBadge style, render in white. Otherwise use label color.
+                let color: NSColor = (style == "grayBadge") ? .white : .labelColor
+                let config = NSImage.SymbolConfiguration(pointSize: size * 0.65, weight: .medium)
+                    .applying(.init(paletteColors: [color]))
+                image = sfImage.withSymbolConfiguration(config) ?? sfImage
+            }
         }
     }
 

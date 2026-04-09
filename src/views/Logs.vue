@@ -11,7 +11,6 @@ import {
   deleteFiles,
   totalLogSize,
 } from "../stores/scanStore";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import Checkbox from "../components/Checkbox.vue";
 
@@ -146,10 +145,6 @@ function shortPath(path: string): string {
         </button>
       </div>
     </div>
-
-    <FdaWarningBanner
-      text="Without Full Disk Access, only /var/log is scanned. ~/Library/Logs is skipped."
-    />
 
     <div v-if="logsError" class="error-message">{{ logsError }}</div>
     <div v-if="deleteError" class="error-message">{{ deleteError }}</div>

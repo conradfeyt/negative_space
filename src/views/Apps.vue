@@ -11,7 +11,6 @@ import {
   uninstallApp as storeUninstallApp,
   hasFullDiskAccess,
 } from "../stores/scanStore";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
 
@@ -119,11 +118,6 @@ function sourceLabel(source: string): string {
         </button>
       </div>
     </div>
-
-    <FdaWarningBanner
-      title="Leftover detection limited -- Full Disk Access required"
-      text="Without Full Disk Access, leftover files in ~/Library cannot be detected. Apps are still listed with their bundle sizes."
-    />
 
     <div v-if="appsError" class="error-message">{{ appsError }}</div>
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>

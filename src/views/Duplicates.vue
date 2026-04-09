@@ -17,7 +17,6 @@ import {
   deleteFiles,
   previewFile,
 } from "../stores/scanStore";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import StatCard from "../components/StatCard.vue";
 import Checkbox from "../components/Checkbox.vue";
 import EmptyState from "../components/EmptyState.vue";
@@ -331,12 +330,6 @@ function shortPath(p: string): string {
         </div>
       </div>
     </div>
-
-    <!-- FDA warning -->
-    <FdaWarningBanner
-      title="Limited scan -- Full Disk Access required for full coverage"
-      text="Without Full Disk Access, only developer tools, package managers, and project directories are scanned. Desktop, Documents, Downloads, and most of ~/Library are skipped."
-    />
 
     <!-- ══════ EXACT DUPLICATES TAB ══════ -->
     <template v-if="activeTab === 'exact'">

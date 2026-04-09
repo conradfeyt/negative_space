@@ -9,7 +9,6 @@
  * Live-updates every 5s.
  */
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
 import { formatSize, fileDiskSize, tempToColor, revealInFinder, getFileExtension, DASHBOARD_CATEGORY_COLORS, storageColor as storageColorFn } from "../utils";
 import ThermalCard from "../components/ThermalCard.vue";
@@ -22,7 +21,6 @@ import {
   scanAllRunning,
   scanAllStep,
   scanAllDone,
-  hasFullDiskAccess,
   domainStatus,
   totalReclaimable as storeTotalReclaimable,
   loadDiskUsage,
@@ -45,11 +43,6 @@ import {
 
 const TOP_FILES_COUNT = 5;
 const TOP_MEMORY_COUNT = 3;
-
-async function openFdaSettings() {
-  try { await invoke("open_full_disk_access_settings"); } catch (e) { console.debug('[settings] FDA settings open failed:', e); }
-}
-
 
 
 const router = useRouter();
@@ -556,14 +549,6 @@ onUnmounted(() => stopPolling());
         </button>
       </div>
 
-      <div v-if="hasFullDiskAccess === false" class="fda-notice">
-        <svg class="fda-notice-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <span class="fda-notice-text">Results may be incomplete -- Full Disk Access not granted.</span>
-        <button class="fda-notice-btn" @click="openFdaSettings">Grant access</button>
-      </div>
-
       <div v-if="scanAllRunning" class="scan-progress">
         <div class="scan-progress-header">
           <span class="scan-progress-label">{{ scanAllStep.replace('_', ' ') }}</span>
@@ -952,12 +937,6 @@ onUnmounted(() => stopPolling());
 .scan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-4); }
 .scan-header h3 { font-size: 16px; font-weight: 700; }
 .scan-header p { font-size: 13px; margin-top: 2px; }
-
-/* FDA notice */
-.fda-notice { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--warning-tint); font-size: 12px; color: var(--warning-text); margin-bottom: var(--sp-4); }
-.fda-notice-icon { flex-shrink: 0; }
-.fda-notice-text { flex: 1; }
-.fda-notice-btn { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; background: transparent; color: var(--warning-text); border: 1px solid currentColor; cursor: pointer; white-space: nowrap; }
 
 /* Progress */
 .scan-progress { margin-bottom: var(--sp-4); }

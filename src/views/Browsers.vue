@@ -11,7 +11,6 @@ import {
   cleanBrowserData,
 } from "../stores/scanStore";
 import type { BrowserInfo, BrowserDataCategory } from "../types";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import Checkbox from "../components/Checkbox.vue";
 
@@ -242,12 +241,6 @@ function selectAllSafe(browser: BrowserInfo) {
         </button>
       </div>
     </div>
-
-    <!-- FDA warning for Safari -->
-    <FdaWarningBanner
-      title="Safari data requires Full Disk Access"
-      text="Safari stores data in TCC-protected directories. Without Full Disk Access, Safari cache, cookies, and history cannot be scanned or cleaned. Other browsers are not affected."
-    />
 
     <!-- Error/success messages -->
     <div v-if="browserError" class="error-message">{{ browserError }}</div>

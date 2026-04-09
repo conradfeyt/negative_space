@@ -11,7 +11,6 @@ import {
   deleteFiles,
   totalCacheSize,
 } from "../stores/scanStore";
-import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import Checkbox from "../components/Checkbox.vue";
 
@@ -169,10 +168,6 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
         </button>
       </div>
     </div>
-
-    <FdaWarningBanner
-      text="Without Full Disk Access, only Xcode and CoreSimulator caches are shown. Other app caches in ~/Library/Caches are skipped."
-    />
 
     <div v-if="cachesError" class="error-message">{{ cachesError }}</div>
     <div v-if="deleteError" class="error-message">{{ deleteError }}</div>
