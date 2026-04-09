@@ -357,7 +357,7 @@ function selectAllSafe(browser: BrowserInfo) {
             >
               <div class="category-left">
                 <Checkbox
-                  :is-on="isCatSelected(browser.id, cat.id)"
+                  :model-value="isCatSelected(browser.id, cat.id)"
                   :disabled="(cat.tcc_protected && !browserResult.has_fda) || (cat.size === 0 && !cat.tcc_protected)"
                   @change="toggleCategory(browser.id, cat)"
                 />

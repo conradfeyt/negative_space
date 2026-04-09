@@ -169,7 +169,7 @@ function shortPath(path: string): string {
     <template v-else-if="logs.length > 0">
       <div class="results-bar">
         <div class="results-bar-left">
-          <Checkbox :is-on="allSelected" @change="toggleAll">Select all</Checkbox>
+          <Checkbox :model-value="allSelected" @change="toggleAll">Select all</Checkbox>
           <span class="results-count text-muted">{{ logs.length }} log(s) &mdash; {{ formatSize(totalLogSize) }} total</span>
         </div>
         <div class="results-bar-right">
@@ -218,7 +218,7 @@ function shortPath(path: string): string {
                 <span class="log-size mono">{{ formatSize(log.size) }}</span>
                 <span v-if="log.modified" class="log-time text-muted">{{ timeAgo(log.modified) }}</span>
               </div>
-              <Checkbox :is-on="selected.has(log.path)" @change="toggleSelect(log.path)" />
+              <Checkbox :model-value="selected.has(log.path)" @change="toggleSelect(log.path)" />
             </div>
           </div>
         </div>

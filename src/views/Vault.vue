@@ -170,7 +170,7 @@ onMounted(loadVaultSummary);
     </div>
 
     <!-- Tab bar -->
-    <TabBar :tabs="tabOptions" v-model="activeTab" class="vault-tab-bar" />
+    <TabBar :options="tabOptions" v-model="activeTab" class="vault-tab-bar" />
 
     <!-- ================================================================
          TAB: COMPRESS
@@ -257,7 +257,7 @@ onMounted(loadVaultSummary);
 
       <div class="candidates-toolbar">
         <Checkbox
-          :is-on="selectedCandidates.size === vaultCandidates.length && vaultCandidates.length > 0"
+          :model-value="selectedCandidates.size === vaultCandidates.length && vaultCandidates.length > 0"
           @change="toggleAllCandidates"
         >Select all</Checkbox>
         <div class="toolbar-right">
@@ -283,7 +283,7 @@ onMounted(loadVaultSummary);
         >
           <div class="candidate-main">
             <Checkbox
-              :is-on="selectedCandidates.has(candidate.path)"
+              :model-value="selectedCandidates.has(candidate.path)"
               @change="toggleCandidate(candidate.path)"
             />
             <div class="candidate-info">

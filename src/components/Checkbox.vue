@@ -1,39 +1,40 @@
 <script setup lang="ts">
 /**
- * Checkbox — Custom styled checkbox.
+ * Checkbox — Custom styled checkbox with animated check mark.
  *
- * Visual state is driven entirely by props (not native input :checked).
- * A hidden native input handles click → label → change event flow.
- * watchEffect imperatively syncs the native input's .checked and
- * .indeterminate properties to match props on every render.
+ * Drop-in replacement for native <input type="checkbox">.
+ * Visual state driven by classes (not :checked pseudo-class).
+ * Hidden native input handles click → label → change event flow.
  */
 import { computed, ref, onMounted, onUpdated } from "vue";
 
 const props = defineProps<{
   modelValue?: boolean
-  isOn?: boolean
   disabled?: boolean
   indeterminate?: boolean
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void
   (e: "change", event: Event): void
 }>();
 
 const uid = `cb-${Math.random().toString(36).slice(2, 9)}`;
 const inputRef = ref<HTMLInputElement | null>(null);
-const isChecked = computed(() => {
-  if (props.isOn !== undefined) return props.isOn;
-  if (props.modelValue !== undefined) return props.modelValue;
-  return false;
-});
+
+const isChecked = computed(() => props.modelValue ?? false);
 
 function syncInput() {
   if (inputRef.value) {
     inputRef.value.checked = isChecked.value;
     inputRef.value.indeterminate = props.indeterminate ?? false;
   }
+}
+
+function handleChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  emit("change", event);
+  emit("update:modelValue", target.checked);
 }
 
 onMounted(syncInput);
@@ -47,7 +48,7 @@ onUpdated(syncInput);
       ref="inputRef"
       type="checkbox"
       :disabled="disabled"
-      @change="$emit('change', $event); $emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
+      @change="handleChange"
     />
     <label
       :for="uid"
@@ -143,10 +144,9 @@ onUpdated(syncInput);
   transition: opacity 0.15s ease;
 }
 
-/* Checked state — driven by class on label, not :checked pseudo-class */
+/* Checked state */
 .is-checked .checkbox__box {
   background: var(--accent);
-  border-color: var(--accent);
   animation: checkbox-wave 0.3s ease;
 }
 
@@ -157,7 +157,6 @@ onUpdated(syncInput);
 /* Indeterminate state */
 .is-indeterminate .checkbox__box {
   background: var(--accent);
-  border-color: var(--accent);
 }
 
 .is-indeterminate .checkbox__check {

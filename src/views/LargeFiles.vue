@@ -22,6 +22,7 @@ import {
 } from "../stores/scanStore";
 import FdaWarningBanner from "../components/FdaWarningBanner.vue";
 import EmptyState from "../components/EmptyState.vue";
+import Modal from "../components/Modal.vue";
 import Checkbox from "../components/Checkbox.vue";
 import TabBar from "../components/TabBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
@@ -469,22 +470,17 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
     <div v-if="successMsg" class="success-message">{{ successMsg }}</div>
 
     <!-- Protected files warning modal -->
-    <Teleport to="body">
-      <div v-if="showProtectedWarning" class="modal-overlay" @click.self="showProtectedWarning = false">
-        <div class="modal-dialog">
-          <div class="modal-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          <h3>Protected files selected</h3>
-          <p>Some of the selected files are protected. Unprotect or deselect them before deleting.</p>
-          <div class="modal-actions">
-            <button class="btn-primary btn-sm" @click="showProtectedWarning = false">OK</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <Modal :visible="showProtectedWarning" title="Protected files selected" @close="showProtectedWarning = false">
+      <template #icon>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </template>
+      <p>Some of the selected files are protected. Unprotect or deselect them before deleting.</p>
+      <template #actions>
+        <button class="btn-primary btn-sm" @click="showProtectedWarning = false">OK</button>
+      </template>
+    </Modal>
 
     <!-- Scanning progress -->
     <div v-if="largeFilesScanning" class="scan-progress-bar">
@@ -518,7 +514,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       <!-- Sticky action bar -->
       <div ref="stickyBarRef" class="results-sticky-bar" :class="{ 'is-stuck': isStuck }">
         <div class="summary-left">
-          <Checkbox :is-on="allSelected" @change="toggleAll" />
+          <Checkbox :model-value="allSelected" @change="toggleAll" />
           <span class="results-count">{{ largeFiles.length }} file(s)</span>
           <span class="results-total-size">&mdash; {{ formatSize(totalLargeFileSize) }}</span>
           <span v-if="selected.size > 0" class="selected-info">
@@ -585,7 +581,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
             </div>
           </div>
           <Checkbox
-            :is-on="isGroupAllSelected(group.flatFiles)"
+            :model-value="isGroupAllSelected(group.flatFiles)"
             :indeterminate="isGroupPartialSelected(group.flatFiles)"
             @change="toggleGroupSelect(group.flatFiles)"
           />
@@ -631,7 +627,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
               <div class="file-row-check">
-                <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
               </div>
             </div>
           </div>
@@ -660,7 +656,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                     <span class="dir-meta text-muted">{{ child.totalFiles }} file(s)</span>
                     <span class="dir-size mono">{{ formatSize(child.totalSize) }}</span>
                     <Checkbox
-                      :is-on="isGroupAllSelected(collectFiles(child))"
+                      :model-value="isGroupAllSelected(collectFiles(child))"
                       :indeterminate="isGroupPartialSelected(collectFiles(child))"
                       @change="toggleGroupSelect(collectFiles(child))"
                     />
@@ -688,7 +684,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                             <span class="dir-meta text-muted">{{ d1.totalFiles }} file(s)</span>
                             <span class="dir-size mono">{{ formatSize(d1.totalSize) }}</span>
                             <Checkbox
-                              :is-on="isGroupAllSelected(collectFiles(d1))"
+                              :model-value="isGroupAllSelected(collectFiles(d1))"
                               :indeterminate="isGroupPartialSelected(collectFiles(d1))"
                               @change="toggleGroupSelect(collectFiles(d1))"
                             />
@@ -716,7 +712,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                     <span class="dir-meta text-muted">{{ d2.totalFiles }} file(s)</span>
                                     <span class="dir-size mono">{{ formatSize(d2.totalSize) }}</span>
                                     <Checkbox
-                                      :is-on="isGroupAllSelected(collectFiles(d2))"
+                                      :model-value="isGroupAllSelected(collectFiles(d2))"
                                       :indeterminate="isGroupPartialSelected(collectFiles(d2))"
                                       @change="toggleGroupSelect(collectFiles(d2))"
                                     />
@@ -743,7 +739,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           <span class="dir-meta text-muted">{{ d3.totalFiles }} file(s)</span>
                                           <span class="dir-size mono">{{ formatSize(d3.totalSize) }}</span>
                                           <Checkbox
-                                            :is-on="isGroupAllSelected(collectFiles(d3))"
+                                            :model-value="isGroupAllSelected(collectFiles(d3))"
                                             :indeterminate="isGroupPartialSelected(collectFiles(d3))"
                                             @change="toggleGroupSelect(collectFiles(d3))"
                                           />
@@ -759,7 +755,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                           @click="toggleSelect(file.path)"
                                         >
                                           <div class="file-row-check">
-                                            <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                                            <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
                                           </div>
                                           <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
@@ -797,7 +793,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                                       @click="toggleSelect(file.path)"
                                     >
                                       <div class="file-row-check">
-                                        <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                                        <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
                                       </div>
                                       <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
@@ -837,7 +833,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                               @click="toggleSelect(file.path)"
                             >
                               <div class="file-row-check">
-                                <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                                <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
                               </div>
                               <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
@@ -877,7 +873,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                       @click="toggleSelect(file.path)"
                     >
                       <div class="file-row-check">
-                        <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                        <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
                       </div>
                       <div class="file-icon-wrap">
                 <img v-if="getFileIcon(file.name)" :src="getFileIcon(file.name)" alt="" class="file-row-icon" width="32" height="32" />
@@ -942,7 +938,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
                 <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
               </button>
               <div class="file-row-check">
-                <Checkbox v-if="!isLocked(file.path)" :is-on="selected.has(file.path)" @change="toggleSelect(file.path)" />
+                <Checkbox v-if="!isLocked(file.path)" :model-value="selected.has(file.path)" @change="toggleSelect(file.path)" />
               </div>
             </div>
           </div>
@@ -1448,49 +1444,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   gap: 16px;
 }
 
-/* ---- Modal dialog ---- */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.modal-dialog {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: var(--radius-lg);
-  padding: 32px;
-  max-width: 360px;
-  text-align: center;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.modal-icon {
-  margin-bottom: 16px;
-}
-
-.modal-dialog h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-
-.modal-dialog p {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
 
 /* Vault section */
 .vault-group {

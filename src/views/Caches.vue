@@ -206,7 +206,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
       </div>
 
       <div class="select-all-row">
-        <Checkbox :is-on="allSelected" @change="toggleAll">Select all</Checkbox>
+        <Checkbox :model-value="allSelected" @change="toggleAll">Select all</Checkbox>
       </div>
 
       <div class="cache-groups">
@@ -249,7 +249,7 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
                 <span class="cache-size mono">{{ formatSize(entry.size) }}</span>
                 <span class="cache-count text-muted">{{ entry.item_count.toLocaleString() }} items</span>
               </div>
-              <Checkbox :is-on="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
+              <Checkbox :model-value="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
             </div>
           </div>
         </div>

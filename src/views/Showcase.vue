@@ -571,7 +571,7 @@ const toggleOff = ref(false);
 
       <h4 class="showcase-subtitle">With badge (tabs prop)</h4>
       <div class="showcase-row">
-        <TabBar :tabs="tabOptions" v-model="tabValue" />
+        <TabBar :options="tabOptions" v-model="tabValue" />
       </div>
     </section>
 
@@ -791,33 +791,7 @@ const toggleOff = ref(false);
   color: var(--muted);
 }
 
-/* ===== FORM INPUTS ===== */
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.input-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.search-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.search-wrapper svg {
-  position: absolute;
-  left: 10px;
-  color: var(--muted);
-  pointer-events: none;
-}
-.search-wrapper input {
-  padding-left: 32px;
-  width: 100%;
-}
+/* Form input group styles now in style.css (section 4e) */
 
 /* ===== CUSTOM CHECKBOX ===== */
 .inline-svg {
@@ -829,186 +803,11 @@ const toggleOff = ref(false);
 }
 /* Checkbox styles now in Checkbox.vue component */
 
-/* ===== LIST ITEM ===== */
-.list-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-}
-.list-item:last-child { border-bottom: none; }
-.list-item-name { flex: 1; font-weight: 500; font-size: 13px; }
-.list-item-meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+/* List item styles now in style.css (section 4f) */
 
-/* ===== SLIDER ===== */
-.slider-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+/* Slider styles now in style.css (section 4b) */
 
-.slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 20px;
-  background: transparent;
-  outline: none;
-  border: none;
-  box-shadow: none;
-  cursor: pointer;
-}
+/* Radio button styles now in style.css (section 4c) */
 
-.slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
-  border: 0;
-  outline: 0;
-  box-shadow: none;
-  -webkit-appearance: none;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0%,
-    var(--accent) var(--fill, 0%),
-    rgba(0, 0, 0, 0.1) var(--fill, 0%),
-    rgba(0, 0, 0, 0.1) 100%
-  );
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
-  border: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-  margin-top: -7px;
-}
-
-.slider-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-/* ===== RADIO BUTTONS ===== */
-.radio-section {
-  padding: 14px 18px;
-}
-
-.radio-section-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 10px;
-}
-
-.radio-divider {
-  height: 1px;
-  background: rgba(0, 0, 0, 0.06);
-  margin: 0 18px;
-}
-
-.radio-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 0;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.radio-item input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.radio-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  background: white;
-  flex-shrink: 0;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  position: relative;
-}
-
-.radio-dot::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  transform: translate(-50%, -50%) scale(0);
-  transition: transform 0.15s ease;
-}
-
-.radio-item input:checked + .radio-dot {
-  border-color: var(--accent);
-}
-
-.radio-item input:checked + .radio-dot::after {
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.radio-item:hover .radio-dot {
-  border-color: var(--accent);
-}
-
-/* ===== PROGRESS BARS ===== */
-.progress-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(0,0,0,0.06);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.progress-track--thin { height: 3px; }
-.progress-track--thick { height: 10px; }
-.progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease;
-}
-.progress-fill--accent { background: var(--accent); }
-.progress-fill--success { background: var(--success); }
-.progress-fill--warning { background: var(--warning); }
-.progress-fill--danger { background: var(--danger); }
-
-.progress-segmented {
-  display: flex;
-  width: 100%;
-  height: 10px;
-  background: rgba(0,0,0,0.06);
-  border-radius: 5px;
-  overflow: hidden;
-}
-.progress-segmented .seg {
-  height: 100%;
-  transition: width 0.4s ease;
-}
-
-.progress-labeled { margin-bottom: 8px; }
-.progress-labeled-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-.progress-labeled-header .label { color: var(--text-secondary); }
-.progress-labeled-header .value { color: var(--text); font-family: var(--font-mono); font-weight: 600; }
+/* Progress bar styles now in style.css (section 4d) */
 </style>

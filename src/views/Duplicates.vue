@@ -288,7 +288,7 @@ function shortPath(p: string): string {
             {{ activeTab === 'exact' ? 'Find identical files wasting disk space' : 'Find visually similar images' }}
           </p>
         </div>
-        <TabBar :tabs="tabOptions" v-model="activeTab" />
+        <TabBar :options="tabOptions" v-model="activeTab" />
         <div v-if="activeTab === 'exact'" class="scan-controls">
           <div class="min-size-control">
             <label for="dup-min-size" class="text-muted">Min size</label>
@@ -456,7 +456,7 @@ function shortPath(p: string): string {
                 }"
                 @click="loadPreview(file.path, $event)"
               >
-                <Checkbox :is-on="selected.has(file.path)" @change="toggleFile(file.path)" />
+                <Checkbox :model-value="selected.has(file.path)" @change="toggleFile(file.path)" />
                 <span v-if="idx === 0" class="badge pill badge-accent card-badge-keep">Keep</span>
 
                 <div v-if="isImageFile(file.name)" class="card-face card-face--thumb">
@@ -619,7 +619,7 @@ function shortPath(p: string): string {
                   }"
                   @click="toggleSimilarFile(file.path)"
                 >
-                  <Checkbox :is-on="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
+                  <Checkbox :model-value="similarSelected.has(file.path)" @change="toggleSimilarFile(file.path)" />
                   <span v-if="idx === group.representative_idx" class="badge pill badge-accent card-badge-keep">Keep</span>
 
                   <div class="card-face card-face--thumb">
