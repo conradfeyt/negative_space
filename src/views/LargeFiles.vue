@@ -25,6 +25,7 @@ import EmptyState from "../components/EmptyState.vue";
 import Modal from "../components/Modal.vue";
 import Checkbox from "../components/Checkbox.vue";
 import TabBar from "../components/TabBar.vue";
+import ScanBar from "../components/ScanBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import {
   useFileGrouping,
@@ -443,7 +444,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
         <h2>Large Files</h2>
         <p class="text-muted">Find and remove large files taking up space</p>
       </div>
-      <div class="scan-bar">
+      <ScanBar :scanning="largeFilesScanning" @scan="scan">
         <label for="lf-min-size" class="sr-only">Minimum size (MB)</label>
         <input id="lf-min-size" v-model.number="minSizeMb" type="number" min="1" max="10000" class="scan-bar-size" title="Minimum size (MB)" @blur="minSizeMb = Math.max(1, Math.min(10000, minSizeMb || 1))" />
         <span class="scan-bar-unit">MB</span>
@@ -454,11 +455,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
           <svg v-else width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
           <span>{{ scanPathDisplay }}</span>
         </button>
-        <button class="scan-bar-btn" :disabled="largeFilesScanning" @click="scan">
-          <span v-if="largeFilesScanning" class="spinner-sm"></span>
-          {{ largeFilesScanning ? "Scanning..." : "Scan" }}
-        </button>
-      </div>
+      </ScanBar>
     </div>
 
     <!-- FDA warning -->
@@ -954,18 +951,7 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 .controls-row { display: flex; align-items: flex-end; gap: var(--sp-4); }
 .control-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 .control-label { font-size: 12px; font-weight: 400; color: var(--muted); }
-/* ---- Combined scan bar ---- */
-.scan-bar {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 3px 3px 3px 12px;
-  gap: 0;
-  flex-shrink: 0;
-}
-
+/* ---- Scan bar slot content ---- */
 .scan-bar-size {
   width: 80px;
   border: none !important;
@@ -1028,31 +1014,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   height: 16px;
   width: auto;
   flex-shrink: 0;
-}
-
-.scan-bar-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  border-radius: 18px;
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.scan-bar-btn:hover {
-  background: var(--accent-hover);
-}
-
-.scan-bar-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* ---- Scanning progress bar ---- */
