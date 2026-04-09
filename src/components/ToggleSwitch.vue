@@ -1,18 +1,25 @@
 <script setup lang="ts">
+/**
+ * ToggleSwitch — macOS-style toggle switch.
+ *
+ * Supports v-model, disabled state, and visible focus indicator.
+ */
 defineProps<{
-  modelValue: boolean;
+  modelValue: boolean
+  disabled?: boolean
 }>();
 
 defineEmits<{
-  (e: "update:modelValue", value: boolean): void;
+  (e: "update:modelValue", value: boolean): void
 }>();
 </script>
 
 <template>
-  <label class="toggle">
+  <label class="toggle" :class="{ 'toggle--disabled': disabled }">
     <input
       type="checkbox"
       :checked="modelValue"
+      :disabled="disabled"
       @change="$emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
     <span class="toggle-slider"></span>
@@ -40,7 +47,7 @@ defineEmits<{
   inset: 0;
   background: rgba(0, 0, 0, 0.18);
   border-radius: 10px;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.15s ease;
 }
 
 .toggle-slider::before {
@@ -62,5 +69,17 @@ defineEmits<{
 
 .toggle input:checked + .toggle-slider::before {
   transform: translateX(12px);
+}
+
+/* Focus indicator */
+.toggle input:focus-visible + .toggle-slider {
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* Disabled state */
+.toggle--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 </style>
