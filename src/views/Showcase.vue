@@ -11,6 +11,7 @@ import ToggleSwitch from "../components/ToggleSwitch.vue";
 import Checkbox from "../components/Checkbox.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import { ref } from "vue";
+import { showToast } from "../stores/toastStore";
 
 const segValue = ref("size");
 const segOptions: TabOption[] = [
@@ -658,6 +659,20 @@ const toggleOff = ref(false);
             <path d="M13 1L6 8"/>
           </svg>
         </button>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TOASTS -->
+    <!-- ================================================================= -->
+    <section class="showcase-section">
+      <h3 class="section-title">Toasts</h3>
+      <p class="showcase-subtitle">Click to trigger (bottom-right of screen, auto-dismiss 60s)</p>
+      <div class="showcase-row">
+        <button class="btn-primary btn-sm" @click="showToast('Cleaned 4 caches, freed 1.2 GB', 'success', 'Caches')">Success</button>
+        <button class="btn-danger btn-sm" @click="showToast('Failed to delete: permission denied', 'error', 'Large Files')">Error</button>
+        <button class="btn-secondary btn-sm" @click="showToast('Scan complete — 180 files found', 'info', 'Duplicates')">Info</button>
+        <button class="btn-secondary btn-sm" @click="showToast('Cleaned 4 caches', 'success', 'Caches'); showToast('Scan complete', 'info', 'Apps'); showToast('Permission denied', 'error', 'Trash')">Stack 3</button>
       </div>
     </section>
 

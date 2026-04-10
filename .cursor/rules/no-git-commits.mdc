@@ -1,0 +1,11 @@
+---
+description: Never commit to git — only stage files and suggest commit messages
+alwaysApply: true
+---
+
+# Git Policy
+
+- **NEVER** run `git commit`, `git push`, `git merge`, `git rebase`, or any command that modifies git history.
+- You MAY run `git add` to stage files.
+- You MAY run read-only git commands: `git status`, `git diff`, `git log`, `git branch`, `git show`.
+- When the user asks to commit, stage the relevant files with `git add` and provide a suggested commit message — do not execute the commit.

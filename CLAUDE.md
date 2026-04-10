@@ -171,6 +171,11 @@ Styles: `plain` (preserves aspect ratio), `grayBadge` (white glyph on grey round
 - `ROADMAP.md` — feature roadmap with completed and planned work
 - `PERFORMANCE_ROADMAP.md` — 15-item performance optimisation plan with metrics and priorities
 
+## Git policy
+- **Never** run `git commit`, `git push`, `git merge`, `git rebase`, or any command that modifies git history
+- May run `git add` to stage files and read-only commands (`status`, `diff`, `log`, `branch`, `show`)
+- When asked to commit: stage files and suggest a commit message — do not execute the commit
+
 ## What NOT to do
 - Don't use git worktrees — causes complications with orphan branches and identity
 - Don't build from `~/projects/macsweep` — old project, WebKit cache there is stale

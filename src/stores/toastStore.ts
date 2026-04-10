@@ -10,13 +10,18 @@ export interface ToastMessage {
   id: number;
   message: string;
   type: "success" | "error" | "info";
+  source?: string;
 }
 
 const toasts = ref<ToastMessage[]>([]);
 let nextId = 0;
 
-export function showToast(message: string, type: "success" | "error" | "info" = "success") {
-  toasts.value.push({ id: nextId++, message, type });
+export function showToast(message: string, type: "success" | "error" | "info" = "success", source?: string) {
+  toasts.value.push({ id: nextId++, message, type, source });
+}
+
+export function clearAllToasts() {
+  toasts.value = [];
 }
 
 export function dismissToast(id: number) {

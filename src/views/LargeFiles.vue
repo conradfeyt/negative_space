@@ -25,12 +25,12 @@ import EmptyState from "../components/EmptyState.vue";
 import Modal from "../components/Modal.vue";
 import Checkbox from "../components/Checkbox.vue";
 import FileRow from "../components/FileRow.vue";
+import DirTreeNode from "../components/DirTreeNode.vue";
 import TabBar from "../components/TabBar.vue";
 import ScanBar from "../components/ScanBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import {
   useFileGrouping,
-  collectFiles,
   parentFolder,
 } from "../composables/useFileGrouping";
 
@@ -388,6 +388,9 @@ const selectableCount = computed(() => largeFiles.value.filter(f => !isLocked(f.
 const allSelected = computed(
   () => selectableCount.value > 0 && selected.value.size >= selectableCount.value
 );
+const partialSelected = computed(
+  () => selected.value.size > 0 && selected.value.size < selectableCount.value
+);
 
 const totalSelected = computed(() =>
   largeFiles.value
@@ -434,6 +437,22 @@ function isGroupAllSelected(files: FileInfo[]): boolean {
 function isGroupPartialSelected(files: FileInfo[]): boolean {
   const selCount = files.filter((f) => selected.value.has(f.path)).length;
   return selCount > 0 && selCount < files.length;
+}
+
+function fileSafetyLabel(path: string): string {
+  return safetyLabel(getClassification(path)?.safety ?? "unknown");
+}
+
+function fileSafetyClass(path: string): string {
+  return safetyBadgeClass(getClassification(path)?.safety ?? "unknown");
+}
+
+function fileSafetyTooltip(path: string): string {
+  return getClassification(path)?.explanation || "";
+}
+
+function fileTimeAgo(file: FileInfo): string {
+  return file.modified ? timeAgo(file.modified) : "";
 }
 </script>
 
@@ -505,12 +524,10 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
       <!-- Sticky action bar -->
       <div ref="stickyBarRef" class="results-sticky-bar" :class="{ 'is-stuck': isStuck }">
         <div class="summary-left">
-          <Checkbox :model-value="allSelected" @change="toggleAll" />
-          <span class="results-count">{{ largeFiles.length }} file(s)</span>
-          <span class="results-total-size">&mdash; {{ formatSize(totalLargeFileSize) }}</span>
-          <span v-if="selected.size > 0" class="selected-info">
-            ({{ selected.size }} selected, {{ formatSize(totalSelected) }})
-          </span>
+          <Checkbox :model-value="allSelected" :indeterminate="partialSelected" @change="toggleAll" />
+          <span v-if="selected.size === 0" class="results-count">{{ largeFiles.length }} file(s) &mdash; {{ formatSize(totalLargeFileSize) }}</span>
+          <span v-else-if="allSelected" class="results-count">{{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+          <span v-else class="results-count">{{ selected.size }} of {{ largeFiles.length }} selected &mdash; {{ formatSize(totalSelected) }}</span>
         </div>
         <div class="results-actions">
           <button class="btn-secondary btn-sm protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
@@ -593,13 +610,13 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               :is-protected="isProtected(file.path)"
               :is-locked="isLocked(file.path)"
               :file-icon="getFileIcon(file.name)"
-              :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-              :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-              :safety-tooltip="getClassification(file.path)?.explanation || ''"
+              :safety-label="fileSafetyLabel(file.path)"
+              :safety-class="fileSafetyClass(file.path)"
+              :safety-tooltip="fileSafetyTooltip(file.path)"
               :is-sparse="isSparse(file)"
               :disk-size="diskSize(file)"
               :parent-folder="parentFolder(file.path)"
-              :time-ago="file.modified ? timeAgo(file.modified) : ''"
+              :time-ago="fileTimeAgo(file)"
               :is-tree="false"
               :native-folder-icon="nativeFolderIcon"
               @toggle="toggleSelect(file.path)"
@@ -611,229 +628,32 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
 
         <!-- ===== DIRECTORY MODE: recursive tree ===== -->
         <template v-if="!collapsedGroups.has(group.id) && sortMode === 'directory'">
-          <!-- Render top-level children of the tree root (root itself is a virtual node) -->
-          <template v-for="child in group.tree.children" :key="child.key">
-            <div class="dir-tree" :style="{ '--depth': 0 }">
-              <!-- Recursive directory node rendering -->
-              <div class="dir-node">
-                <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(child.key)" @click="toggleGroup(child.key)" @keydown.enter="toggleGroup(child.key)" @keydown.space.prevent="toggleGroup(child.key)">
-                  <div class="dir-header-left">
-                    <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(child.key) }">
-                      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-                    </span>
-                    <span class="dir-header-icon">
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                      </svg>
-                    </span>
-                    <span class="dir-path mono">{{ child.path || child.name }}</span>
-                  </div>
-                  <div class="dir-header-right">
-                    <span class="dir-meta text-muted">{{ child.totalFiles }} file(s)</span>
-                    <span class="dir-size mono">{{ formatSize(child.totalSize) }}</span>
-                    <Checkbox
-                      :model-value="isGroupAllSelected(collectFiles(child))"
-                      :indeterminate="isGroupPartialSelected(collectFiles(child))"
-                      @change="toggleGroupSelect(collectFiles(child))"
-                    />
-                  </div>
-                </div>
-
-                <template v-if="!collapsedGroups.has(child.key)">
-                  <!-- Sub-directories (depth 1) -->
-                  <template v-for="d1 in child.children" :key="d1.key">
-                    <div class="dir-tree" :style="{ '--depth': 1 }">
-                      <div class="dir-node">
-                        <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d1.key)" @click="toggleGroup(d1.key)" @keydown.enter="toggleGroup(d1.key)" @keydown.space.prevent="toggleGroup(d1.key)">
-                          <div class="dir-header-left">
-                            <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d1.key) }">
-                              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-                            </span>
-                            <span class="dir-header-icon">
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                              </svg>
-                            </span>
-                            <span class="dir-path mono">{{ d1.name }}</span>
-                          </div>
-                          <div class="dir-header-right">
-                            <span class="dir-meta text-muted">{{ d1.totalFiles }} file(s)</span>
-                            <span class="dir-size mono">{{ formatSize(d1.totalSize) }}</span>
-                            <Checkbox
-                              :model-value="isGroupAllSelected(collectFiles(d1))"
-                              :indeterminate="isGroupPartialSelected(collectFiles(d1))"
-                              @change="toggleGroupSelect(collectFiles(d1))"
-                            />
-                          </div>
-                        </div>
-
-                        <template v-if="!collapsedGroups.has(d1.key)">
-                          <!-- Sub-directories (depth 2) -->
-                          <template v-for="d2 in d1.children" :key="d2.key">
-                            <div class="dir-tree" :style="{ '--depth': 2 }">
-                              <div class="dir-node">
-                                <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d2.key)" @click="toggleGroup(d2.key)" @keydown.enter="toggleGroup(d2.key)" @keydown.space.prevent="toggleGroup(d2.key)">
-                                  <div class="dir-header-left">
-                                    <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d2.key) }">
-                                      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-                                    </span>
-                                    <span class="dir-header-icon">
-                                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                                      </svg>
-                                    </span>
-                                    <span class="dir-path mono">{{ d2.name }}</span>
-                                  </div>
-                                  <div class="dir-header-right">
-                                    <span class="dir-meta text-muted">{{ d2.totalFiles }} file(s)</span>
-                                    <span class="dir-size mono">{{ formatSize(d2.totalSize) }}</span>
-                                    <Checkbox
-                                      :model-value="isGroupAllSelected(collectFiles(d2))"
-                                      :indeterminate="isGroupPartialSelected(collectFiles(d2))"
-                                      @change="toggleGroupSelect(collectFiles(d2))"
-                                    />
-                                  </div>
-                                </div>
-
-                                <template v-if="!collapsedGroups.has(d2.key)">
-                                  <!-- Deeper levels: just show files flat -->
-                                  <template v-for="d3 in d2.children" :key="d3.key">
-                                    <div class="dir-tree" :style="{ '--depth': 3 }">
-                                      <div class="dir-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(d3.key)" @click="toggleGroup(d3.key)" @keydown.enter="toggleGroup(d3.key)" @keydown.space.prevent="toggleGroup(d3.key)">
-                                        <div class="dir-header-left">
-                                          <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(d3.key) }">
-                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-                                          </span>
-                                          <span class="dir-header-icon">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                              <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
-                                            </svg>
-                                          </span>
-                                          <span class="dir-path mono">{{ d3.name }}</span>
-                                        </div>
-                                        <div class="dir-header-right">
-                                          <span class="dir-meta text-muted">{{ d3.totalFiles }} file(s)</span>
-                                          <span class="dir-size mono">{{ formatSize(d3.totalSize) }}</span>
-                                          <Checkbox
-                                            :model-value="isGroupAllSelected(collectFiles(d3))"
-                                            :indeterminate="isGroupPartialSelected(collectFiles(d3))"
-                                            @change="toggleGroupSelect(collectFiles(d3))"
-                                          />
-                                        </div>
-                                      </div>
-                                      <!-- Files inside depth-3+ dirs shown flat -->
-                                      <div v-if="!collapsedGroups.has(d3.key)" class="file-list file-list-indented">
-                                        <FileRow
-                                          v-for="file in collectFiles(d3)"
-                                          :key="file.path"
-                                          :file="file"
-                                          :selected="selected.has(file.path)"
-                                          :is-protected="isProtected(file.path)"
-                                          :is-locked="isLocked(file.path)"
-                                          :file-icon="getFileIcon(file.name)"
-                                          :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-                                          :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-                                          :safety-tooltip="getClassification(file.path)?.explanation || ''"
-                                          :is-sparse="isSparse(file)"
-                                          :disk-size="diskSize(file)"
-                                          :parent-folder="parentFolder(file.path)"
-                                          :time-ago="file.modified ? timeAgo(file.modified) : ''"
-                                          :is-tree="true"
-                                          :native-folder-icon="nativeFolderIcon"
-                                          @toggle="toggleSelect(file.path)"
-                                          @reveal="revealInFinder(file.path)"
-                                          @unprotect="toggleProtected(file.path)"
-                                        />
-                                      </div>
-                                    </div>
-                                  </template>
-
-                                  <!-- Files at depth 2 -->
-                                  <div v-if="d2.files.length > 0" class="file-list file-list-indented">
-                                    <FileRow
-                                      v-for="file in d2.files"
-                                      :key="file.path"
-                                      :file="file"
-                                      :selected="selected.has(file.path)"
-                                      :is-protected="isProtected(file.path)"
-                                      :is-locked="isLocked(file.path)"
-                                      :file-icon="getFileIcon(file.name)"
-                                      :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-                                      :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-                                      :safety-tooltip="getClassification(file.path)?.explanation || ''"
-                                      :is-sparse="isSparse(file)"
-                                      :disk-size="diskSize(file)"
-                                      :parent-folder="parentFolder(file.path)"
-                                      :time-ago="file.modified ? timeAgo(file.modified) : ''"
-                                      :is-tree="true"
-                                      :native-folder-icon="nativeFolderIcon"
-                                      @toggle="toggleSelect(file.path)"
-                                      @reveal="revealInFinder(file.path)"
-                                      @unprotect="toggleProtected(file.path)"
-                                    />
-                                  </div>
-                                </template>
-                              </div>
-                            </div>
-                          </template>
-
-                          <!-- Files at depth 1 -->
-                          <div v-if="d1.files.length > 0" class="file-list file-list-indented">
-                            <FileRow
-                              v-for="file in d1.files"
-                              :key="file.path"
-                              :file="file"
-                              :selected="selected.has(file.path)"
-                              :is-protected="isProtected(file.path)"
-                              :is-locked="isLocked(file.path)"
-                              :file-icon="getFileIcon(file.name)"
-                              :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-                              :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-                              :safety-tooltip="getClassification(file.path)?.explanation || ''"
-                              :is-sparse="isSparse(file)"
-                              :disk-size="diskSize(file)"
-                              :parent-folder="parentFolder(file.path)"
-                              :time-ago="file.modified ? timeAgo(file.modified) : ''"
-                              :is-tree="true"
-                              :native-folder-icon="nativeFolderIcon"
-                              @toggle="toggleSelect(file.path)"
-                              @reveal="revealInFinder(file.path)"
-                              @unprotect="toggleProtected(file.path)"
-                            />
-                          </div>
-                        </template>
-                      </div>
-                    </div>
-                  </template>
-
-                  <!-- Files at depth 0 (directly under top-level dir) -->
-                  <div v-if="child.files.length > 0" class="file-list file-list-indented">
-                    <FileRow
-                      v-for="file in child.files"
-                      :key="file.path"
-                      :file="file"
-                      :selected="selected.has(file.path)"
-                      :is-protected="isProtected(file.path)"
-                      :is-locked="isLocked(file.path)"
-                      :file-icon="getFileIcon(file.name)"
-                      :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-                      :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-                      :safety-tooltip="getClassification(file.path)?.explanation || ''"
-                      :is-sparse="isSparse(file)"
-                      :disk-size="diskSize(file)"
-                      :parent-folder="parentFolder(file.path)"
-                      :time-ago="file.modified ? timeAgo(file.modified) : ''"
-                      :is-tree="true"
-                      :native-folder-icon="nativeFolderIcon"
-                      @toggle="toggleSelect(file.path)"
-                      @reveal="revealInFinder(file.path)"
-                      @unprotect="toggleProtected(file.path)"
-                    />
-                  </div>
-                </template>
-              </div>
-            </div>
-          </template>
+          <DirTreeNode
+            v-for="child in group.tree.children"
+            :key="child.key"
+            :node="child"
+            :depth="0"
+            :collapsed-groups="collapsedGroups"
+            :selected="selected"
+            :get-file-icon="getFileIcon"
+            :safety-label="fileSafetyLabel"
+            :safety-class="fileSafetyClass"
+            :safety-tooltip="fileSafetyTooltip"
+            :is-protected="isProtected"
+            :is-locked="isLocked"
+            :is-sparse="isSparse"
+            :disk-size="diskSize"
+            :parent-folder="parentFolder"
+            :time-ago="fileTimeAgo"
+            :native-folder-icon="nativeFolderIcon"
+            :is-group-all-selected="isGroupAllSelected"
+            :is-group-partial-selected="isGroupPartialSelected"
+            @toggle-group="toggleGroup"
+            @toggle-group-select="toggleGroupSelect"
+            @toggle-select="toggleSelect"
+            @reveal="revealInFinder"
+            @unprotect="toggleProtected"
+          />
 
           <!-- Files at tree root level (shouldn't normally happen, but handle gracefully) -->
           <div v-if="group.tree.files.length > 0" class="file-list">
@@ -845,13 +665,13 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
               :is-protected="isProtected(file.path)"
               :is-locked="isLocked(file.path)"
               :file-icon="getFileIcon(file.name)"
-              :safety-label="safetyLabel(getClassification(file.path)?.safety ?? 'unknown')"
-              :safety-class="safetyBadgeClass(getClassification(file.path)?.safety ?? 'unknown')"
-              :safety-tooltip="getClassification(file.path)?.explanation || ''"
+              :safety-label="fileSafetyLabel(file.path)"
+              :safety-class="fileSafetyClass(file.path)"
+              :safety-tooltip="fileSafetyTooltip(file.path)"
               :is-sparse="isSparse(file)"
               :disk-size="diskSize(file)"
               :parent-folder="parentFolder(file.path)"
-              :time-ago="file.modified ? timeAgo(file.modified) : ''"
+              :time-ago="fileTimeAgo(file)"
               :is-tree="false"
               :native-folder-icon="nativeFolderIcon"
               @toggle="toggleSelect(file.path)"
@@ -1079,84 +899,6 @@ function isGroupPartialSelected(files: FileInfo[]): boolean {
   font-size: 11px;
   padding: 0 16px 8px 16px;
   color: rgba(0, 0, 0, 0.85);
-}
-
-/* ---- Directory tree ---- */
-.dir-tree {
-  padding-left: calc(var(--depth, 0) * 20px);
-}
-
-.dir-node {
-  margin-bottom: 1px;
-}
-
-.dir-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 14px 6px 12px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  user-select: none;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-}
-
-.dir-header:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.dir-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-
-.dir-header-icon {
-  color: var(--muted);
-  flex-shrink: 0;
-  display: flex;
-}
-
-.dir-path {
-  font-size: 12px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dir-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.dir-meta {
-  justify-self: end;
-}
-
-.dir-size {
-  justify-self: end;
-}
-
-
-.dir-meta {
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.dir-size {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.expand-chevron--sm svg {
-  width: 10px;
-  height: 10px;
 }
 
 /* ---- File list ---- */
