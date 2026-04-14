@@ -34,7 +34,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **Native:** AppKit via objc2 — custom gradient layer, SMC sensor reading
 - **Image processing:** `image` crate (0.23) + `img_hash` (3.2) for perceptual hashing
 - **Testing:** Vitest (37 unit tests for pure utilities), Rust `#[cfg(test)]` modules
-- **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance, SensitiveContent
+- **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, Archive, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance, SensitiveContent
 
 ## Architecture notes
 
@@ -42,12 +42,12 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 `src-tauri/src/` is organized into domain modules:
 - **`lib.rs`** — module declarations, Tauri app builder, command registration, shared commands (disk usage, trash, FDA)
 - **`commands.rs`** — shared types (`FileInfo`, `LargeFileScanResult`), utility functions (`home_dir`, `get_du_size`, `run_cmd`, `build_skip_prefixes`, `build_scan_roots`, `format_system_time`)
-- **`large_files.rs`** — streaming large file scanner
+- **`large_files.rs`** — streaming large file scanner, supports multi-directory via `scan_paths`
 - **`caches_logs.rs`** — cache and log scanning
 - **`docker.rs`** — Docker detection, info, and cleanup
 - **`apps.rs`** — app scanning, uninstall, leftover detection
-- **`duplicates.rs`** — 3-stage duplicate file detection (size → partial hash → full hash)
-- **`similar_images.rs`** — perceptual hash-based similar image clustering
+- **`duplicates.rs`** — 3-stage duplicate file detection (size → partial hash → full hash), supports multi-directory via `scan_paths`
+- **`similar_images.rs`** — perceptual hash-based similar image clustering, supports multi-directory via `scan_paths`
 - **`vault.rs`** — compressed file vault (zstd)
 - **`security.rs`** — launch item auditing
 - **`browser.rs`** — multi-browser cache/data scanning
@@ -77,6 +77,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **`diskUsageStore.ts`** — disk usage stats
 - **`intelligenceStore.ts`** — AI classification
 - **`nsfwStore.ts`** — NSFW scan state, label exclusions, per-label weights, exposed label constants
+- **`archiveStore.ts`** — compressed file archive operations (zstd compression, restoration, inventory)
 
 All views import from `scanStore.ts` (the facade) — no view changes needed when stores are reorganized internally.
 
@@ -92,6 +93,19 @@ All views import from `scanStore.ts` (the facade) — no view changes needed whe
 - **`ScanBar.vue`** — Pill-shaped scan controls container with slot for inputs + integrated scan button
 - **`Modal.vue`** — Reusable modal dialog with overlay, ESC dismiss, icon/default/actions slots
 - **`FileRow.vue`** — File list row (icon, name, path, safety badge, size, reveal button, checkbox)
+- **`AppSelect.vue`** — Custom div-based dropdown replacing native `<select>`, with icon support, glassmorphism styling, compact mode for ScanBar
+- **`FilterPill.vue`** — Filter icon button for toggling filter states (used in Duplicates + Sensitive Content)
+- **`ScanHeader.vue`** — Shared scan view header with title, stat cards, scan button, folder picker, and settings popover slot. Used by Duplicates, LargeFiles, SensitiveContent
+- **`KindFilterBar.vue`** — File kind filter pills (All, Images, Documents, Audio, Video, Archives, Code, Other)
+- **`StickyBar.vue`** — Sticky toolbar that pins to the top of scrollable content, with selection controls and action buttons
+- **`LoadingState.vue`** — Lightweight loading placeholder with spinner and message
+- **`ProgressBar.vue`** — Animated progress bar with percentage display
+- **`InlineAlert.vue`** — Contextual alert banner (info, warning, success, error variants) with icon and dismiss
+- **`CollapsibleSection.vue`** — Expandable/collapsible section with animated chevron and header slot
+- **`ConfirmPanel.vue`** — Confirmation panel with summary, action buttons, and cancel — used for destructive batch operations
+- **`DiskUsageBar.vue`** — Segmented horizontal bar showing disk usage breakdown by category
+- **`MetricStrip.vue`** — Horizontal strip of key-value metric pairs, used in scan result summaries
+- **`ViewHeader.vue`** — Simple view title header with optional subtitle and action slot
 
 **Existing components (unchanged):**
 - **`ThermalCard.vue`**, **`FanCard.vue`**, **`BatteryCard.vue`**, **`CpuCard.vue`**, **`MemoryCard.vue`** — health card components
@@ -99,12 +113,16 @@ All views import from `scanStore.ts` (the facade) — no view changes needed whe
 - **`ChipSchematic.vue`** — Apple Silicon thermal overlay
 - **`VoronoiViz.vue`**, **`GalacticViz.vue`** — SpaceMap visualizations
 - **`NsfwImageCard.vue`** — sensitive content card with blurred preview, confidence badge, NudeNet label tags, info popover trigger
-- **`TimelineRail.vue`** — hierarchical date scrubber (years → months) with dock-style fish-eye scaling effect
+- **`TimelineRail.vue`** — hierarchical date scrubber (years → months) with dock-style fish-eye scaling, proportional scroll tracking
 
 ### Shared composables
 - **`useZoomPan.ts`** — drag-state-machine + wheel-zoom (used by VoronoiViz and GalacticViz)
 - **`useScanSettings.ts`** — scan area configuration with localStorage persistence
 - **`useScreenGradient.ts`** — Screen-anchored gradient rendering (blob geometry, bitmap painting, position polling, monitor topology, custom JS drag). Extracted from App.vue (~370 lines).
+- **`useScanFolder.ts`** — multi-directory scan path management. Exports `useScanFolder` (single path picker), `useScanLocations` (multi-path picker with up to 10 locations), `iconForPath` (native SF Symbol icons for known directories), `displayForPath` (friendly names). localStorage persistence. Used by LargeFiles, Duplicates, SensitiveContent.
+- **`useDuplicateFilters.ts`** — file kind filtering for duplicate groups (All, Images, Documents, Audio, Video, Archives, Code, Other). Extracted from Duplicates.vue.
+- **`useFileGrouping.ts`** — groups, sorts, and categorizes FileInfo[] by size, directory, safety, or type. Extracted from LargeFiles.vue.
+- **`useCompressionQueue.ts`** — compression queue management for the Archive view. Handles staging, size calculation, and sequential zstd compression.
 
 ### Shared utilities (`src/utils.ts`)
 - `formatSize`, `fileDiskSize`, `timeAgo`, `tempToColor`, `revealInFinder`
