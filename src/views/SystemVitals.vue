@@ -13,7 +13,7 @@
  *
  * Refreshes every 3 seconds for a live feel.
  */
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import {
   vitalsResult,
   vitalsScanning,
@@ -34,6 +34,9 @@ import BatteryCard from "../components/BatteryCard.vue";
 import CpuCard from "../components/CpuCard.vue";
 import MemoryCard from "../components/MemoryCard.vue";
 import LiveIndicator from "../components/LiveIndicator.vue";
+import LoadingState from "../components/LoadingState.vue";
+import MetricStrip from "../components/MetricStrip.vue";
+import { showToast } from "../stores/toastStore";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -187,6 +190,8 @@ const storageColor = computed(() => {
 const uptime = computed(() => vitalsResult.value?.load.uptime_display ?? "—");
 const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 0);
 
+watch(vitalsError, (err) => { if (err) showToast(err, "error"); });
+
 </script>
 
 <template>
@@ -209,13 +214,10 @@ const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 
     </div>
 
     <!-- Loading state -->
-    <div v-if="vitalsScanning && !vitalsScanned" class="loading-state">
-      <span class="spinner"></span>
-      Scanning system vitals...
-    </div>
-
-    <!-- Error state -->
-    <div v-if="vitalsError" class="error-message">{{ vitalsError }}</div>
+    <LoadingState
+      v-if="vitalsScanning && !vitalsScanned"
+      message="Scanning system vitals..."
+    />
 
     <!-- Main content -->
     <template v-if="vitalsResult">
@@ -309,22 +311,13 @@ const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 
       <!-- ================================================================
            Info strip: uptime + background agents
            ================================================================ -->
-      <div class="info-strip">
-        <span class="info-strip-item">
-          <span class="info-strip-label">Uptime</span>
-          <span class="info-strip-value">{{ uptime }}</span>
-        </span>
-        <span class="info-strip-divider"></span>
-        <span class="info-strip-item">
-          <span class="info-strip-label">Background Agents</span>
-          <span class="info-strip-value">{{ agentCount }}</span>
-        </span>
-        <span class="info-strip-divider"></span>
-        <span class="info-strip-item">
-          <span class="info-strip-label">Processes</span>
-          <span class="info-strip-value">{{ vitalsResult.total_processes }}</span>
-        </span>
-      </div>
+      <MetricStrip
+        :items="[
+          { label: 'Uptime', value: uptime },
+          { label: 'Background Agents', value: agentCount },
+          { label: 'Processes', value: vitalsResult.total_processes },
+        ]"
+      />
 
     </template>
   </div>
@@ -512,48 +505,6 @@ const agentCount = computed(() => vitalsResult.value?.background_agent_count ?? 
   font-weight: 500;
   color: var(--muted);
   margin-top: 6px;
-}
-
-/* ---------------------------------------------------------------------------
-   Info strip
-   --------------------------------------------------------------------------- */
-
-.info-strip {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  margin-bottom: var(--sp-6);
-}
-
-.info-strip-item {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.info-strip-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.info-strip-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.info-strip-divider {
-  width: 1px;
-  height: 14px;
-  background: rgba(0, 0, 0, 0.08);
 }
 
 /* Section headers (kept for potential future sections) */

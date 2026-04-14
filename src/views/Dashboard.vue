@@ -16,6 +16,8 @@ import FanCard from "../components/FanCard.vue";
 import BatteryCard from "../components/BatteryCard.vue";
 import CpuCard from "../components/CpuCard.vue";
 import MemoryCard from "../components/MemoryCard.vue";
+import ProgressBar from "../components/ProgressBar.vue";
+import MetricStrip from "../components/MetricStrip.vue";
 import {
   diskUsage,
   scanAllRunning,
@@ -464,22 +466,14 @@ onUnmounted(() => stopPolling());
     <!-- ================================================================
          Info strip
          ================================================================ -->
-    <div class="info-strip" v-if="vitalsResult">
-      <span class="info-strip-item">
-        <span class="info-strip-label">Uptime</span>
-        <span class="info-strip-value">{{ uptime }}</span>
-      </span>
-      <span class="info-strip-divider"></span>
-      <span class="info-strip-item">
-        <span class="info-strip-label">Agents</span>
-        <span class="info-strip-value">{{ agentCount }}</span>
-      </span>
-      <span class="info-strip-divider"></span>
-      <span class="info-strip-item">
-        <span class="info-strip-label">Processes</span>
-        <span class="info-strip-value">{{ vitalsResult.total_processes }}</span>
-      </span>
-    </div>
+    <MetricStrip
+      v-if="vitalsResult"
+      :items="[
+        { label: 'Uptime', value: uptime },
+        { label: 'Agents', value: agentCount },
+        { label: 'Processes', value: vitalsResult.total_processes },
+      ]"
+    />
 
     <!-- ================================================================
          AI Scan Summary (shown after scan-all completes)
@@ -554,9 +548,7 @@ onUnmounted(() => stopPolling());
           <span class="scan-progress-label">{{ scanAllStep.replace('_', ' ') }}</span>
           <span class="scan-progress-count mono">{{ quickScanDone }} / {{ quickScanTotal }}</span>
         </div>
-        <div class="scan-progress-track" role="progressbar" :aria-valuenow="scanProgress" aria-valuemin="0" aria-valuemax="100">
-          <div class="scan-progress-fill" :style="{ width: scanProgress + '%' }"></div>
-        </div>
+        <ProgressBar :percent="scanProgress" size="thin" />
       </div>
 
       <div v-if="hasAnyResults || scanAllRunning" class="domain-list">
@@ -894,15 +886,6 @@ onUnmounted(() => stopPolling());
 }
 
 /* ======================================================================
-   Info strip
-   ====================================================================== */
-.info-strip { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-radius: var(--radius-sm); background: var(--glass); border: 1px solid var(--glass-border); margin-bottom: var(--sp-6); }
-.info-strip-item { display: flex; align-items: baseline; gap: 6px; }
-.info-strip-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.info-strip-value { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-.info-strip-divider { width: 1px; height: 14px; background: rgba(0, 0, 0, 0.08); }
-
-/* ======================================================================
    AI Summary card
    ====================================================================== */
 .ai-summary-card {
@@ -943,8 +926,6 @@ onUnmounted(() => stopPolling());
 .scan-progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .scan-progress-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); text-transform: capitalize; }
 .scan-progress-count { font-size: 12px; color: var(--muted); }
-.scan-progress-track { height: 3px; background: rgba(0, 0, 0, 0.06); border-radius: 2px; overflow: hidden; }
-.scan-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
 
 /* Domain list */
 .domain-list { display: flex; flex-direction: column; }

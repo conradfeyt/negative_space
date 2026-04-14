@@ -1,16 +1,9 @@
 /**
- * Vault store — compressed file storage.
+ * Vault store — secure storage for sensitive files.
  */
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { hasFullDiskAccess } from "./domainStatusStore";
-import type {
-  VaultEntry,
-  VaultSummary,
-  CompressionCandidate,
-  CompressResult,
-  RestoreResult,
-} from "../types";
+import type { VaultEntry, VaultSummary, CompressResult, RestoreResult, MoveResult, StorageConfig } from "../types";
 
 // ---------------------------------------------------------------------------
 // State
@@ -18,22 +11,7 @@ import type {
 
 export const vaultSummary = ref<VaultSummary | null>(null);
 export const vaultEntries = ref<VaultEntry[]>([]);
-export const vaultCandidates = ref<CompressionCandidate[]>([]);
-export const vaultScanning = ref(false);
-export const vaultCompressing = ref(false);
 export const vaultError = ref("");
-
-// ---------------------------------------------------------------------------
-// Mutations (store-only — views should call these, not mutate refs directly)
-// ---------------------------------------------------------------------------
-
-export function setVaultEntries(entries: VaultEntry[]) {
-  vaultEntries.value = entries;
-}
-
-export function removeCandidates(paths: string[]) {
-  vaultCandidates.value = vaultCandidates.value.filter(c => !paths.includes(c.path));
-}
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -48,33 +26,13 @@ export async function loadVaultSummary() {
   }
 }
 
-export async function scanVaultCandidates(path = "~", minSizeMb = 10, minAgeDays = 30) {
-  vaultScanning.value = true;
-  vaultError.value = "";
-  try {
-    const fda = hasFullDiskAccess.value ?? false;
-    vaultCandidates.value = await invoke<CompressionCandidate[]>("scan_vault_candidates", {
-      path, minSizeMb, minAgeDays, fda,
-    });
-  } catch (e) {
-    vaultError.value = String(e);
-  } finally {
-    vaultScanning.value = false;
-  }
-}
-
 export async function compressToVault(paths: string[]): Promise<CompressResult> {
-  vaultCompressing.value = true;
-  vaultError.value = "";
   try {
     const result = await invoke<CompressResult>("compress_to_vault", { paths });
     await loadVaultSummary();
     return result;
   } catch (e) {
-    vaultError.value = String(e);
     return { success: false, files_compressed: 0, total_original_size: 0, total_compressed_size: 0, total_savings: 0, errors: [String(e)] };
-  } finally {
-    vaultCompressing.value = false;
   }
 }
 
@@ -88,33 +46,6 @@ export async function restoreFromVault(entryId: string): Promise<RestoreResult> 
   }
 }
 
-export async function compressDirectoryToVault(path: string): Promise<CompressResult> {
-  vaultCompressing.value = true;
-  vaultError.value = "";
-  try {
-    const result = await invoke<CompressResult>("compress_directory_to_vault", { path });
-    await loadVaultSummary();
-    return result;
-  } catch (e) {
-    vaultError.value = String(e);
-    return { success: false, files_compressed: 0, total_original_size: 0, total_compressed_size: 0, total_savings: 0, errors: [String(e)] };
-  } finally {
-    vaultCompressing.value = false;
-  }
-}
-
-export async function collectVaultDirectory(path: string) {
-  vaultScanning.value = true;
-  vaultError.value = "";
-  try {
-    vaultCandidates.value = await invoke<CompressionCandidate[]>("collect_vault_directory", { path });
-  } catch (e) {
-    vaultError.value = String(e);
-  } finally {
-    vaultScanning.value = false;
-  }
-}
-
 export async function deleteVaultEntry(entryId: string): Promise<void> {
   try {
     await invoke<void>("delete_vault_entry", { entryId });
@@ -122,4 +53,41 @@ export async function deleteVaultEntry(entryId: string): Promise<void> {
   } catch (e) {
     vaultError.value = String(e);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Move files to directory (fire-and-forget)
+// ---------------------------------------------------------------------------
+
+export async function moveFilesToDirectory(
+  paths: string[],
+  targetDir: string,
+): Promise<MoveResult> {
+  try {
+    return await invoke<MoveResult>("move_files_to_directory", {
+      paths,
+      targetDir,
+    });
+  } catch (e) {
+    return { success: false, files_moved: 0, errors: [String(e)] };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Storage configuration
+// ---------------------------------------------------------------------------
+
+export const storageConfig = ref<StorageConfig>({ archive_dir: null, vault_dir: null });
+
+export async function loadStorageConfig(): Promise<void> {
+  try {
+    storageConfig.value = await invoke<StorageConfig>("get_storage_config");
+  } catch (e) {
+    vaultError.value = String(e);
+  }
+}
+
+export async function setStorageConfig(config: StorageConfig): Promise<void> {
+  await invoke<void>("set_storage_config", { config });
+  storageConfig.value = config;
 }

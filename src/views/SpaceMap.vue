@@ -23,6 +23,7 @@ import { interpolateRgb } from "d3-interpolate";
 import { easeCubicInOut } from "d3-ease";
 import "d3-transition";
 import { formatSize, revealInFinder, SPACEMAP_CATEGORY_FILLS, OVERVIEW_CATEGORY_COLORS } from "../utils";
+import { showToast } from "../stores/toastStore";
 import {
   diskMapResult,
   diskMapLoading,
@@ -40,6 +41,9 @@ import {
 import type { DiskNode, CacheMetadata } from "../types";
 import GalacticViz from "../components/GalacticViz.vue";
 import VoronoiViz from "../components/VoronoiViz.vue";
+import LoadingState from "../components/LoadingState.vue";
+import DiskUsageBar from "../components/DiskUsageBar.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 // ---------------------------------------------------------------------------
 // View switcher (Phase 4 shell — only Sunburst active)
@@ -318,11 +322,6 @@ const showCacheDropdown = ref(false);
 // ---------------------------------------------------------------------------
 // Computed
 // ---------------------------------------------------------------------------
-const diskUsedPct = computed(() => {
-  if (!diskMapResult.value || diskMapResult.value.disk_total === 0) return 0;
-  return (diskMapResult.value.disk_used / diskMapResult.value.disk_total) * 100;
-});
-
 const rootSize = computed(() => diskMapResult.value?.root.size ?? 0);
 
 /** Center display info — shows hover target or current zoom root */
@@ -809,20 +808,16 @@ onBeforeUnmount(() => {
   if (contentEl) contentEl.style.overflow = '';
   if (sunburstResizeObserver) sunburstResizeObserver.disconnect();
 });
+
+watch(diskMapError, (err) => { if (err) showToast(err, "error"); });
 </script>
 
 <template>
     <div class="spacemap-view" :class="{ 'viz-expanded': vizExpanded }">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Space Map</h2>
-          <p class="text-muted">
-            Visualize what's using your disk space
-          </p>
-        </div>
-      </div>
-    </div>
+    <ViewHeader
+      title="Space Map"
+      subtitle="Visualize what's using your disk space"
+    />
 
     <!-- View switcher row — in expanded mode, header-actions sit inline -->
     <div class="viz-switcher-row">
@@ -926,32 +921,20 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Messages -->
-    <div v-if="diskMapError" class="error-message">{{ diskMapError }}</div>
-
     <!-- Loading -->
-    <div v-if="diskMapLoading" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning disk usage... this may take a moment</span>
-    </div>
+    <LoadingState
+      v-if="diskMapLoading"
+      message="Scanning disk usage... this may take a moment"
+    />
 
     <!-- Results -->
     <template v-else-if="diskMapResult">
       <!-- Disk usage bar (hidden in overview mode — overview has its own) -->
-      <div v-if="activeViz !== 'overview'" class="disk-bar-container">
-        <div class="disk-bar">
-          <div
-            class="disk-bar-fill"
-            :style="{ width: diskUsedPct + '%' }"
-            :class="{ 'disk-bar-warning': diskUsedPct > 80, 'disk-bar-danger': diskUsedPct > 90 }"
-          ></div>
-        </div>
-        <div class="disk-bar-labels">
-          <span>{{ formatSize(diskMapResult.disk_used) }} used</span>
-          <span>{{ formatSize(diskMapResult.disk_free) }} free</span>
-          <span class="text-muted">{{ formatSize(diskMapResult.disk_total) }} total</span>
-        </div>
-      </div>
+      <DiskUsageBar
+        v-if="activeViz !== 'overview'"
+        :used="diskMapResult.disk_used"
+        :total="diskMapResult.disk_total"
+      />
 
       <!-- ============================================================= -->
       <!-- OVERVIEW VIEW (macOS-style)                                     -->
@@ -1505,41 +1488,6 @@ onBeforeUnmount(() => {
   background: var(--glass-strong);
   color: var(--text);
   box-shadow: var(--shadow-sm);
-}
-
-/* ---- Disk usage bar ---- */
-.disk-bar-container {
-  margin-bottom: var(--sp-4);
-}
-
-.disk-bar {
-  height: 10px;
-  background: var(--border);
-  border-radius: 5px;
-  overflow: hidden;
-  margin-bottom: var(--sp-2);
-}
-
-.disk-bar-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 5px;
-  transition: width 0.5s ease;
-}
-
-.disk-bar-fill.disk-bar-warning {
-  background: var(--warning);
-}
-
-.disk-bar-fill.disk-bar-danger {
-  background: var(--danger);
-}
-
-.disk-bar-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-secondary);
 }
 
 /* ---- Sunburst ---- */

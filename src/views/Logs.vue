@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize, timeAgo } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -13,7 +13,11 @@ import {
   totalLogSize,
 } from "../stores/scanStore";
 import EmptyState from "../components/EmptyState.vue";
+import LoadingState from "../components/LoadingState.vue";
 import Checkbox from "../components/Checkbox.vue";
+import StickyBar from "../components/StickyBar.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
@@ -51,6 +55,7 @@ function toggleAll() {
 }
 
 const allSelected = computed(() => logs.value.length > 0 && selected.value.size === logs.value.length);
+const partialSelected = computed(() => selected.value.size > 0 && selected.value.size < logs.value.length);
 const totalSelected = computed(() => logs.value.filter((l) => selected.value.has(l.path)).reduce((sum, l) => sum + l.size, 0));
 
 // ── Log file icon ─────────────────────────────────────────────────────
@@ -124,29 +129,27 @@ function isGroupAllSelected(group: LogGroup): boolean {
 function shortPath(path: string): string {
   return path.replace(/^\/Users\/[^/]+/, "~");
 }
+
+watch(logsError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="logs-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Logs</h2>
-          <p class="text-muted">System and application log files</p>
-        </div>
+    <ViewHeader
+      title="Logs"
+      subtitle="System and application log files"
+    >
+      <template #actions>
         <button class="btn-primary scan-btn" :disabled="logsScanning" @click="scan">
           <span v-if="logsScanning" class="spinner-sm"></span>
           {{ logsScanning ? "Scanning..." : "Scan" }}
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="logsError" class="error-message">{{ logsError }}</div>
-
-    <div v-if="logsScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning log files...</span>
-    </div>
+    <LoadingState v-if="logsScanning" message="Scanning log files..." />
 
     <EmptyState
       v-else-if="logsScanned && logs.length === 0"
@@ -155,60 +158,60 @@ function shortPath(path: string): string {
     />
 
     <template v-else-if="logs.length > 0">
-      <div class="results-bar">
-        <div class="results-bar-left">
-          <Checkbox :model-value="allSelected" @change="toggleAll">Select all</Checkbox>
-          <span class="results-count text-muted">{{ logs.length }} log(s) &mdash; {{ formatSize(totalLogSize) }} total</span>
-        </div>
-        <div class="results-bar-right">
-          <span v-if="selected.size > 0" class="selected-info">{{ selected.size }} selected ({{ formatSize(totalSelected) }})</span>
+      <StickyBar>
+        <Checkbox :model-value="allSelected" :indeterminate="partialSelected" @change="toggleAll" />
+        <span v-if="selected.size === 0" class="results-count">{{ logs.length }} log(s) &mdash; {{ formatSize(totalLogSize) }}</span>
+        <span v-else-if="allSelected" class="results-count">{{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <span v-else class="results-count">{{ selected.size }} of {{ logs.length }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <template #actions>
           <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="cleanSelected">
             <span v-if="deleting" class="spinner-sm"></span>
             {{ deleting ? "Cleaning..." : "Clean Selected" }}
           </button>
-        </div>
-      </div>
+        </template>
+      </StickyBar>
 
       <div class="log-groups">
         <div v-for="group in groupedLogs" :key="group.source" class="log-category">
-          <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.source)" @click="toggleGroup(group.source)" @keydown.enter="toggleGroup(group.source)" @keydown.space.prevent="toggleGroup(group.source)">
-            <div class="category-header-left">
-              <span class="category-chevron" :class="{ expanded: !collapsedGroups.has(group.source) }">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-              </span>
-              <span class="category-label">{{ group.source }}</span>
-              <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
-            </div>
-            <div class="category-header-right">
-              <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
-              <button class="btn-sm btn-secondary" @click.stop="isGroupAllSelected(group) ? deselectGroup(group) : selectGroup(group)">
-                {{ isGroupAllSelected(group) ? 'Deselect' : 'Select all' }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="!collapsedGroups.has(group.source)" class="log-list">
-            <div
-              v-for="log in group.entries"
-              :key="log.path"
-              class="log-item"
-              :class="{ 'log-item--selected': selected.has(log.path) }"
-              @click="toggleSelect(log.path)"
-            >
-              <div class="log-icon">
-                <img v-if="logIcon" :src="logIcon" alt="" width="28" height="28" />
+          <CollapsibleSection
+            :expanded="!collapsedGroups.has(group.source)"
+            @toggle="toggleGroup(group.source)"
+          >
+            <template #header>
+              <div class="category-header-left">
+                <span class="category-label">{{ group.source }}</span>
+                <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
               </div>
-              <div class="log-info">
-                <span class="log-name">{{ log.name }}</span>
-                <span class="log-path text-muted" :title="log.path">{{ shortPath(log.path) }}</span>
+              <div class="category-header-right">
+                <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
+                <button class="btn-sm btn-secondary" @click.stop="isGroupAllSelected(group) ? deselectGroup(group) : selectGroup(group)">
+                  {{ isGroupAllSelected(group) ? 'Deselect' : 'Select all' }}
+                </button>
               </div>
-              <div class="log-size-col">
-                <span class="log-size mono">{{ formatSize(log.size) }}</span>
-                <span v-if="log.modified" class="log-time text-muted">{{ timeAgo(log.modified) }}</span>
+            </template>
+            <div class="log-list">
+              <div
+                v-for="log in group.entries"
+                :key="log.path"
+                class="log-item"
+                :class="{ 'log-item--selected': selected.has(log.path) }"
+                @click="toggleSelect(log.path)"
+              >
+                <div class="log-icon">
+                  <img v-if="logIcon" :src="logIcon" alt="" width="28" height="28" />
+                </div>
+                <div class="log-info">
+                  <span class="log-name">{{ log.name }}</span>
+                  <span class="log-path text-muted" :title="log.path">{{ shortPath(log.path) }}</span>
+                </div>
+                <div class="log-size-col">
+                  <span class="log-size mono">{{ formatSize(log.size) }}</span>
+                  <span v-if="log.modified" class="log-time text-muted">{{ timeAgo(log.modified) }}</span>
+                </div>
+                <Checkbox :model-value="selected.has(log.path)" @change="toggleSelect(log.path)" />
               </div>
-              <Checkbox :model-value="selected.has(log.path)" @change="toggleSelect(log.path)" />
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
       </div>
     </template>
@@ -218,27 +221,11 @@ function shortPath(path: string): string {
 <style scoped>
 .logs-view { max-width: 1440px; }
 
-.results-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--sp-3);
+.results-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
-
-.results-bar-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.results-bar-right {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-
-.results-count { font-size: 12px; }
 
 .log-groups {
   display: flex;
@@ -253,30 +240,26 @@ function shortPath(path: string): string {
   overflow: hidden;
 }
 
-.category-header {
+.log-category :deep(.collapsible-header) {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 10px 16px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.category-header:hover { background: rgba(255, 255, 255, 0.3); }
+.log-category :deep(.collapsible-header:hover) {
+  background: rgba(255, 255, 255, 0.3);
+}
 
 .category-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
-
-.category-chevron {
-  display: flex;
-  transition: transform 0.15s;
-  color: var(--muted);
-}
-
-.category-chevron.expanded { transform: rotate(90deg); }
 
 .category-label {
   font-size: 13px;

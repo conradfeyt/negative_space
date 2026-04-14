@@ -1,11 +1,7 @@
 // spotlight.rs — Core Spotlight integration for Negative _.
 //
-// Makes vault entries searchable from macOS Spotlight by invoking
-// mdimport-compatible metadata. Uses a lightweight approach: writes
-// a .plist sidecar file for each vault entry that Spotlight can index.
-//
-// Alternative approach: We use NSMetadataItem through a subprocess
-// to avoid complex objc2 lifetime issues with CoreSpotlight's ObjC API.
+// Makes archived/vaulted entries searchable from macOS Spotlight by
+// creating sidecar files that Spotlight can index.
 
 use std::fs;
 use std::path::Path;
@@ -32,7 +28,7 @@ pub fn index_vault_entry(entry: &VaultEntry) {
     let sidecar_path = format!("{}/{}.txt", dir, entry.id);
 
     let content = format!(
-        "Negative _ Vault Entry\n\
+        "Negative _ Compressed Entry\n\
          Original: {}\n\
          Name: {}\n\
          Type: {}\n\

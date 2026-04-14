@@ -25,6 +25,7 @@ import {
 } from "../stores/scanStore";
 import ChipSchematic from "../components/ChipSchematic.vue";
 import LiveIndicator from "../components/LiveIndicator.vue";
+import LoadingState from "../components/LoadingState.vue";
 
 // ---------------------------------------------------------------------------
 // Schematic responsive width — measure container, update on resize
@@ -191,10 +192,11 @@ const orderedSummaries = computed(() => {
     </div>
 
     <!-- Loading state -->
-    <div v-if="thermalScanning && !thermalResult" class="loading-state">
-      <div class="spinner-sm"></div>
-      <span class="text-muted">Reading SMC sensors...</span>
-    </div>
+    <LoadingState
+      v-if="thermalScanning && !thermalResult"
+      message="Reading SMC sensors..."
+      muted
+    />
 
     <!-- Error state -->
     <div v-else-if="thermalError" class="error-state card">

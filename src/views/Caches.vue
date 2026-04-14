@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -13,7 +13,11 @@ import {
   totalCacheSize,
 } from "../stores/scanStore";
 import EmptyState from "../components/EmptyState.vue";
+import LoadingState from "../components/LoadingState.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
 import Checkbox from "../components/Checkbox.vue";
+import StickyBar from "../components/StickyBar.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 // Native macOS blue folder icon via NSWorkspace.shared.icon(forFile:)
 const folderIcon = ref("");
@@ -58,6 +62,7 @@ function toggleAll() {
 }
 
 const allSelected = computed(() => caches.value.length > 0 && selected.value.size === caches.value.length);
+const partialSelected = computed(() => selected.value.size > 0 && selected.value.size < caches.value.length);
 const totalSelected = computed(() => caches.value.filter((e) => selected.value.has(e.path)).reduce((sum, e) => sum + e.size, 0));
 
 // ── Cache categorisation ──────────────────────────────────────────────
@@ -147,29 +152,27 @@ function deselectCategory(group: CacheGroup) {
 function isCategoryAllSelected(group: CacheGroup): boolean {
   return group.entries.every(e => selected.value.has(e.path));
 }
+
+watch(cachesError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="caches-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Caches</h2>
-          <p class="text-muted">Application and system caches</p>
-        </div>
+    <ViewHeader
+      title="Caches"
+      subtitle="Application and system caches"
+    >
+      <template #actions>
         <button class="btn-primary scan-btn" :disabled="cachesScanning" @click="scan">
           <span v-if="cachesScanning" class="spinner-sm"></span>
           {{ cachesScanning ? "Scanning..." : "Scan" }}
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="cachesError" class="error-message">{{ cachesError }}</div>
-
-    <div v-if="cachesScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning caches...</span>
-    </div>
+    <LoadingState v-if="cachesScanning" message="Scanning caches..." />
 
     <EmptyState
       v-else-if="cachesScanned && caches.length === 0"
@@ -178,68 +181,61 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
     />
 
     <template v-else-if="caches.length > 0">
-      <div class="summary-bar">
-        <span class="results-count">
-          {{ caches.length }} cache(s) -- {{ formatSize(totalCacheSize) }} total
-        </span>
-        <div class="results-actions">
-          <span v-if="selected.size > 0" class="selected-info">
-            {{ selected.size }} selected ({{ formatSize(totalSelected) }})
-          </span>
+      <StickyBar>
+        <Checkbox :model-value="allSelected" :indeterminate="partialSelected" @change="toggleAll" />
+        <span v-if="selected.size === 0" class="results-count">{{ caches.length }} cache(s) &mdash; {{ formatSize(totalCacheSize) }}</span>
+        <span v-else-if="allSelected" class="results-count">{{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <span v-else class="results-count">{{ selected.size }} of {{ caches.length }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <template #actions>
           <button class="btn-danger" :disabled="selected.size === 0 || deleting" @click="cleanSelected">
             <span v-if="deleting" class="spinner-sm"></span>
             {{ deleting ? "Cleaning..." : "Clean Selected" }}
           </button>
-        </div>
-      </div>
-
-      <div class="select-all-row">
-        <Checkbox :model-value="allSelected" @change="toggleAll">Select all</Checkbox>
-      </div>
+        </template>
+      </StickyBar>
 
       <div class="cache-groups">
         <div v-for="group in groupedCaches" :key="group.id" class="cache-category">
-          <!-- Category header -->
-          <div class="category-header" tabindex="0" role="button" :aria-expanded="!collapsedCategories.has(group.id)" @click="toggleCategory(group.id)" @keydown.enter="toggleCategory(group.id)" @keydown.space.prevent="toggleCategory(group.id)">
-            <div class="category-header-left">
-              <span class="category-chevron" :class="{ expanded: !collapsedCategories.has(group.id) }">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-              </span>
-              <span class="category-label">{{ group.label }}</span>
-              <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
-            </div>
-            <div class="category-header-right">
-              <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
-              <button
-                class="btn-sm btn-secondary"
-                @click.stop="isCategoryAllSelected(group) ? deselectCategory(group) : selectCategory(group)"
-              >{{ isCategoryAllSelected(group) ? 'Deselect' : 'Select all' }}</button>
-            </div>
-          </div>
-
-          <!-- Category items -->
-          <div v-if="!collapsedCategories.has(group.id)" class="cache-list">
-            <div
-              v-for="entry in group.entries"
-              :key="entry.path"
-              class="cache-item"
-              :class="{ 'cache-item--selected': selected.has(entry.path) }"
-              @click="toggleSelect(entry.path)"
-            >
-              <div class="cache-icon">
-                <img v-if="folderIcon" :src="folderIcon" alt="" width="28" height="28" />
+          <CollapsibleSection
+            :expanded="!collapsedCategories.has(group.id)"
+            @toggle="toggleCategory(group.id)"
+          >
+            <template #header>
+              <div class="category-header-left">
+                <span class="category-label">{{ group.label }}</span>
+                <span class="badge pill badge-neutral">{{ group.entries.length }}</span>
               </div>
-              <div class="cache-info">
-                <span class="cache-name">{{ entry.name }}</span>
-                <span class="cache-path text-muted" :title="entry.path">{{ entry.path.replace(/^\/Users\/[^/]+/, '~') }}</span>
+              <div class="category-header-right">
+                <span class="category-size mono">{{ formatSize(group.totalSize) }}</span>
+                <button
+                  class="btn-sm btn-secondary"
+                  @click.stop="isCategoryAllSelected(group) ? deselectCategory(group) : selectCategory(group)"
+                >{{ isCategoryAllSelected(group) ? 'Deselect' : 'Select all' }}</button>
               </div>
-              <div class="cache-size-col">
-                <span class="cache-size mono">{{ formatSize(entry.size) }}</span>
-                <span class="cache-count text-muted">{{ entry.item_count.toLocaleString() }} items</span>
+            </template>
+            <div class="cache-list">
+              <div
+                v-for="entry in group.entries"
+                :key="entry.path"
+                class="cache-item"
+                :class="{ 'cache-item--selected': selected.has(entry.path) }"
+                @click="toggleSelect(entry.path)"
+              >
+                <div class="cache-icon">
+                  <img v-if="folderIcon" :src="folderIcon" alt="" width="28" height="28" />
+                </div>
+                <div class="cache-info">
+                  <span class="cache-name">{{ entry.name }}</span>
+                  <span class="cache-path text-muted" :title="entry.path">{{ entry.path.replace(/^\/Users\/[^/]+/, '~') }}</span>
+                </div>
+                <div class="cache-size-col">
+                  <span class="cache-size mono">{{ formatSize(entry.size) }}</span>
+                  <span class="cache-count text-muted">{{ entry.item_count.toLocaleString() }} items</span>
+                </div>
+                <Checkbox :model-value="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
               </div>
-              <Checkbox :model-value="selected.has(entry.path)" @change="toggleSelect(entry.path)" />
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
       </div>
     </template>
@@ -262,16 +258,16 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   overflow: hidden;
 }
 
-.category-header {
+.cache-category :deep(.collapsible-header) {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 10px 16px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.category-header:hover {
+.cache-category :deep(.collapsible-header:hover) {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -279,16 +275,8 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.category-chevron {
-  display: flex;
-  transition: transform 0.15s;
-  color: var(--muted);
-}
-
-.category-chevron.expanded {
-  transform: rotate(90deg);
+  flex: 1;
+  min-width: 0;
 }
 
 .category-label {
@@ -397,5 +385,9 @@ function isCategoryAllSelected(group: CacheGroup): boolean {
   font-size: 10px;
 }
 
-.select-all-row { margin-bottom: var(--sp-2); padding: 0 var(--sp-1); }
+.results-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
 </style>

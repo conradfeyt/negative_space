@@ -84,7 +84,7 @@ const safetyGroupMeta: Record<string, { label: string; description: string }> = 
   probably_safe: { label: "Likely Safe", description: "Review recommended — these are usually safe but may be needed by some apps" },
   unknown: { label: "Unknown", description: "No classification available — check before deleting" },
   risky: { label: "Caution", description: "May contain user-created content or important application data" },
-  vaulted: { label: "Vaulted Archives", description: "Files archived by Negativ_ Vault. Manage these from the Vault view — do not delete directly." },
+  archived: { label: "Archived", description: "Files compressed by Negativ_ Archive. Manage from the Archive view — do not delete directly." },
 };
 
 // ---------------------------------------------------------------------------
@@ -235,12 +235,12 @@ export interface UseFileGroupingOptions {
   files: Ref<FileInfo[]>;
   /** Return the safety classification string for a file path, or undefined */
   getClassification: (path: string) => { safety: string } | undefined;
-  /** Return true if a file has been vaulted */
-  isVaulted: (path: string) => boolean;
+  /** Return true if a file has been archived */
+  isArchived: (path: string) => boolean;
 }
 
 export function useFileGrouping(opts: UseFileGroupingOptions) {
-  const { files, getClassification, isVaulted } = opts;
+  const { files, getClassification, isArchived } = opts;
 
   const sortMode = ref<SortMode>("size");
 
@@ -292,7 +292,7 @@ export function useFileGrouping(opts: UseFileGroupingOptions) {
 
   // Safety grouping
   const safetyGroupedFiles = computed<CategoryGroup[]>(() => {
-    const buckets: Record<string, FileInfo[]> = { safe: [], safe_stale: [], safe_rebuild: [], probably_safe: [], unknown: [], risky: [], vaulted: [] };
+    const buckets: Record<string, FileInfo[]> = { safe: [], safe_stale: [], safe_rebuild: [], probably_safe: [], unknown: [], risky: [], archived: [] };
 
     for (const file of files.value) {
       const c = getClassification(file.path);
@@ -324,7 +324,7 @@ export function useFileGrouping(opts: UseFileGroupingOptions) {
   const typeGroupedFiles = computed<CategoryGroup[]>(() => {
     const buckets: Record<string, FileInfo[]> = {};
     for (const file of files.value) {
-      if (isVaulted(file.path)) continue;
+      if (isArchived(file.path)) continue;
       const group = fileTypeGroup(file.name);
       if (!buckets[group]) buckets[group] = [];
       buckets[group].push(file);
@@ -346,23 +346,21 @@ export function useFileGrouping(opts: UseFileGroupingOptions) {
       .sort((a, b) => b.totalSize - a.totalSize);
   });
 
-  // Vaulted files
-  const vaultedFiles = computed(() =>
-    files.value.filter(f => isVaulted(f.path)).sort((a, b) => diskSize(b) - diskSize(a))
+  const archivedFiles = computed(() =>
+    files.value.filter(f => isArchived(f.path)).sort((a, b) => diskSize(b) - diskSize(a))
   );
 
-  const vaultedTotalSize = computed(() =>
-    vaultedFiles.value.reduce((s, f) => s + diskSize(f), 0)
+  const archivedTotalSize = computed(() =>
+    archivedFiles.value.reduce((s, f) => s + diskSize(f), 0)
   );
 
-  // Active groups: selected mode, with vaulted files filtered out
   const activeGroups = computed(() => {
     const base = sortMode.value === "safety" ? safetyGroupedFiles.value
       : sortMode.value === "type" ? typeGroupedFiles.value
       : groupedFiles.value;
     return base
       .map(g => {
-        const filtered = g.flatFiles.filter(f => !isVaulted(f.path));
+        const filtered = g.flatFiles.filter(f => !isArchived(f.path));
         return {
           ...g,
           flatFiles: filtered,
@@ -384,8 +382,8 @@ export function useFileGrouping(opts: UseFileGroupingOptions) {
     groupedFiles,
     safetyGroupedFiles,
     typeGroupedFiles,
-    vaultedFiles,
-    vaultedTotalSize,
+    archivedFiles,
+    archivedTotalSize,
     totalLargeFileSize,
   };
 }

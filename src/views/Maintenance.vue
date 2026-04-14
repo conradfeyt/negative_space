@@ -6,6 +6,9 @@ import {
   loadMaintenanceTasks,
   runMaintenanceTask,
 } from "../stores/scanStore";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
+import LoadingState from "../components/LoadingState.vue";
+import InlineAlert from "../components/InlineAlert.vue";
 
 // Track which task detail panels are expanded
 const expandedTasks = ref<Set<string>>(new Set());
@@ -55,23 +58,17 @@ function statusLabel(status: string): string {
       </div>
     </div>
 
-    <div class="info-banner">
-      <span class="info-dot"></span>
-      <div class="info-body">
-        <div class="info-title">About these tasks</div>
-        <div class="info-text">
-          Each task shows exactly which commands will run, which services are
-          affected, and which files or paths are touched. Expand "What this
-          touches" to review before running. Tasks marked "Admin" will prompt
-          for your system password via macOS's native dialog.
-        </div>
+    <InlineAlert variant="info">
+      <div>
+        <div style="font-weight:600;margin-bottom:2px">About these tasks</div>
+        Each task shows exactly which commands will run, which services are
+        affected, and which files or paths are touched. Expand "What this
+        touches" to review before running. Tasks marked "Admin" will prompt
+        for your system password via macOS's native dialog.
       </div>
-    </div>
+    </InlineAlert>
 
-    <div v-if="!maintenanceLoaded" class="loading-state">
-      <span class="spinner"></span>
-      <span>Loading tasks...</span>
-    </div>
+    <LoadingState v-if="!maintenanceLoaded" message="Loading tasks..." />
 
     <div v-else class="task-list">
       <div
@@ -146,20 +143,14 @@ function statusLabel(status: string): string {
           </div>
         </div>
 
-        <!-- Expandable details toggle -->
-        <div
-          class="details-toggle"
-          @click="toggleDetails(task.id)"
+        <CollapsibleSection
+          :expanded="expandedTasks.has(task.id)"
+          @toggle="toggleDetails(task.id)"
         >
-          <span
-            class="expand-chevron"
-            :class="{ expanded: expandedTasks.has(task.id) }"
-          ><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg></span>
-          <span class="details-toggle-label">What this touches</span>
-        </div>
-
-        <!-- Expanded details: commands, services, paths -->
-        <div v-if="expandedTasks.has(task.id)" class="details-panel">
+          <template #header>
+            <span class="details-toggle-label">What this touches</span>
+          </template>
+          <div class="details-panel">
           <!-- Commands -->
           <div class="detail-section">
             <div class="detail-section-label">Commands executed</div>
@@ -206,7 +197,8 @@ function statusLabel(status: string): string {
               automatically recreated by macOS.
             </p>
           </div>
-        </div>
+          </div>
+        </CollapsibleSection>
 
         <!-- Result message -->
         <div
@@ -228,44 +220,6 @@ function statusLabel(status: string): string {
 <style scoped>
 .maintenance-view {
   max-width: 1440px;
-}
-
-/* Info banner */
-.info-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-5);
-  border-radius: var(--radius-md);
-  background: var(--accent-light);
-  border: 1px solid rgba(2, 117, 244, 0.1);
-  margin-bottom: var(--sp-6);
-}
-
-.info-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-  margin-top: 5px;
-}
-
-.info-body {
-  flex: 1;
-}
-
-.info-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: var(--sp-1);
-}
-
-.info-text {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
 }
 
 /* Task list */
@@ -360,8 +314,8 @@ function statusLabel(status: string): string {
   background: var(--danger-hover);
 }
 
-/* Details toggle */
-.details-toggle {
+/* CollapsibleSection header — match former .details-toggle row */
+.task-card :deep(.collapsible-header) {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -370,7 +324,7 @@ function statusLabel(status: string): string {
   user-select: none;
 }
 
-.details-toggle:hover .details-toggle-label {
+.task-card :deep(.collapsible-header:hover) .details-toggle-label {
   color: var(--accent);
 }
 

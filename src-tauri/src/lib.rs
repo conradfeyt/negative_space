@@ -69,10 +69,15 @@ mod image_utils;
 // even when they differ in resolution, compression, or format.
 mod similar_images;
 
+// NSFW / sensitive content detection using CoreML + Vision framework.
+// Scans images and classifies them with a bundled OpenNSFW2 model.
+mod nsfw;
+
 // Bring standard-library and crate items into scope.
 use commands::{CleanResult, DiskUsage, TrashInfo};
 use std::fs;
 use std::path::Path;
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // Command 1: get_disk_usage
@@ -197,17 +202,25 @@ async fn get_trash_info() -> Result<TrashInfo, String> {
 
 /// Delete a list of files and/or directories. Returns a summary of what happened.
 #[tauri::command]
-async fn delete_files(paths: Vec<String>) -> CleanResult {
+async fn delete_files(app: tauri::AppHandle, paths: Vec<String>) -> CleanResult {
     let mut freed_bytes: u64 = 0;
     let mut deleted_count: u64 = 0;
     let mut errors: Vec<String> = Vec::new();
+    let total = paths.len() as u64;
 
-    for path_str in &paths {
+    for (idx, path_str) in paths.iter().enumerate() {
         let path = Path::new(path_str);
+        let name = path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
 
-        // Get the size before we delete, so we know how much space was freed.
-        // We use `du -sk` (subprocess) instead of walkdir to avoid TCC dialogs
-        // if the path contains items from TCC-protected directories.
+        let _ = app.emit("operation-progress", vault::OperationProgress {
+            operation: "delete".to_string(),
+            processed: idx as u64,
+            total,
+            current_file: name,
+        });
+
         let size = get_du_size(path_str);
         if size == 0 && !path.exists() {
             errors.push(format!("Path not found: {}", path_str));
@@ -230,6 +243,13 @@ async fn delete_files(paths: Vec<String>) -> CleanResult {
             }
         }
     }
+
+    let _ = app.emit("operation-progress", vault::OperationProgress {
+        operation: "delete".to_string(),
+        processed: total,
+        total,
+        current_file: String::new(),
+    });
 
     CleanResult {
         success: errors.is_empty(),
@@ -701,14 +721,17 @@ async fn scan_duplicates(
     min_size_mb: u64,
     has_fda: Option<bool>,
     skip_paths: Option<Vec<String>>,
+    scan_paths: Option<Vec<String>>,
 ) -> Result<duplicates::DuplicateScanResult, String> {
     let fda = has_fda.unwrap_or(false);
     let skips = skip_paths.unwrap_or_default();
+    let explicit_roots = scan_paths.unwrap_or_default();
     Ok(duplicates::run_duplicate_scan(duplicates::DuplicateScanOptions {
         scan_path: &path,
         min_size_mb,
         fda,
         skip_paths: &skips,
+        scan_paths: &explicit_roots,
     }))
 }
 
@@ -761,15 +784,18 @@ async fn scan_similar_images(
     min_size_mb: u64,
     has_fda: Option<bool>,
     skip_paths: Option<Vec<String>>,
+    scan_paths: Option<Vec<String>>,
 ) -> Result<similar_images::SimilarScanResult, String> {
     let fda = has_fda.unwrap_or(false);
     let skips = skip_paths.unwrap_or_default();
+    let explicit_roots = scan_paths.unwrap_or_default();
     let min_bytes = if min_size_mb > 0 { min_size_mb * 1024 * 1024 } else { 10 * 1024 }; // default 10KB min
     Ok(similar_images::run_similar_scan(&app, similar_images::SimilarScanOptions {
         threshold,
         min_size_bytes: min_bytes,
         fda,
         skip_paths: &skips,
+        scan_paths: &explicit_roots,
     }))
 }
 
@@ -1139,6 +1165,26 @@ async fn scan_packages() -> Result<packages::PackageScanResult, String> {
     Ok(packages::scan_all())
 }
 
+#[tauri::command]
+async fn get_custom_probes() -> Result<Vec<packages::CustomProbe>, String> {
+    packages::load_custom_probes()
+}
+
+#[tauri::command]
+async fn save_custom_probes(probes: Vec<packages::CustomProbe>) -> Result<(), String> {
+    packages::save_custom_probes(&probes)
+}
+
+#[tauri::command]
+async fn delete_custom_probe(id: String) -> Result<(), String> {
+    packages::delete_custom_probe(&id)
+}
+
+#[tauri::command]
+async fn test_probe_command(program: String, args: Vec<String>) -> packages::CommandRecord {
+    packages::test_probe_command(&program, &args)
+}
+
 // ---------------------------------------------------------------------------
 // Command 29: scan_vitals
 // ---------------------------------------------------------------------------
@@ -1230,11 +1276,11 @@ async fn load_scan_cache(domain: String) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Command 36-41: Vault (compress-instead-of-delete)
+// Command 36-41: Archive (compress-to-save-space)
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-async fn scan_vault_candidates(
+async fn scan_archive_candidates(
     path: String,
     min_size_mb: u64,
     min_age_days: u64,
@@ -1249,32 +1295,32 @@ async fn scan_vault_candidates(
 }
 
 #[tauri::command]
-async fn compress_to_vault(paths: Vec<String>) -> vault::CompressResult {
-    vault::compress_files(&paths)
+async fn compress_to_archive(app: tauri::AppHandle, paths: Vec<String>) -> vault::CompressResult {
+    vault::compress_files(&paths, vault::StorageKind::Archive, |p| { let _ = app.emit("operation-progress", p); })
 }
 
 #[tauri::command]
-async fn restore_from_vault(entry_id: String) -> vault::RestoreResult {
-    vault::restore_file(&entry_id)
+async fn restore_from_archive(entry_id: String) -> vault::RestoreResult {
+    vault::restore_file(&entry_id, vault::StorageKind::Archive)
 }
 
 #[tauri::command]
-async fn get_vault_summary() -> vault::VaultSummary {
-    vault::get_summary()
+async fn get_archive_summary() -> vault::VaultSummary {
+    vault::get_summary(vault::StorageKind::Archive)
 }
 
 #[tauri::command]
-async fn get_vault_entries() -> Vec<vault::VaultEntry> {
-    vault::get_entries()
+async fn get_archive_entries() -> Vec<vault::VaultEntry> {
+    vault::get_entries(vault::StorageKind::Archive)
 }
 
 #[tauri::command]
-async fn delete_vault_entry(entry_id: String) -> Result<(), String> {
-    vault::delete_entry(&entry_id)
+async fn delete_archive_entry(entry_id: String) -> Result<(), String> {
+    vault::delete_entry(&entry_id, vault::StorageKind::Archive)
 }
 
 #[tauri::command]
-async fn collect_vault_directory(path: String) -> Vec<vault::CompressionCandidate> {
+async fn collect_archive_directory(path: String) -> Vec<vault::CompressionCandidate> {
     vault::collect_directory_files(&path)
 }
 
@@ -1284,8 +1330,52 @@ async fn get_directory_size(path: String) -> u64 {
 }
 
 #[tauri::command]
-async fn compress_directory_to_vault(path: String) -> vault::CompressResult {
-    vault::compress_directory(&path)
+async fn compress_directory_to_archive(path: String) -> vault::CompressResult {
+    vault::compress_directory(&path, vault::StorageKind::Archive)
+}
+
+// ---------------------------------------------------------------------------
+// Command 42-47: Vault (sensitive content secure storage)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn compress_to_vault(app: tauri::AppHandle, paths: Vec<String>) -> vault::CompressResult {
+    vault::compress_files(&paths, vault::StorageKind::Vault, |p| { let _ = app.emit("operation-progress", p); })
+}
+
+#[tauri::command]
+async fn restore_from_vault(entry_id: String) -> vault::RestoreResult {
+    vault::restore_file(&entry_id, vault::StorageKind::Vault)
+}
+
+#[tauri::command]
+async fn get_vault_summary() -> vault::VaultSummary {
+    vault::get_summary(vault::StorageKind::Vault)
+}
+
+#[tauri::command]
+async fn get_vault_entries() -> Vec<vault::VaultEntry> {
+    vault::get_entries(vault::StorageKind::Vault)
+}
+
+#[tauri::command]
+async fn delete_vault_entry(entry_id: String) -> Result<(), String> {
+    vault::delete_entry(&entry_id, vault::StorageKind::Vault)
+}
+
+#[tauri::command]
+async fn move_files_to_directory(app: tauri::AppHandle, paths: Vec<String>, target_dir: String) -> vault::MoveResult {
+    vault::move_files_to_directory(&paths, &target_dir, |p| { let _ = app.emit("operation-progress", p); })
+}
+
+#[tauri::command]
+async fn get_storage_config() -> vault::StorageConfig {
+    vault::load_storage_config()
+}
+
+#[tauri::command]
+async fn set_storage_config(config: vault::StorageConfig) -> Result<(), String> {
+    vault::save_storage_config(&config)
 }
 
 // ---------------------------------------------------------------------------
@@ -1334,6 +1424,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             use tauri::Manager;
+
+            vault::migrate_legacy_vault();
+
             let window = app
                 .get_webview_window("main")
                 .expect("main window must exist per tauri.conf.json");
@@ -1407,6 +1500,10 @@ pub fn run() {
             scan_memory,
             preview_file,
             scan_packages,
+            get_custom_probes,
+            save_custom_probes,
+            delete_custom_probe,
+            test_probe_command,
             scan_vitals,
             quit_process,
             force_quit_process,
@@ -1416,21 +1513,34 @@ pub fn run() {
             gradient::update_native_background_position,
             save_scan_cache,
             load_scan_cache,
-            scan_vault_candidates,
+            scan_archive_candidates,
+            compress_to_archive,
+            restore_from_archive,
+            get_archive_summary,
+            get_archive_entries,
+            delete_archive_entry,
+            collect_archive_directory,
+            compress_directory_to_archive,
+            get_directory_size,
             compress_to_vault,
             restore_from_vault,
             get_vault_summary,
             get_vault_entries,
             delete_vault_entry,
-            collect_vault_directory,
-            compress_directory_to_vault,
-            get_directory_size,
+            move_files_to_directory,
+            get_storage_config,
+            set_storage_config,
             check_intelligence_available,
             check_ai_available,
             classify_files_ai,
             generate_scan_summary_ai,
             render_sf_symbol,
             list_system_images,
+            nsfw::scan_nsfw,
+            nsfw::cancel_nsfw_scan,
+            nsfw::dismiss_nsfw_paths,
+            nsfw::clear_nsfw_dismissed,
+            nsfw::delete_photo_assets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

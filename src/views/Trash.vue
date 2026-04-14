@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { formatSize } from "../utils";
 import { showToast } from "../stores/toastStore";
 import {
@@ -9,6 +9,9 @@ import {
   loadTrashInfo,
   emptyTrash as storeEmptyTrash,
 } from "../stores/scanStore";
+import LoadingState from "../components/LoadingState.vue";
+import ViewHeader from "../components/ViewHeader.vue";
+import ConfirmPanel from "../components/ConfirmPanel.vue";
 
 const emptying = ref(false);
 const confirmEmpty = ref(false);
@@ -40,16 +43,16 @@ function cancelEmpty() {
 }
 
 onMounted(loadTrashInfo);
+
+watch(trashError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="trash-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Trash</h2>
-          <p class="text-muted">View and empty system trash</p>
-        </div>
+    <ViewHeader title="Trash" subtitle="View and empty system trash">
+      <template #actions>
         <button
           class="btn-secondary"
           :disabled="trashLoading"
@@ -57,15 +60,10 @@ onMounted(loadTrashInfo);
         >
           Refresh
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="trashError" class="error-message">{{ trashError }}</div>
-
-    <div v-if="trashLoading" class="loading-state">
-      <span class="spinner"></span>
-      <span>Loading trash info...</span>
-    </div>
+    <LoadingState v-if="trashLoading" message="Loading trash info..." />
 
     <template v-else-if="trashInfo">
       <div class="card trash-card">
@@ -106,28 +104,18 @@ onMounted(loadTrashInfo);
         </template>
 
         <template v-else>
-          <div class="confirm-block">
-            <p class="confirm-text">
-              Are you sure you want to permanently delete
-              <strong>
-                {{ trashInfo.item_count.toLocaleString() }} item(s)
-              </strong>
-              ({{ formatSize(trashInfo.size) }})? This cannot be undone.
-            </p>
-            <div class="confirm-actions">
-              <button class="btn-secondary" @click="cancelEmpty">
-                Cancel
-              </button>
-              <button
-                class="btn-danger"
-                :disabled="emptying"
-                @click="handleEmptyTrash"
-              >
-                <span v-if="emptying" class="spinner-sm"></span>
-                {{ emptying ? "Emptying..." : "Yes, Empty Trash" }}
-              </button>
-            </div>
-          </div>
+          <ConfirmPanel
+            confirm-label="Yes, Empty Trash"
+            loading-label="Emptying..."
+            :loading="emptying"
+            danger
+            @confirm="handleEmptyTrash"
+            @cancel="cancelEmpty"
+          >
+            Are you sure you want to permanently delete
+            <strong>{{ trashInfo.item_count.toLocaleString() }} item(s)</strong>
+            ({{ formatSize(trashInfo.size) }})? This cannot be undone.
+          </ConfirmPanel>
         </template>
       </div>
     </template>
@@ -199,29 +187,5 @@ onMounted(loadTrashInfo);
 
 .action-row p {
   font-size: 13px;
-}
-
-.confirm-block {
-  text-align: center;
-  padding: var(--sp-2) 0;
-}
-
-.confirm-text {
-  font-size: 14px;
-  color: var(--text);
-  margin-bottom: var(--sp-4);
-  line-height: 1.6;
-}
-
-.confirm-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
-.confirm-actions .btn-danger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 </style>

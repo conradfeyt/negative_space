@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import type { AppInfo } from "../types";
 import { formatSize } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -14,6 +14,9 @@ import {
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
+import LoadingState from "../components/LoadingState.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 const expanded = ref<Set<string>>(new Set());
 const uninstalling = ref<string | null>(null);
@@ -94,18 +97,19 @@ function sourceLabel(source: string): string {
   if (source === "app-store") return "App Store";
   return "";
 }
+
+watch(appsError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="apps-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Apps</h2>
-          <p class="text-muted">
-            Manage applications and their full disk footprint
-          </p>
-        </div>
+    <ViewHeader
+      title="Apps"
+      subtitle="Manage applications and their full disk footprint"
+    >
+      <template #actions>
         <button
           class="btn-primary scan-btn"
           :disabled="appsScanning"
@@ -114,15 +118,10 @@ function sourceLabel(source: string): string {
           <span v-if="appsScanning" class="spinner-sm"></span>
           {{ appsScanning ? "Scanning..." : "Scan" }}
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="appsError" class="error-message">{{ appsError }}</div>
-
-    <div v-if="appsScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning applications and detecting leftovers...</span>
-    </div>
+    <LoadingState v-if="appsScanning" message="Scanning applications and detecting leftovers..." />
 
     <EmptyState
       v-else-if="appsScanned && apps.length === 0"
@@ -176,12 +175,7 @@ function sourceLabel(source: string): string {
             <!-- Info -->
             <div class="app-info">
               <div class="app-name-row">
-                <span
-                  class="expand-chevron"
-                  :class="{ expanded: expanded.has(app.path) }"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-                </span>
+                <ChevronIcon :expanded="expanded.has(app.path)" />
                 <span class="app-name">{{ app.name }}</span>
                 <span v-if="app.install_source !== 'manual'" class="badge source pill" :class="app.install_source">
                   {{ sourceLabel(app.install_source) }}

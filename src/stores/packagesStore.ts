@@ -4,7 +4,7 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { saveCache, loadCache } from "./domainStatusStore";
-import type { PackageScanResult } from "../types";
+import type { PackageScanResult, CustomProbe, CommandRecord } from "../types";
 
 // ---------------------------------------------------------------------------
 // State
@@ -14,6 +14,10 @@ export const packagesResult = ref<PackageScanResult | null>(null);
 export const packagesScanning = ref(false);
 export const packagesScanned = ref(false);
 export const packagesError = ref("");
+
+// Custom probes
+export const customProbes = ref<CustomProbe[]>([]);
+export const customProbesLoaded = ref(false);
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -34,6 +38,36 @@ export async function scanPackages() {
   } finally {
     packagesScanning.value = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Custom probe CRUD
+// ---------------------------------------------------------------------------
+
+export async function loadCustomProbes(): Promise<void> {
+  try {
+    customProbes.value = await invoke<CustomProbe[]>("get_custom_probes");
+    customProbesLoaded.value = true;
+  } catch (e) {
+    console.warn("[packages] Failed to load custom probes:", e);
+  }
+}
+
+export async function saveCustomProbes(probes: CustomProbe[]): Promise<void> {
+  await invoke("save_custom_probes", { probes });
+  customProbes.value = probes;
+}
+
+export async function deleteCustomProbe(id: string): Promise<void> {
+  await invoke("delete_custom_probe", { id });
+  customProbes.value = customProbes.value.filter((p) => p.id !== id);
+}
+
+export async function testProbeCommand(
+  program: string,
+  args: string[]
+): Promise<CommandRecord> {
+  return invoke<CommandRecord>("test_probe_command", { program, args });
 }
 
 // ---------------------------------------------------------------------------

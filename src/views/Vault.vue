@@ -1,112 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import { formatSize } from "../utils";
 import { showToast } from "../stores/toastStore";
 import StatCard from "../components/StatCard.vue";
-import TabBar from "../components/TabBar.vue";
-import type { TabOption } from "../components/TabBar.vue";
 import {
   vaultSummary,
   vaultEntries,
-  vaultCandidates,
-  vaultScanning,
-  vaultCompressing,
   vaultError,
   loadVaultSummary,
-  scanVaultCandidates,
-  compressToVault,
-  compressDirectoryToVault,
   restoreFromVault,
   deleteVaultEntry,
-  removeCandidates,
 } from "../stores/scanStore";
-import { useCompressionQueue } from "../composables/useCompressionQueue";
 import EmptyState from "../components/EmptyState.vue";
-import Checkbox from "../components/Checkbox.vue";
-
-// ---------------------------------------------------------------------------
-// UI state
-// ---------------------------------------------------------------------------
-
-type Tab = "compress" | "archived";
-const activeTab = ref<Tab>("compress");
-
-const tabOptions = computed<TabOption[]>(() => [
-  { value: "compress", label: "Compress" },
-  { value: "archived", label: "Archived", badge: vaultEntries.value.length > 0 ? vaultEntries.value.length : undefined },
-]);
+import ViewHeader from "../components/ViewHeader.vue";
 
 const restoring = ref<string | null>(null);
 const confirmDeleteId = ref<string | null>(null);
-const minAgeDays = ref(30);
-
-// Candidates selection
-const selectedCandidates = ref<Set<string>>(new Set());
-
-// ---------------------------------------------------------------------------
-// Compression queue (composable)
-// ---------------------------------------------------------------------------
-
-const {
-  queue,
-  compressProgress,
-  totalQueueSize,
-  addFolderToQueue,
-  removeFromQueue,
-  clearQueue,
-  compressQueue,
-} = useCompressionQueue({
-  compressDirectoryToVault,
-  compressToVault,
-  onError: (msg) => { vaultError.value = msg; },
-  onSuccess: (msg) => showToast(msg),
-  compressing: vaultCompressing,
-});
-
-// ---------------------------------------------------------------------------
-// Candidates (file-level scan)
-// ---------------------------------------------------------------------------
-
-async function scanCandidates() {
-  selectedCandidates.value = new Set();
-  await scanVaultCandidates("~", 10, minAgeDays.value);
-}
-
-function toggleCandidate(path: string) {
-  const next = new Set(selectedCandidates.value);
-  next.has(path) ? next.delete(path) : next.add(path);
-  selectedCandidates.value = next;
-}
-
-function toggleAllCandidates() {
-  if (selectedCandidates.value.size === vaultCandidates.value.length) {
-    selectedCandidates.value = new Set();
-  } else {
-    selectedCandidates.value = new Set(vaultCandidates.value.map(c => c.path));
-  }
-}
-
-const totalCandidateSavings = computed(() =>
-  vaultCandidates.value
-    .filter(c => selectedCandidates.value.has(c.path))
-    .reduce((sum, c) => sum + c.estimated_savings, 0)
-);
-
-async function compressSelectedCandidates() {
-  if (selectedCandidates.value.size === 0) return;
-  const paths = Array.from(selectedCandidates.value);
-  const result = await compressToVault(paths);
-  if (result.success || result.files_compressed > 0) {
-    showToast(`Compressed ${result.files_compressed} file(s), saved ${formatSize(result.total_savings)}`);
-    selectedCandidates.value = new Set();
-    removeCandidates(paths);
-  }
-  if (result.errors.length) vaultError.value = result.errors.join("; ");
-}
-
-// ---------------------------------------------------------------------------
-// Restore / Delete
-// ---------------------------------------------------------------------------
 
 async function handleRestore(entryId: string) {
   restoring.value = entryId;
@@ -130,23 +39,10 @@ onMounted(loadVaultSummary);
 
 <template>
   <section class="vault-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Vault</h2>
-          <p class="text-muted">Compress files and folders to reclaim space. Restore anytime.</p>
-        </div>
-        <div class="header-buttons">
-          <button class="btn-secondary" :disabled="vaultCompressing" @click="addFolderToQueue">
-            Add Folder...
-          </button>
-          <button class="btn-primary" :disabled="vaultScanning" @click="scanCandidates">
-            <span v-if="vaultScanning" class="spinner-sm"></span>
-            {{ vaultScanning ? "Scanning..." : "Find Files" }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ViewHeader
+      title="Vault"
+      subtitle="Securely stored sensitive files. Restore or permanently delete."
+    />
 
     <!-- Error -->
     <div v-if="vaultError" class="error-banner">
@@ -156,161 +52,19 @@ onMounted(loadVaultSummary);
       </button>
     </div>
 
-    <!-- Tab bar -->
-    <TabBar :options="tabOptions" v-model="activeTab" class="vault-tab-bar" />
-
-    <!-- ================================================================
-         TAB: COMPRESS
-         ================================================================ -->
-    <template v-if="activeTab === 'compress'">
-
-    <!-- Vault Summary -->
+    <!-- Summary -->
     <div v-if="vaultSummary && vaultSummary.file_count > 0" class="vault-summary">
-      <StatCard :value="String(vaultSummary.file_count)" label="Archived" />
+      <StatCard :value="String(vaultSummary.file_count)" label="Secured" />
       <StatCard :value="formatSize(vaultSummary.total_savings)" label="Saved" />
       <StatCard :value="formatSize(vaultSummary.total_compressed_size)" label="Vault Size" />
     </div>
 
-    <!-- ================================================================
-         COMPRESSION QUEUE
-         ================================================================ -->
-    <div v-if="queue.length > 0" class="section">
-      <div class="section-header">
-        <h3 class="section-title">Compression Queue</h3>
-        <div class="section-actions">
-          <span class="section-meta">{{ queue.length }} item(s) &middot; {{ formatSize(totalQueueSize) }}</span>
-          <button class="btn-ghost btn-sm" @click="clearQueue">Clear</button>
-        </div>
-      </div>
-
-      <div class="queue-list">
-        <div v-for="item in queue" :key="item.path" class="queue-item card-flush">
-          <div class="queue-item-left">
-            <svg class="queue-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-            </svg>
-            <div class="queue-item-info">
-              <span class="queue-item-name">{{ item.name }}</span>
-              <span class="queue-item-path mono text-muted">{{ item.path }}</span>
-            </div>
-          </div>
-          <div class="queue-item-right">
-            <span v-if="item.calculating" class="spinner-sm"></span>
-            <span v-else class="queue-item-size mono">{{ formatSize(item.size) }}</span>
-            <button class="btn-close" @click="removeFromQueue(item.path)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="queue-actions">
-        <button
-          class="btn-primary btn-compress"
-          :disabled="vaultCompressing || queue.some(q => q.calculating)"
-          @click="compressQueue"
-        >
-          <span v-if="vaultCompressing" class="spinner-sm"></span>
-          <template v-if="compressProgress">
-            Compressing {{ compressProgress.current }}/{{ compressProgress.total }}: {{ compressProgress.name }}
-          </template>
-          <template v-else>
-            Compress {{ queue.length }} Item(s)
-          </template>
-        </button>
-      </div>
-    </div>
-
-    <!-- ================================================================
-         SCANNING STATE
-         ================================================================ -->
-    <div v-if="vaultScanning" class="scan-state">
-      <div class="scan-animation">
-        <span class="scan-dot"></span>
-        <span class="scan-dot"></span>
-        <span class="scan-dot"></span>
-      </div>
-      <span>Scanning for compressible files...</span>
-    </div>
-
-    <!-- ================================================================
-         FILE CANDIDATES (from scan)
-         ================================================================ -->
-    <div v-if="!vaultScanning && vaultCandidates.length > 0" class="section">
-      <div class="section-header">
-        <h3 class="section-title">Compressible Files</h3>
-        <span class="section-meta">{{ vaultCandidates.length }} file(s)</span>
-      </div>
-
-      <div class="candidates-toolbar">
-        <Checkbox
-          :model-value="selectedCandidates.size === vaultCandidates.length && vaultCandidates.length > 0"
-          @change="toggleAllCandidates"
-        >Select all</Checkbox>
-        <div class="toolbar-right">
-          <span v-if="selectedCandidates.size > 0" class="selected-info">
-            {{ selectedCandidates.size }} selected &middot; ~{{ formatSize(totalCandidateSavings) }}
-          </span>
-          <button
-            class="btn-primary btn-sm"
-            :disabled="selectedCandidates.size === 0 || vaultCompressing"
-            @click="compressSelectedCandidates"
-          >
-            Compress Selected
-          </button>
-        </div>
-      </div>
-
-      <div class="candidate-list">
-        <div
-          v-for="candidate in vaultCandidates"
-          :key="candidate.path"
-          :class="['card-flush', 'candidate-card', { selected: selectedCandidates.has(candidate.path) }]"
-          @click="toggleCandidate(candidate.path)"
-        >
-          <div class="candidate-main">
-            <Checkbox
-              :model-value="selectedCandidates.has(candidate.path)"
-              @change="toggleCandidate(candidate.path)"
-            />
-            <div class="candidate-info">
-              <span class="candidate-name">{{ candidate.name }}</span>
-              <span class="candidate-path mono text-muted">{{ candidate.path }}</span>
-            </div>
-            <div class="candidate-stats">
-              <span class="candidate-savings">~{{ formatSize(candidate.estimated_savings) }}</span>
-              <span class="candidate-size mono text-muted">{{ formatSize(candidate.size) }}</span>
-            </div>
-          </div>
-          <div v-if="candidate.recently_accessed" class="candidate-warning">
-            Recently accessed — check that no apps depend on this file after compression.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Empty state (compress tab) -->
-    <EmptyState
-      v-if="!vaultScanning && vaultCandidates.length === 0 && queue.length === 0"
-      title="Compress files to free up space"
-      description="Add folders to compress, or scan for large stale files that can be archived."
-    />
-
-    </template>
-
-    <!-- ================================================================
-         TAB: ARCHIVED
-         ================================================================ -->
-    <template v-if="activeTab === 'archived'">
-
+    <!-- Entries -->
     <div v-if="vaultEntries.length > 0" class="entry-list">
       <div v-for="entry in vaultEntries" :key="entry.id" class="card-flush entry-card">
         <div class="entry-main">
           <div class="entry-icon">
-            <svg v-if="entry.file_type === 'directory'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-            </svg>
-            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
               <path d="M14 2v6h6"/>
             </svg>
@@ -320,8 +74,8 @@ onMounted(loadVaultSummary);
             <span class="entry-path mono text-muted">{{ entry.original_path }}</span>
           </div>
           <div class="entry-stats">
-            <span class="entry-savings">{{ formatSize(entry.original_size - entry.compressed_size) }} saved</span>
-            <span class="entry-ratio text-muted">{{ Math.round((1 - entry.compression_ratio) * 100) }}% smaller</span>
+            <span class="entry-size mono">{{ formatSize(entry.original_size) }}</span>
+            <span class="entry-status text-muted">Secured</span>
           </div>
           <div class="entry-actions">
             <button
@@ -351,13 +105,10 @@ onMounted(loadVaultSummary);
     </div>
 
     <EmptyState
-      v-else
-      title="Nothing archived yet"
-      description="Compressed files and folders will appear here. You can restore them to their original location at any time."
+      v-if="vaultEntries.length === 0"
+      title="Vault is empty"
+      description="Files secured from the Sensitive Content view will appear here. You can restore or permanently delete them."
     />
-
-    </template>
-
   </section>
 </template>
 
@@ -366,22 +117,6 @@ onMounted(loadVaultSummary);
   max-width: 1440px;
 }
 
-.header-buttons {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-/* Tab bar */
-.vault-tab-bar {
-  display: flex;
-  margin-bottom: var(--sp-6);
-}
-
-.vault-tab-bar :deep(.tab-btn) {
-  flex: 1;
-}
-
-/* Error banner (dismissible) */
 .error-banner {
   display: flex;
   align-items: center;
@@ -397,122 +132,12 @@ onMounted(loadVaultSummary);
   color: var(--danger-text);
 }
 
-
-/* Vault summary */
 .vault-summary {
   display: flex;
   gap: 8px;
   margin-bottom: var(--sp-6);
 }
 
-
-/* Sections */
-.section {
-  margin-bottom: var(--sp-8);
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--sp-3);
-}
-
-.section-header .section-title {
-  margin-bottom: 0;
-}
-
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.section-meta {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* ----------------------------------------------------------------
-   Queue
-   ---------------------------------------------------------------- */
-.queue-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.queue-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-}
-
-.queue-item-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex: 1;
-  min-width: 0;
-}
-
-.queue-icon {
-  flex-shrink: 0;
-  color: var(--muted);
-}
-
-.queue-item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.queue-item-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.queue-item-path {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item-right {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-shrink: 0;
-}
-
-.queue-item-size {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-
-.queue-actions {
-  margin-top: var(--sp-4);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-compress {
-  min-width: 200px;
-  justify-content: center;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ----------------------------------------------------------------
-   Archived entries
-   ---------------------------------------------------------------- */
 .entry-list {
   display: flex;
   flex-direction: column;
@@ -563,13 +188,13 @@ onMounted(loadVaultSummary);
   flex-shrink: 0;
 }
 
-.entry-savings {
+.entry-size {
   font-size: 13px;
   font-weight: 600;
-  color: var(--success);
+  color: var(--text);
 }
 
-.entry-ratio {
+.entry-status {
   font-size: 11px;
 }
 
@@ -586,138 +211,4 @@ onMounted(loadVaultSummary);
   padding-top: var(--sp-2);
   border-top: 1px solid var(--border-divider);
 }
-
-/* ----------------------------------------------------------------
-   Scanning state
-   ---------------------------------------------------------------- */
-.scan-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: 48px 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.scan-animation {
-  display: flex;
-  gap: 6px;
-}
-
-.scan-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: scanPulse 1.4s ease-in-out infinite;
-}
-
-.scan-dot:nth-child(2) { animation-delay: 0.2s; }
-.scan-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes scanPulse {
-  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.1); }
-}
-
-/* ----------------------------------------------------------------
-   Candidates
-   ---------------------------------------------------------------- */
-.candidates-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--sp-3);
-}
-
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.selected-info {
-  font-size: 12px;
-  color: var(--accent-deep);
-  font-weight: 500;
-}
-
-.candidate-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.candidate-card {
-  padding: var(--sp-3) var(--sp-4);
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.candidate-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.candidate-card:hover {
-  background: var(--surface-alt);
-}
-
-.candidate-main {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.candidate-main > .checkbox { flex-shrink: 0; }
-
-.candidate-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.candidate-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.candidate-path {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.candidate-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.candidate-savings {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--success);
-}
-
-.candidate-size { font-size: 11px; }
-
-.candidate-warning {
-  margin: var(--sp-2) 0 0 28px;
-  padding: var(--sp-2) var(--sp-3);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--warning-text);
-  background: var(--warning-tint);
-  border-radius: var(--radius-sm);
-}
-
 </style>

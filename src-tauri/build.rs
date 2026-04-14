@@ -55,6 +55,10 @@ fn build_swift_bridge() {
     println!("cargo:rustc-link-lib=framework=Foundation");
     println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=CoreSpotlight");
+    println!("cargo:rustc-link-lib=framework=Vision");
+    println!("cargo:rustc-link-lib=framework=CoreML");
+    println!("cargo:rustc-link-lib=framework=Photos");
+    println!("cargo:rustc-link-lib=framework=PhotosUI");
 
     // Rebuild if Swift sources change
     println!("cargo:rerun-if-changed=swift/Sources/");

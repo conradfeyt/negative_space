@@ -34,7 +34,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **Native:** AppKit via objc2 — custom gradient layer, SMC sensor reading
 - **Image processing:** `image` crate (0.23) + `img_hash` (3.2) for perceptual hashing
 - **Testing:** Vitest (37 unit tests for pure utilities), Rust `#[cfg(test)]` modules
-- **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance
+- **Key views:** Dashboard, LargeFiles, Caches, Logs, Docker, Apps, Trash, Browsers, Duplicates, Vault, SpaceMap, Thermal, Memory, Vitals, Packages, Security, Maintenance, SensitiveContent
 
 ## Architecture notes
 
@@ -63,6 +63,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **`intelligence.rs`** — Apple Intelligence integration
 - **`spotlight.rs`** — vault Spotlight indexing
 - **`preview.rs`** — Quick Look thumbnail generation
+- **`nsfw.rs`** — dual-model NSFW image detection (OpenNSFW2 + NudeNet), EXIF date extraction, multi-phase progress events
 
 ### Frontend store structure
 `src/stores/` uses domain-specific stores with a re-export facade:
@@ -75,6 +76,7 @@ open src-tauri/target/release/bundle/macos/Negativ_.app
 - **`vaultStore.ts`** — vault operations
 - **`diskUsageStore.ts`** — disk usage stats
 - **`intelligenceStore.ts`** — AI classification
+- **`nsfwStore.ts`** — NSFW scan state, label exclusions, per-label weights, exposed label constants
 
 All views import from `scanStore.ts` (the facade) — no view changes needed when stores are reorganized internally.
 
@@ -96,6 +98,8 @@ All views import from `scanStore.ts` (the facade) — no view changes needed whe
 - **`Toast.vue`** — notification toasts
 - **`ChipSchematic.vue`** — Apple Silicon thermal overlay
 - **`VoronoiViz.vue`**, **`GalacticViz.vue`** — SpaceMap visualizations
+- **`NsfwImageCard.vue`** — sensitive content card with blurred preview, confidence badge, NudeNet label tags, info popover trigger
+- **`TimelineRail.vue`** — hierarchical date scrubber (years → months) with dock-style fish-eye scaling effect
 
 ### Shared composables
 - **`useZoomPan.ts`** — drag-state-machine + wheel-zoom (used by VoronoiViz and GalacticViz)
@@ -143,6 +147,40 @@ Thumbnails are generated during the duplicate scan (one per group, since all fil
 - `mode: "system"` — NSImage named system image (e.g., `"NSApplicationIcon"`)
 
 Styles: `plain` (preserves aspect ratio), `grayBadge` (white glyph on grey rounded rect), `grayBadgeHier` (hierarchical), `blueBadge` (blue symbol on white), `blueGradientBadge` (#47A8FF→#0690FF gradient, white glyph), `grayscaleApp`.
+
+### Sensitive content detection (NSFW)
+Dual-model on-device pipeline — fully private, no network calls.
+
+**Models:**
+- **OpenNSFW2** — CoreML classification model. Returns a single NSFW probability score (0.0–1.0). Fast, good recall.
+- **NudeNet v3 (320n)** — CoreML object detection model (YOLO-based). Returns per-region labels with confidence (e.g., `FEMALE_BREAST_EXPOSED 0.87`). Provides richer information but slower.
+
+**Pipeline (`nsfw.rs`):**
+1. **Discovery** — `walkdir` traversal, filters by image extensions + minimum size.
+2. **Classification** — Both models always run on all images. OpenNSFW2 detects, NudeNet enriches.
+3. **Merge** — Union of positives from both models. Every flagged image gets NudeNet labels for enrichment.
+4. **Synthetic label** — OpenNSFW2 score injected as `NSFW_SCORE` (displayed as "General") into `detected_labels`, making it a filterable dimension alongside NudeNet body-part labels.
+5. **Thumbnails** — Generated via `sips` during scan, embedded as base64 in results.
+6. **EXIF dates** — Extracted via `kamadak-exif` (JPEG/TIFF) or `mdls` (HEIC), used for timeline grouping.
+
+**Swift bridge (`Bridge.swift`):**
+- `msw_classify_nsfw` — OpenNSFW2 inference via `VNCoreMLRequest`.
+- `msw_detect_nsfw` — NudeNet inference. Parses raw YOLO tensor `[1, 22, 2100]`, applies score threshold + greedy NMS. Returns JSON with per-detection labels + confidence. Uses safe `MLMultiArray` subscript access (not raw pointers) to handle Float16/Float32.
+
+**Frontend (`SensitiveContent.vue`):**
+- Date-grouped results with adaptive granularity (sparse years collapse, dense months expand to days).
+- Hierarchical `TimelineRail` scrubber with fish-eye scaling.
+- Shift-click multi-select, batch delete/vault/move operations with progress bars.
+- Blurred image previews with "Show content" toggle.
+- Label filter popover (draggable, clamped to window bounds) with per-label toggle + weight slider (0–200%).
+- Filter dims non-passing images (never hides — all flagged images remain visible and interactive).
+- Info popover shows all NudeNet labels with raw and weighted confidence bars.
+
+**Exposed labels (filterable):** `NSFW_SCORE` (General), `FEMALE_BREAST_EXPOSED`, `BUTTOCKS_EXPOSED`, `FEMALE_GENITALIA_EXPOSED`, `MALE_GENITALIA_EXPOSED`, `ANUS_EXPOSED`, `MALE_BREAST_EXPOSED`, `BELLY_EXPOSED`, `ARMPITS_EXPOSED`.
+
+**Persistence (localStorage):** `negativ_nsfw_sensitivity`, `negativ_nsfw_min_size`, `negativ_nsfw_excluded_labels`, `negativ_nsfw_label_weights`, `negativ_sensitive_move_target`.
+
+**Bundled model:** `NudeNet320n.mlmodelc` in `tauri.conf.json` resources. OpenNSFW2 model at `src-tauri/resources/OpenNSFW2.mlmodelc`.
 
 ### Native gradient layer
 `src-tauri/src/gradient.rs` — receives JPEG from frontend, creates `NSImageView` behind WKWebView. Do NOT replace with CSS — it's there for zero-lag window drag tracking.

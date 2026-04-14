@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -13,7 +13,11 @@ import {
 } from "../stores/scanStore";
 import type { BrowserInfo, BrowserDataCategory } from "../types";
 import EmptyState from "../components/EmptyState.vue";
+import LoadingState from "../components/LoadingState.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
 import Checkbox from "../components/Checkbox.vue";
+import StickyBar from "../components/StickyBar.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 // ── Browser app icons via NSWorkspace ─────────────────────────────────
 const browserIcons = ref<Record<string, string>>({});
@@ -214,18 +218,18 @@ function selectAllSafe(browser: BrowserInfo) {
   selected.value = next;
 }
 
+watch(browserError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="browsers-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Browser Cleanup</h2>
-          <p class="text-muted">
-            Cache, cookies, history, and session data
-          </p>
-        </div>
+    <ViewHeader
+      title="Browser Cleanup"
+      subtitle="Cache, cookies, history, and session data"
+    >
+      <template #actions>
         <button
           class="btn-primary scan-btn"
           :disabled="browserScanning"
@@ -234,17 +238,11 @@ function selectAllSafe(browser: BrowserInfo) {
           <span v-if="browserScanning" class="spinner-sm"></span>
           {{ browserScanning ? "Scanning..." : "Scan Browsers" }}
         </button>
-      </div>
-    </div>
-
-    <!-- Scan error -->
-    <div v-if="browserError" class="error-message">{{ browserError }}</div>
+      </template>
+    </ViewHeader>
 
     <!-- Loading state -->
-    <div v-if="browserScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning browsers...</span>
-    </div>
+    <LoadingState v-if="browserScanning" message="Scanning browsers..." />
 
     <!-- Empty state -->
     <EmptyState
@@ -255,16 +253,15 @@ function selectAllSafe(browser: BrowserInfo) {
 
     <!-- Results -->
     <template v-else-if="browserResult && browserResult.browsers.length > 0">
-      <!-- Summary bar -->
-      <div class="summary-bar">
-        <span class="results-count">
-          {{ browserResult.browsers.length }} browser(s) --
+      <StickyBar>
+        <span v-if="selected.size === 0" class="results-count">
+          {{ browserResult.browsers.length }} browser(s) &mdash;
           {{ formatSize(browserResult.total_size) }} total cleanable data
         </span>
-        <div class="results-actions">
-          <span v-if="selected.size > 0" class="selected-info">
-            {{ selected.size }} selected ({{ formatSize(totalSelected) }})
-          </span>
+        <span v-else class="results-count">
+          {{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}
+        </span>
+        <template #actions>
           <button
             class="btn-danger"
             :disabled="selected.size === 0 || cleaning"
@@ -273,8 +270,8 @@ function selectAllSafe(browser: BrowserInfo) {
             <span v-if="cleaning" class="spinner-sm"></span>
             {{ cleaning ? "Cleaning..." : "Clean Selected" }}
           </button>
-        </div>
-      </div>
+        </template>
+      </StickyBar>
 
       <!-- Browser cards -->
       <div class="browser-list">
@@ -289,12 +286,7 @@ function selectAllSafe(browser: BrowserInfo) {
             @click="toggleBrowser(browser.id)"
           >
             <div class="browser-header-left">
-              <span
-                class="expand-chevron"
-                :class="{ expanded: expandedBrowsers.has(browser.id) }"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-              </span>
+              <ChevronIcon :expanded="expandedBrowsers.has(browser.id)" />
               <img v-if="getBrowserIcon(browser.id)" :src="getBrowserIcon(browser.id)" :alt="browser.name" class="browser-icon" width="44" height="44" />
               <div class="browser-info">
                 <span class="browser-name">{{ browser.name }}</span>
@@ -425,6 +417,12 @@ function selectAllSafe(browser: BrowserInfo) {
 <style scoped>
 .browsers-view {
   max-width: 1440px;
+}
+
+.results-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 /* Browser list */

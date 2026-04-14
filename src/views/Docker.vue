@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { showToast } from "../stores/toastStore";
 import {
   dockerInfo,
@@ -8,6 +8,8 @@ import {
   loadDockerInfo,
   cleanDocker,
 } from "../stores/scanStore";
+import LoadingState from "../components/LoadingState.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 const cleaning = ref(false);
 
@@ -36,16 +38,19 @@ async function prune(pruneAll: boolean) {
 }
 
 onMounted(loadDockerInfo);
+
+watch(dockerError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="docker-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Docker</h2>
-          <p class="text-muted">Manage Docker images and reclaim space</p>
-        </div>
+    <ViewHeader
+      title="Docker"
+      subtitle="Manage Docker images and reclaim space"
+    >
+      <template #actions>
         <button
           v-if="dockerInfo?.installed"
           class="btn-secondary"
@@ -54,15 +59,10 @@ onMounted(loadDockerInfo);
         >
           Refresh
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="dockerError" class="error-message">{{ dockerError }}</div>
-
-    <div v-if="dockerLoading" class="loading-state">
-      <span class="spinner"></span>
-      <span>Checking Docker status...</span>
-    </div>
+    <LoadingState v-if="dockerLoading" message="Checking Docker status..." />
 
     <template v-else-if="dockerInfo">
       <div v-if="!dockerInfo.installed" class="card not-installed">

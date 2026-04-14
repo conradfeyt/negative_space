@@ -7,6 +7,10 @@
 import Foundation
 import AppKit
 import UniformTypeIdentifiers
+import Vision
+import CoreML
+import Photos
+
 
 // MARK: - Availability Check
 
@@ -455,6 +459,442 @@ public func listSystemImages() -> UnsafeMutablePointer<CChar> {
         return strdup("[]")!
     }
     return strdup(str)!
+}
+
+// MARK: - Photos Library Access
+
+/// Check current Photos authorization status.
+/// Output JSON: { "status": "authorized"|"denied"|"restricted"|"notDetermined"|"limited", "canPrompt": bool }
+@_cdecl("msw_photos_auth_status")
+public func photosAuthStatus() -> UnsafeMutablePointer<CChar> {
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    let statusStr: String
+    switch status {
+    case .authorized: statusStr = "authorized"
+    case .denied: statusStr = "denied"
+    case .restricted: statusStr = "restricted"
+    case .notDetermined: statusStr = "notDetermined"
+    case .limited: statusStr = "limited"
+    @unknown default: statusStr = "unknown"
+    }
+    let result = "{\"status\":\"\(statusStr)\",\"canPrompt\":\(status == .notDetermined)}"
+    return strdup(result)!
+}
+
+/// Request Photos library read-write access (shows system prompt if not yet determined).
+/// Blocks until the user responds. Returns "authorized", "denied", etc.
+@_cdecl("msw_request_photos_access")
+public func requestPhotosAccess() -> UnsafeMutablePointer<CChar> {
+    let sem = DispatchSemaphore(value: 0)
+    var resultStatus = ""
+    PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+        switch status {
+        case .authorized: resultStatus = "authorized"
+        case .denied: resultStatus = "denied"
+        case .restricted: resultStatus = "restricted"
+        case .limited: resultStatus = "limited"
+        case .notDetermined: resultStatus = "notDetermined"
+        @unknown default: resultStatus = "unknown"
+        }
+        sem.signal()
+    }
+    sem.wait()
+    return strdup(resultStatus)!
+}
+
+/// Enumerate Photos library image assets and return their file URLs.
+/// Input JSON: { "min_size": u64 (optional, bytes) }
+/// Output JSON: { "paths": [String], "count": Int, "error": String? }
+///
+/// Uses PHContentEditingInput to obtain file URLs for each image asset.
+/// Processes in batches to avoid excessive memory use.
+@_cdecl("msw_enumerate_photo_paths")
+public func enumeratePhotoPaths(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar> {
+    let input = String(cString: jsonInput)
+    var minSize: UInt64 = 0
+    if let data = input.data(using: .utf8),
+       let params = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        if let ms = params["min_size"] as? UInt64 { minSize = ms }
+    }
+
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    guard status == .authorized || status == .limited else {
+        let err = "{\"paths\":[],\"count\":0,\"error\":\"Photos access not authorized (status: \(status.rawValue))\"}"
+        return strdup(err)!
+    }
+
+    let fetchOptions = PHFetchOptions()
+    fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    fetchOptions.includeHiddenAssets = false
+    let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+
+    var entries: [[String: String]] = []
+    var skippedCloud: Int = 0
+
+    let inputOptions = PHContentEditingInputRequestOptions()
+    inputOptions.isNetworkAccessAllowed = false
+
+    let workQueue = DispatchQueue(label: "com.conradfe.negativespace.photoenum", qos: .userInitiated)
+    let outerSem = DispatchSemaphore(value: 0)
+
+    workQueue.async {
+        for idx in 0..<assets.count {
+            autoreleasepool {
+                let asset = assets.object(at: idx)
+
+                if minSize > 0 {
+                    let resources = PHAssetResource.assetResources(for: asset)
+                    if let primary = resources.first {
+                        let fileSize = (primary.value(forKey: "fileSize") as? NSNumber)?.uint64Value ?? 0
+                        if fileSize < minSize { return }
+                    }
+                }
+
+                let sem = DispatchSemaphore(value: 0)
+                asset.requestContentEditingInput(with: inputOptions) { input, _ in
+                    if let url = input?.fullSizeImageURL,
+                       FileManager.default.fileExists(atPath: url.path) {
+                        entries.append(["path": url.path, "id": asset.localIdentifier])
+                    } else {
+                        skippedCloud += 1
+                    }
+                    sem.signal()
+                }
+                sem.wait()
+            }
+        }
+        outerSem.signal()
+    }
+    outerSem.wait()
+
+    let paths = entries.map { $0["path"]! }
+    var result: [String: Any] = [
+        "paths": paths,
+        "entries": entries,
+        "count": entries.count,
+        "total_assets": assets.count,
+        "skipped_cloud": skippedCloud,
+    ]
+    if skippedCloud > 0 {
+        result["error"] = "\(skippedCloud) iCloud-only photos skipped (not downloaded locally)."
+    }
+    guard let jsonData = try? JSONSerialization.data(withJSONObject: result),
+          let jsonStr = String(data: jsonData, encoding: .utf8) else {
+        return strdup("{\"paths\":[],\"count\":0,\"error\":\"JSON encoding failed\"}")!
+    }
+    return strdup(jsonStr)!
+}
+
+/// Delete photos from the Photos Library via PhotoKit.
+/// Input JSON: array of localIdentifier strings, e.g. ["ABC-123/L0/001", ...]
+/// Triggers the system confirmation dialog. Returns JSON with deleted count.
+@_cdecl("msw_delete_photo_assets")
+public func deletePhotoAssets(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar> {
+    let input = String(cString: jsonInput)
+    guard let data = input.data(using: .utf8),
+          let identifiers = try? JSONSerialization.jsonObject(with: data) as? [String] else {
+        return strdup("{\"deleted\":0,\"error\":\"Invalid input\"}")!
+    }
+
+    let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+    guard fetchResult.count > 0 else {
+        return strdup("{\"deleted\":0,\"error\":\"No matching assets found\"}")!
+    }
+
+    let sem = DispatchSemaphore(value: 0)
+    var deletedCount = 0
+    var deleteError: String? = nil
+
+    PHPhotoLibrary.shared().performChanges({
+        PHAssetChangeRequest.deleteAssets(fetchResult)
+    }) { success, error in
+        if success {
+            deletedCount = fetchResult.count
+        } else {
+            deleteError = error?.localizedDescription ?? "Deletion denied"
+        }
+        sem.signal()
+    }
+    sem.wait()
+
+    var result: [String: Any] = ["deleted": deletedCount]
+    if let err = deleteError { result["error"] = err }
+    guard let jsonData = try? JSONSerialization.data(withJSONObject: result),
+          let jsonStr = String(data: jsonData, encoding: .utf8) else {
+        return strdup("{\"deleted\":0,\"error\":\"JSON error\"}")!
+    }
+    return strdup(jsonStr)!
+}
+
+/// Generate a thumbnail for a Photos library asset by localIdentifier.
+/// Input JSON: { "identifier": String, "size": Int }
+/// Output: base64 JPEG string (or empty string on failure)
+@_cdecl("msw_photos_thumbnail")
+public func photosThumbnail(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar> {
+    let input = String(cString: jsonInput)
+    guard let data = input.data(using: .utf8),
+          let params = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let identifier = params["identifier"] as? String else {
+        return strdup("")!
+    }
+    let size = (params["size"] as? Int) ?? 200
+
+    let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+    guard let asset = fetchResult.firstObject else { return strdup("")! }
+
+    let sem = DispatchSemaphore(value: 0)
+    var resultB64 = ""
+
+    let options = PHImageRequestOptions()
+    options.isNetworkAccessAllowed = false
+    options.isSynchronous = false
+    options.deliveryMode = .highQualityFormat
+
+    let targetSize = CGSize(width: size, height: size)
+    PHImageManager.default().requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFill, options: options) { image, _ in
+        defer { sem.signal() }
+        guard let image = image else { return }
+        let bitmapRep = NSBitmapImageRep(data: image.tiffRepresentation!)!
+        if let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
+            resultB64 = "data:image/jpeg;base64," + jpegData.base64EncodedString()
+        }
+    }
+    sem.wait()
+
+    return strdup(resultB64)!
+}
+
+// MARK: - NSFW Classification (file-system based)
+
+/// Classify images for NSFW content using CoreML + Vision.
+///
+/// Input JSON: { "paths": [String], "model_path": String }
+/// Output JSON: [{ "path": String, "score": Double }]
+///
+/// Uses VNCoreMLRequest to run the bundled OpenNSFW2 model on each image.
+/// Returns the NSFW probability score (0.0 = safe, 1.0 = explicit) for each
+/// image that could be successfully classified. Failed images are silently skipped.
+@_cdecl("msw_classify_nsfw")
+public func classifyNsfw(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar> {
+    let input = String(cString: jsonInput)
+    guard let data = input.data(using: .utf8),
+          let params = try? JSONDecoder().decode(NsfwParams.self, from: data) else {
+        return strdup("[]")!
+    }
+
+    let modelURL = URL(fileURLWithPath: params.model_path)
+    guard FileManager.default.fileExists(atPath: params.model_path) else {
+        return strdup("[]")!
+    }
+
+    guard let compiledModel = try? MLModel(contentsOf: modelURL),
+          let vnModel = try? VNCoreMLModel(for: compiledModel) else {
+        return strdup("[]")!
+    }
+
+    var results: [[String: Any]] = []
+
+    for imagePath in params.paths {
+        autoreleasepool {
+            let imageURL = URL(fileURLWithPath: imagePath)
+            guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                  let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+                return
+            }
+
+            let request = VNCoreMLRequest(model: vnModel)
+            request.imageCropAndScaleOption = .scaleFill
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                return
+            }
+
+            guard let observations = request.results as? [VNClassificationObservation] else { return }
+
+            let nsfwScore = observations.first(where: { $0.identifier == "nsfw" })?.confidence ?? 0.0
+            results.append([
+                "path": imagePath,
+                "score": Double(nsfwScore)
+            ])
+        }
+    }
+
+    guard let jsonData = try? JSONSerialization.data(withJSONObject: results),
+          let jsonStr = String(data: jsonData, encoding: .utf8) else {
+        return strdup("[]")!
+    }
+    return strdup(jsonStr)!
+}
+
+private struct NsfwParams: Codable {
+    let paths: [String]
+    let model_path: String
+}
+
+// MARK: - NudeNet Detection (YOLO-based body part detection)
+
+/// NudeNet class labels (YOLOv8-nano 320n, 18 classes)
+private let nudeNetLabels: [String] = [
+    "FEMALE_GENITALIA_COVERED", "FACE_FEMALE", "BUTTOCKS_EXPOSED",
+    "FEMALE_BREAST_EXPOSED", "FEMALE_GENITALIA_EXPOSED", "MALE_BREAST_EXPOSED",
+    "ANUS_EXPOSED", "FEET_EXPOSED", "BELLY_COVERED", "FEET_COVERED",
+    "ARMPITS_COVERED", "ARMPITS_EXPOSED", "FACE_MALE", "BELLY_EXPOSED",
+    "MALE_GENITALIA_EXPOSED", "ANUS_COVERED", "FEMALE_BREAST_COVERED",
+    "BUTTOCKS_COVERED"
+]
+
+/// Detect body parts in images using NudeNet CoreML model.
+///
+/// Input JSON: { "paths": [String], "model_path": String }
+/// Output JSON: [{ "path": String, "detections": [{ "label": String, "confidence": Double }] }]
+///
+/// The NudeNet model outputs raw YOLO tensors [1, 22, 2100]. This function
+/// performs score thresholding and greedy NMS post-processing, then returns
+/// per-class detections with confidence scores.
+@_cdecl("msw_detect_nsfw")
+public func detectNsfw(_ jsonInput: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar> {
+    let input = String(cString: jsonInput)
+    guard let data = input.data(using: .utf8),
+          let params = try? JSONDecoder().decode(NsfwParams.self, from: data) else {
+        return strdup("[]")!
+    }
+
+    let modelURL = URL(fileURLWithPath: params.model_path)
+    guard FileManager.default.fileExists(atPath: params.model_path) else {
+        return strdup("[]")!
+    }
+
+    guard let mlModel = try? MLModel(contentsOf: modelURL),
+          let vnModel = try? VNCoreMLModel(for: mlModel) else {
+        return strdup("[]")!
+    }
+
+    var results: [[String: Any]] = []
+    let numClasses = nudeNetLabels.count // 18
+    let confThreshold: Float = 0.1
+    let iouThreshold: Float = 0.45
+
+    for imagePath in params.paths {
+        autoreleasepool {
+            let imageURL = URL(fileURLWithPath: imagePath)
+            guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                  let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+                return
+            }
+
+            let request = VNCoreMLRequest(model: vnModel)
+            request.imageCropAndScaleOption = .scaleFill
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                return
+            }
+
+            // VNCoreMLRequest with a raw tensor model returns VNCoreMLFeatureValueObservation
+            guard let featureResults = request.results as? [VNCoreMLFeatureValueObservation],
+                  let firstResult = featureResults.first,
+                  let multiArray = firstResult.featureValue.multiArrayValue else {
+                return
+            }
+
+            // Shape: [1, 22, N] where 22 = 4 (cx,cy,w,h) + 18 (class scores)
+            let shape = multiArray.shape.map { $0.intValue }
+            let channels = shape.count == 3 ? shape[1] : (shape.count == 2 ? shape[0] : 0)
+            let numDetections = shape.count == 3 ? shape[2] : (shape.count == 2 ? shape[1] : 0)
+            guard channels == numClasses + 4, numDetections > 0 else { return }
+
+            // Use safe subscript access — works regardless of data type (Float16/32/64)
+            struct Detection {
+                let cx: Float; let cy: Float; let w: Float; let h: Float
+                let classIdx: Int; let score: Float
+            }
+            var candidates: [Detection] = []
+
+            for j in 0..<numDetections {
+                let idx: (Int) -> [NSNumber] = shape.count == 3
+                    ? { row in [0 as NSNumber, row as NSNumber, j as NSNumber] }
+                    : { row in [row as NSNumber, j as NSNumber] }
+
+                let cx = multiArray[idx(0)].floatValue
+                let cy = multiArray[idx(1)].floatValue
+                let w  = multiArray[idx(2)].floatValue
+                let h  = multiArray[idx(3)].floatValue
+
+                var bestClass = 0
+                var bestScore: Float = 0
+                for c in 0..<numClasses {
+                    let score = multiArray[idx(4 + c)].floatValue
+                    if score > bestScore {
+                        bestScore = score
+                        bestClass = c
+                    }
+                }
+                if bestScore >= confThreshold {
+                    candidates.append(Detection(cx: cx, cy: cy, w: w, h: h,
+                                                classIdx: bestClass, score: bestScore))
+                }
+            }
+
+            // Greedy NMS per class
+            candidates.sort { $0.score > $1.score }
+            var keep: [Detection] = []
+            var suppressed = [Bool](repeating: false, count: candidates.count)
+
+            for i in 0..<candidates.count {
+                if suppressed[i] { continue }
+                let a = candidates[i]
+                keep.append(a)
+                for jj in (i+1)..<candidates.count {
+                    if suppressed[jj] { continue }
+                    let b = candidates[jj]
+                    if a.classIdx != b.classIdx { continue }
+                    let iou = computeIoU(a.cx, a.cy, a.w, a.h, b.cx, b.cy, b.w, b.h)
+                    if iou > iouThreshold { suppressed[jj] = true }
+                }
+            }
+
+            // Deduplicate to best-per-class for the result
+            var bestPerClass: [String: Double] = [:]
+            for det in keep {
+                let label = nudeNetLabels[det.classIdx]
+                let existing = bestPerClass[label] ?? 0
+                if Double(det.score) > existing {
+                    bestPerClass[label] = Double(det.score)
+                }
+            }
+
+            let detections: [[String: Any]] = bestPerClass.map { label, conf in
+                ["label": label, "confidence": conf]
+            }
+
+            results.append([
+                "path": imagePath,
+                "detections": detections
+            ])
+        }
+    }
+
+    guard let jsonData = try? JSONSerialization.data(withJSONObject: results),
+          let jsonStr = String(data: jsonData, encoding: .utf8) else {
+        return strdup("[]")!
+    }
+    return strdup(jsonStr)!
+}
+
+private func computeIoU(_ cx1: Float, _ cy1: Float, _ w1: Float, _ h1: Float,
+                         _ cx2: Float, _ cy2: Float, _ w2: Float, _ h2: Float) -> Float {
+    let x1a = cx1 - w1/2, y1a = cy1 - h1/2, x1b = cx1 + w1/2, y1b = cy1 + h1/2
+    let x2a = cx2 - w2/2, y2a = cy2 - h2/2, x2b = cx2 + w2/2, y2b = cy2 + h2/2
+    let interX = max(0, min(x1b, x2b) - max(x1a, x2a))
+    let interY = max(0, min(y1b, y2b) - max(y1a, y2a))
+    let interArea = interX * interY
+    let union = w1 * h1 + w2 * h2 - interArea
+    return union > 0 ? interArea / union : 0
 }
 
 // MARK: - Memory Management

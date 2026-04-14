@@ -402,6 +402,15 @@ export interface InstalledPackage {
   removal_warning: string;
 }
 
+export interface CommandRecord {
+  program: string;
+  args: string[];
+  purpose: string;
+  success: boolean;
+  duration_ms: number;
+  output_preview: string;
+}
+
 export interface PackageManagerInfo {
   id: string;
   name: string;
@@ -412,6 +421,8 @@ export interface PackageManagerInfo {
   total_package_count: number;
   detected: boolean;
   uninstall_hint: string;
+  is_custom: boolean;
+  commands_run: CommandRecord[];
 }
 
 export interface RuntimeVersion {
@@ -430,12 +441,36 @@ export interface RuntimeInfo {
   versions: RuntimeVersion[];
   uninstall_hint: string;
   removal_warning: string;
+  is_custom: boolean;
+  commands_run: CommandRecord[];
 }
 
 export interface PackageScanResult {
   managers: PackageManagerInfo[];
   runtimes: RuntimeInfo[];
   total_size: number;
+}
+
+export interface ProbeCommand {
+  program: string;
+  args: string[];
+}
+
+export type ProbeType = "manager" | "runtime";
+export type ParseMode = "lines" | "json" | "none";
+
+export interface CustomProbe {
+  id: string;
+  name: string;
+  probe_type: ProbeType;
+  enabled: boolean;
+  detect: ProbeCommand;
+  version: ProbeCommand | null;
+  list_packages: ProbeCommand | null;
+  list_parse_mode: ParseMode;
+  size_paths: string[];
+  install_path: string;
+  uninstall_hint: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +606,7 @@ export interface ThermalScanResult {
 
 export interface FileClassification {
   path: string;
-  safety: "safe" | "safe_stale" | "safe_rebuild" | "probably_safe" | "risky" | "unknown" | "vaulted";
+  safety: "safe" | "safe_stale" | "safe_rebuild" | "probably_safe" | "risky" | "unknown" | "archived";
   explanation: string;
   confidence: number;
 }
@@ -633,4 +668,66 @@ export interface RestoreResult {
   success: boolean;
   restored_path: string;
   errors: string[];
+}
+
+export interface MoveResult {
+  success: boolean;
+  files_moved: number;
+  errors: string[];
+}
+
+export interface StorageConfig {
+  archive_dir: string | null;
+  vault_dir: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// NSFW / Sensitive Content Detection
+// ---------------------------------------------------------------------------
+
+
+export interface NsfwFile {
+  path: string;
+  name: string;
+  size: number;
+  modified: string;
+  parent_dir: string;
+  score: number;
+  thumbnail: string | null;
+  photo_asset_id?: string;
+  date_taken?: string;
+  detected_labels?: DetectedLabel[];
+}
+
+export interface DetectedLabel {
+  label: string;
+  confidence: number;
+}
+
+
+export interface NsfwScanResult {
+  flagged: NsfwFile[];
+  images_scanned: number;
+  images_skipped: number;
+  threshold: number;
+  scan_duration_ms: number;
+  warnings: string[];
+  model: string;
+}
+
+export interface NsfwScanProgress {
+  images_processed: number;
+  total_images: number;
+  current_file: string;
+  phase: string;
+  images_discovered: number;
+  thumbnails_processed: number;
+  total_thumbnails: number;
+}
+
+export interface OperationProgress {
+  operation: string;
+  processed: number;
+  total: number;
+  current_file: string;
 }

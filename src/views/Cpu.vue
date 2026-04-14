@@ -8,7 +8,7 @@
  *
  * Refreshes every 3 seconds for a live feel.
  */
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import type { VitalsGroup } from "../types";
 import {
   vitalsResult,
@@ -22,6 +22,8 @@ import {
 import { formatSize, cpuLoadClass } from "../utils";
 import { showToast } from "../stores/toastStore";
 import LiveIndicator from "../components/LiveIndicator.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
+import LoadingState from "../components/LoadingState.vue";
 
 // ---------------------------------------------------------------------------
 // Live refresh — 3s interval
@@ -124,6 +126,8 @@ function toggleGroup(name: string) {
 function fmtCpu(pct: number): string {
   return pct >= 10 ? `${Math.round(pct)}%` : `${pct.toFixed(1)}%`;
 }
+
+watch(vitalsError, (err) => { if (err) showToast(err, "error"); });
 </script>
 
 <template>
@@ -144,14 +148,7 @@ function fmtCpu(pct: number): string {
     </div>
 
     <!-- Loading state -->
-    <div v-if="vitalsScanning && !vitalsScanned" class="loading-state">
-      <span class="spinner"></span>
-      Scanning processes...
-    </div>
-
-    <!-- Error state -->
-    <div v-if="vitalsError" class="error-message">{{ vitalsError }}</div>
-
+    <LoadingState v-if="vitalsScanning && !vitalsScanned" message="Scanning processes..." />
 
     <template v-if="vitalsResult">
 
@@ -212,11 +209,7 @@ function fmtCpu(pct: number): string {
                 >
                   {{ quitting.has(group.name) ? "..." : "Quit" }}
                 </button>
-                <span class="expand-chevron" :class="{ expanded: expandedGroups.has(group.name) }">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4.5 2.5l3.5 3.5-3.5 3.5"/>
-                  </svg>
-                </span>
+                <ChevronIcon :expanded="expandedGroups.has(group.name)" />
               </div>
             </div>
 
@@ -443,20 +436,6 @@ function fmtCpu(pct: number): string {
 .btn-quit:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.expand-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: var(--muted);
-  transition: transform 0.15s;
-}
-
-.expand-chevron.expanded {
-  transform: rotate(90deg);
 }
 
 .hog-suggestion {

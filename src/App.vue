@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { BUILD_NUMBER } from "./buildNumber";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useRouter, useRoute } from "vue-router";
 import { checkFullDiskAccess, hasFullDiskAccess as _hasFullDiskAccess, domainStatus, checkDockerInstalled, dockerInstalled, restoreAllCaches, checkIntelligence } from "./stores/scanStore";
 import Toast from "./components/Toast.vue";
@@ -35,7 +36,13 @@ const icons = {
   trash:        "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
   browsers:     "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9",
   duplicates:   "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z",
-  vault:        "M21 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v3m18 0v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8m18 0H3m7 4h4",
+  sensitive:    [
+    "M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94",
+    "M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24",
+    "M1 1l22 22",
+  ],
+  archive:      "M21 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v3m18 0v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8m18 0H3m7 4h4",
+  vault:        "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
   spaceMap:     "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z",
   maintenance:  "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
   security:     "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
@@ -55,34 +62,46 @@ const navSections: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: "Cleanup",
+    label: "Storage",
     items: [
       { id: "large-files", label: "Large Files", icon: icons.largeFiles },
       { id: "caches", label: "Caches", icon: icons.caches },
       { id: "logs", label: "Logs", icon: icons.logs },
-      { id: "docker", label: "Docker", icon: icons.docker },
-      { id: "apps", label: "Apps", icon: icons.apps },
       { id: "trash", label: "Trash", icon: icons.trash },
-      { id: "browsers", label: "Browsers", icon: icons.browsers },
       { id: "duplicates", label: "Duplicates", icon: icons.duplicates },
-      { id: "vault", label: "Vault", icon: icons.vault },
+      { id: "archive", label: "Archive", icon: icons.archive },
     ],
   },
   {
-    label: "Analysis",
+    label: "Apps",
     items: [
-      { id: "space-map", label: "Space Map", icon: icons.spaceMap },
-      { id: "cpu", label: "CPU", icon: icons.cpu },
-      { id: "memory", label: "Memory", icon: icons.memory },
+      { id: "apps", label: "Apps", icon: icons.apps },
+      { id: "browsers", label: "Browsers", icon: icons.browsers },
+      { id: "docker", label: "Docker", icon: icons.docker },
       { id: "packages", label: "Packages", icon: icons.packages },
+    ],
+  },
+  {
+    label: "Privacy",
+    items: [
+      { id: "sensitive-content", label: "Sensitive", icon: icons.sensitive },
+      { id: "vault", label: "Vault", icon: icons.vault },
+      { id: "security", label: "Security", icon: icons.security },
     ],
   },
   {
     label: "System",
     items: [
+      { id: "space-map", label: "Space Map", icon: icons.spaceMap },
+      { id: "cpu", label: "CPU", icon: icons.cpu },
+      { id: "memory", label: "Memory", icon: icons.memory },
       { id: "thermal", label: "Thermal", icon: icons.thermal },
       { id: "maintenance", label: "Maintenance", icon: icons.maintenance },
-      { id: "security", label: "Security", icon: icons.security },
+    ],
+  },
+  {
+    label: "",
+    items: [
       { id: "settings", label: "Settings", icon: icons.settings },
     ],
   },
@@ -201,15 +220,28 @@ async function loadFdaIcons() {
 }
 onMounted(loadFdaIcons);
 
+let unlistenFocus: (() => void) | null = null;
+
 onMounted(async () => {
   try {
     await checkFullDiskAccess();
   } catch (_) { /* FDA check may fail in dev mode — proceed anyway */ }
   fdaChecked.value = true;
-  // Fire-and-forget: don't block render waiting for these
   void checkDockerInstalled();
   void restoreAllCaches();
   void checkIntelligence();
+
+  // Re-check FDA automatically when the window regains focus
+  const win = getCurrentWindow();
+  unlistenFocus = await win.onFocusChanged(({ payload: focused }) => {
+    if (focused && !_hasFullDiskAccess.value) {
+      checkFullDiskAccess();
+    }
+  });
+});
+
+onUnmounted(() => {
+  unlistenFocus?.();
 });
 </script>
 
@@ -293,7 +325,7 @@ onMounted(async () => {
       <nav class="sidebar-nav">
         <template v-for="(section, sIdx) in navSections" :key="section.label">
           <div v-if="sIdx > 0" class="nav-divider"></div>
-          <span class="nav-section-label">{{ section.label }}</span>
+          <span v-if="section.label" class="nav-section-label">{{ section.label }}</span>
           <button
             v-for="item in section.items"
             v-show="item.id !== 'docker' || dockerInstalled !== false"

@@ -10,8 +10,43 @@ import LiveIndicator from "../components/LiveIndicator.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import Checkbox from "../components/Checkbox.vue";
 import type { TabOption } from "../components/TabBar.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
+import ProgressBar from "../components/ProgressBar.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
+import LoadingState from "../components/LoadingState.vue";
+import InlineAlert from "../components/InlineAlert.vue";
+import ViewHeader from "../components/ViewHeader.vue";
+import ConfirmPanel from "../components/ConfirmPanel.vue";
+import MetricStrip from "../components/MetricStrip.vue";
+import DiskUsageBar from "../components/DiskUsageBar.vue";
+import TimelineRail from "../components/TimelineRail.vue";
+import Modal from "../components/Modal.vue";
+import ScanBar from "../components/ScanBar.vue";
+import StickyBar from "../components/StickyBar.vue";
+import FileRow from "../components/FileRow.vue";
+import KindFilterBar from "../components/KindFilterBar.vue";
 import { ref } from "vue";
 import { showToast } from "../stores/toastStore";
+import type { FileInfo } from "../types";
+
+const modalOpen = ref(false);
+const kindFilterValue = ref<string[]>([]);
+
+/** Static demo for FileRow — matches LargeFiles prop wiring */
+const showcaseFileRow: FileInfo = {
+  path: "/Users/demo/Downloads/big_archive.zip",
+  name: "big_archive.zip",
+  apparent_size: 1073741824,
+  actual_size: 1073741824,
+  modified: "2026-04-01T12:00:00Z",
+  is_sparse: false,
+};
+
+const kindFilterIcon =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0088FF" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
+  );
 
 const segValue = ref("size");
 const segOptions: TabOption[] = [
@@ -42,6 +77,17 @@ const sliderValue = ref(50);
 const radioValue = ref("auto");
 const radioScroll = ref("next-page");
 const toggleOff = ref(false);
+
+const collapsibleOpen = ref(true);
+const confirmLoading = ref(false);
+
+function onConfirmPanelDemo() {
+  confirmLoading.value = true;
+  window.setTimeout(() => {
+    confirmLoading.value = false;
+    showToast("Confirmed!", "success");
+  }, 1500);
+}
 </script>
 
 <template>
@@ -745,6 +791,195 @@ const toggleOff = ref(false);
           <button class="btn-primary btn-sm">Prune</button>
           <button class="btn-danger btn-sm">Prune All</button>
         </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- EXTRACTED COMPONENTS -->
+    <!-- ================================================================= -->
+    <section class="showcase-section">
+      <h3 class="section-title">Extracted Components</h3>
+
+      <h4 class="showcase-subtitle">ChevronIcon</h4>
+      <div class="showcase-row">
+        <ChevronIcon />
+        <ChevronIcon :expanded="true" />
+        <ChevronIcon variant="filled" />
+        <ChevronIcon variant="filled" :expanded="true" />
+        <ChevronIcon :size="10" variant="filled" />
+      </div>
+
+      <h4 class="showcase-subtitle">ProgressBar</h4>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+        <ProgressBar :percent="65" variant="accent" />
+        <ProgressBar :percent="84" variant="success" />
+        <ProgressBar :percent="45" variant="warning" />
+        <ProgressBar :percent="92" variant="danger" />
+        <ProgressBar :percent="31" variant="accent" size="thin" />
+        <ProgressBar :percent="78" variant="warning" size="thick" />
+      </div>
+
+      <h4 class="showcase-subtitle">LoadingState</h4>
+      <div style="margin-bottom:16px">
+        <LoadingState message="Scanning applications and detecting leftovers..." />
+      </div>
+
+      <h4 class="showcase-subtitle">InlineAlert — warning</h4>
+      <InlineAlert variant="warning">Photos Library access was denied. Grant access in System Settings → Privacy.</InlineAlert>
+
+      <h4 class="showcase-subtitle">InlineAlert — info</h4>
+      <InlineAlert variant="info">
+        <div>
+          <div style="font-weight:600;margin-bottom:2px">About these tasks</div>
+          Each task shows which commands will run and whether the operation is reversible.
+        </div>
+      </InlineAlert>
+
+      <h4 class="showcase-subtitle">InlineAlert — dismissible</h4>
+      <InlineAlert variant="warning" dismissible @dismiss="showToast('Alert dismissed', 'info')">This alert can be dismissed.</InlineAlert>
+
+      <h4 class="showcase-subtitle">CollapsibleSection</h4>
+      <div class="card" style="padding:0;overflow:hidden">
+        <CollapsibleSection :expanded="collapsibleOpen" title="Collapsible Section" @toggle="collapsibleOpen = !collapsibleOpen">
+          <div style="padding:12px 16px;font-size:13px;color:var(--text-secondary)">
+            This content is inside the collapsible body. It toggles when you click the header.
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <h4 class="showcase-subtitle">ViewHeader</h4>
+      <ViewHeader title="Example View" subtitle="This is a description of the view">
+        <template #actions>
+          <button class="btn-secondary btn-sm">Refresh</button>
+          <button class="btn-primary btn-sm">Scan</button>
+        </template>
+      </ViewHeader>
+
+      <h4 class="showcase-subtitle">ConfirmPanel</h4>
+      <div class="card" style="overflow:hidden">
+        <ConfirmPanel
+          confirm-label="Yes, Empty Trash"
+          loading-label="Emptying..."
+          :loading="confirmLoading"
+          danger
+          @confirm="onConfirmPanelDemo"
+          @cancel="showToast('Cancelled', 'info')"
+        >
+          Are you sure you want to permanently delete <strong>1,247 item(s)</strong> (4.8 GB)? This cannot be undone.
+        </ConfirmPanel>
+      </div>
+
+      <h4 class="showcase-subtitle">MetricStrip</h4>
+      <MetricStrip :items="[
+        { label: 'Uptime', value: '3d 14h' },
+        { label: 'Agents', value: 142 },
+        { label: 'Processes', value: 387 },
+      ]" />
+
+      <h4 class="showcase-subtitle">DiskUsageBar</h4>
+      <DiskUsageBar :used="412000000000" :total="500000000000" />
+      <DiskUsageBar :used="250000000000" :total="500000000000" />
+
+      <h4 class="showcase-subtitle">TimelineRail</h4>
+      <div style="display:flex;gap:24px;height:220px;border:1px solid var(--border);border-radius:var(--radius-md);padding:12px;background:var(--glass)">
+        <div style="flex:1;font-size:13px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center">← Content area</div>
+        <TimelineRail
+          :years="[
+            { year: '2026', key: 'April 2026', totalCount: 25, collapsed: false, months: [
+              { key: 'April 2026', label: 'Apr', count: 5 },
+              { key: 'March 2026', label: 'Mar', count: 12 },
+              { key: 'February 2026', label: 'Feb', count: 8 },
+            ]},
+            { year: '2025', key: 'December 2025', totalCount: 7, collapsed: false, months: [
+              { key: 'December 2025', label: 'Dec', count: 7 },
+            ]},
+            { year: '2024', key: '2024', totalCount: 3, collapsed: true, months: [] },
+          ]"
+          active-key="March 2026"
+          @navigate="showToast('Navigate to: ' + $event, 'info')"
+        />
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- EXISTING SHARED COMPONENTS -->
+    <!-- ================================================================= -->
+    <section class="showcase-section">
+      <h3 class="section-title">Shared Components</h3>
+
+      <h4 class="showcase-subtitle">Modal</h4>
+      <button class="btn-primary btn-sm" type="button" @click="modalOpen = true">Open Modal</button>
+      <Modal :visible="modalOpen" title="Example modal" @close="modalOpen = false">
+        <template #icon>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </template>
+        <p style="text-align: center; margin: 0">
+          This is a reusable modal with overlay, ESC dismiss, and slots for icon, content, and actions.
+        </p>
+        <template #actions>
+          <button class="btn-secondary" type="button" @click="modalOpen = false">Cancel</button>
+          <button class="btn-primary" type="button" @click="modalOpen = false; showToast('Confirmed!', 'success')">Confirm</button>
+        </template>
+      </Modal>
+
+      <h4 class="showcase-subtitle">ScanBar</h4>
+      <ScanBar :scanning="false" scan-label="Scan" @scan="showToast('Scan started', 'info')">
+        <select class="scan-bar-select" style="font-size: 13px">
+          <option>Normal</option>
+          <option>Deep</option>
+        </select>
+      </ScanBar>
+
+      <h4 class="showcase-subtitle">StickyBar</h4>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0; overflow: hidden">
+        <StickyBar>
+          <span style="font-size: 13px; font-weight: 500">3 items selected — 4.2 GB</span>
+          <template #actions>
+            <button class="btn-secondary btn-sm" type="button">Vault</button>
+            <button class="btn-danger btn-sm" type="button">Delete</button>
+          </template>
+        </StickyBar>
+      </div>
+
+      <h4 class="showcase-subtitle">FileRow</h4>
+      <div class="card" style="padding: 0; overflow: hidden">
+        <FileRow
+          :file="showcaseFileRow"
+          :selected="false"
+          :is-protected="false"
+          :is-locked="false"
+          file-icon=""
+          safety-label="Likely safe"
+          safety-class="badge-accent"
+          safety-tooltip="Showcase demo — classification tooltip text."
+          :is-sparse="false"
+          :disk-size="1073741824"
+          parent-folder="~/Downloads"
+          time-ago="2 days ago"
+          :is-tree="false"
+          native-folder-icon=""
+          @toggle="showToast('File toggled', 'info')"
+          @reveal="showToast('Reveal in Finder', 'info')"
+          @unprotect="showToast('Unprotect', 'info')"
+        />
+      </div>
+
+      <h4 class="showcase-subtitle">KindFilterBar</h4>
+      <div style="position: relative; margin-bottom: 16px">
+        <KindFilterBar
+          :options="[
+            { key: 'images', label: 'Images' },
+            { key: 'documents', label: 'Documents' },
+            { key: 'audio', label: 'Audio' },
+            { key: 'video', label: 'Video' },
+            { key: 'code', label: 'Code' },
+          ]"
+          v-model="kindFilterValue"
+          :counts="{ images: 42, documents: 18, audio: 7, video: 3, code: 15 }"
+          :icon="kindFilterIcon"
+        />
       </div>
     </section>
   </div>

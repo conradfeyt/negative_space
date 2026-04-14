@@ -12,6 +12,7 @@ import { collectFiles } from "../composables/useFileGrouping";
 import { formatSize } from "../utils";
 import Checkbox from "./Checkbox.vue";
 import FileRow from "./FileRow.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
 
 const MAX_DEPTH = 3;
 
@@ -59,9 +60,7 @@ const isAtMaxDepth = props.depth >= MAX_DEPTH;
         @keydown.space.prevent="emit('toggle-group', node.key)"
       >
         <div class="dir-header-left">
-          <span class="expand-chevron expand-chevron--sm" :class="{ expanded: !collapsedGroups.has(node.key) }">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-          </span>
+          <ChevronIcon :expanded="!collapsedGroups.has(node.key)" variant="filled" :size="10" />
           <span class="dir-header-icon">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2.5 2.5h4l1.5 1.5h5.5v9h-11z"/>
@@ -232,11 +231,6 @@ export default { name: "DirTreeNode" };
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
-}
-
-.expand-chevron--sm svg {
-  width: 10px;
-  height: 10px;
 }
 
 .file-list {

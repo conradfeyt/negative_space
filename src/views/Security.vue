@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import type { LaunchItem, AppTrustInfo, ShellInitFinding, Severity } from "../types";
 import { showToast } from "../stores/toastStore";
 import {
@@ -13,6 +13,10 @@ import {
 } from "../stores/scanStore";
 import StatCard from "../components/StatCard.vue";
 import EmptyState from "../components/EmptyState.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
+import LoadingState from "../components/LoadingState.vue";
+import ViewHeader from "../components/ViewHeader.vue";
 
 type SectionId = "launch" | "trust" | "shell";
 
@@ -140,18 +144,19 @@ async function handleRemove(item: LaunchItem) {
     actionInProgress.value = null;
   }
 }
+
+watch(securityError, (err) => {
+  if (err) showToast(err, "error");
+});
 </script>
 
 <template>
   <section class="security-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Security Audit</h2>
-          <p class="text-muted">
-            Inspect startup items, app trust, and shell configuration
-          </p>
-        </div>
+    <ViewHeader
+      title="Security Audit"
+      subtitle="Inspect startup items, app trust, and shell configuration"
+    >
+      <template #actions>
         <button
           class="btn-primary scan-btn"
           :disabled="securityScanning"
@@ -160,15 +165,10 @@ async function handleRemove(item: LaunchItem) {
           <span v-if="securityScanning" class="spinner-sm"></span>
           {{ securityScanning ? "Scanning..." : "Scan" }}
         </button>
-      </div>
-    </div>
+      </template>
+    </ViewHeader>
 
-    <div v-if="securityError" class="error-message">{{ securityError }}</div>
-
-    <div v-if="securityScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Running security audit...</span>
-    </div>
+    <LoadingState v-if="securityScanning" message="Running security audit..." />
 
     <template v-else-if="securityScanned && securityResult">
       <!-- Summary Cards -->
@@ -182,23 +182,23 @@ async function handleRemove(item: LaunchItem) {
 
       <!-- Launch Items Section -->
       <div class="section">
-        <div class="section-header" tabindex="0" role="button" :aria-expanded="expandedSections.has('launch')" @click="toggleSection('launch')" @keydown.enter="toggleSection('launch')" @keydown.space.prevent="toggleSection('launch')">
-          <span class="expand-chevron" :class="{ expanded: expandedSections.has('launch') }">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-          </span>
-          <h3 class="section-title">Launch Items</h3>
-          <span class="badge badge-accent">
-            {{ securityResult.launch_items.length }}
-          </span>
-          <span
-            v-if="launchItemsWithFindings.length > 0"
-            class="badge badge-warning"
-          >
-            {{ launchItemsWithFindings.length }} with findings
-          </span>
-        </div>
-
-        <div v-if="expandedSections.has('launch')" class="section-body">
+        <CollapsibleSection
+          :expanded="expandedSections.has('launch')"
+          @toggle="toggleSection('launch')"
+        >
+          <template #header>
+            <h3 class="section-title">Launch Items</h3>
+            <span class="badge badge-accent">
+              {{ securityResult.launch_items.length }}
+            </span>
+            <span
+              v-if="launchItemsWithFindings.length > 0"
+              class="badge badge-warning"
+            >
+              {{ launchItemsWithFindings.length }} with findings
+            </span>
+          </template>
+          <div class="section-body">
           <EmptyState
             v-if="securityResult.launch_items.length === 0"
             title="No launch items found"
@@ -213,9 +213,7 @@ async function handleRemove(item: LaunchItem) {
             <div class="finding-row" @click="toggleLaunch(item.path)">
               <div class="finding-info">
                 <div class="finding-name-row">
-                  <span class="expand-chevron" :class="{ expanded: expandedLaunch.has(item.path) }">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-                  </span>
+                  <ChevronIcon :expanded="expandedLaunch.has(item.path)" />
                   <span class="finding-name">{{ item.label }}</span>
                   <span
                     v-if="item.findings.length > 0"
@@ -293,28 +291,29 @@ async function handleRemove(item: LaunchItem) {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </CollapsibleSection>
       </div>
 
       <!-- App Trust Section -->
       <div class="section">
-        <div class="section-header" tabindex="0" role="button" :aria-expanded="expandedSections.has('trust')" @click="toggleSection('trust')" @keydown.enter="toggleSection('trust')" @keydown.space.prevent="toggleSection('trust')">
-          <span class="expand-chevron" :class="{ expanded: expandedSections.has('trust') }">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-          </span>
-          <h3 class="section-title">App Trust</h3>
-          <span class="badge badge-accent">
-            {{ securityResult.app_trust.length }}
-          </span>
-          <span
-            v-if="appTrustWithFindings.length > 0"
-            class="badge badge-warning"
-          >
-            {{ appTrustWithFindings.length }} with findings
-          </span>
-        </div>
-
-        <div v-if="expandedSections.has('trust')" class="section-body">
+        <CollapsibleSection
+          :expanded="expandedSections.has('trust')"
+          @toggle="toggleSection('trust')"
+        >
+          <template #header>
+            <h3 class="section-title">App Trust</h3>
+            <span class="badge badge-accent">
+              {{ securityResult.app_trust.length }}
+            </span>
+            <span
+              v-if="appTrustWithFindings.length > 0"
+              class="badge badge-warning"
+            >
+              {{ appTrustWithFindings.length }} with findings
+            </span>
+          </template>
+          <div class="section-body">
           <EmptyState
             v-if="securityResult.app_trust.length === 0"
             title="No app trust issues found"
@@ -324,32 +323,32 @@ async function handleRemove(item: LaunchItem) {
           <div
             v-for="app in securityResult.app_trust"
             :key="app.path"
-            class="card-flush finding-item"
+            class="card-flush finding-item finding-item--collapsible"
           >
-            <div class="finding-row" @click="toggleTrust(app.path)">
-              <div class="finding-info">
-                <div class="finding-name-row">
-                  <span class="expand-chevron" :class="{ expanded: expandedTrust.has(app.path) }">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-                  </span>
-                  <span class="finding-name">{{ app.name }}</span>
-                  <span
-                    v-if="app.findings.length > 0"
-                    :class="['badge', severityClass[highestSeverityTrust(app)]]"
-                  >
-                    {{ severityLabel[highestSeverityTrust(app)] }}
-                  </span>
-                  <span v-if="!app.is_signed" class="badge badge-danger">Unsigned</span>
-                  <span v-else-if="!app.signature_valid" class="badge badge-warning">Invalid Signature</span>
-                  <span v-if="app.is_notarized" class="badge badge-success">Notarized</span>
+            <CollapsibleSection
+              :expanded="expandedTrust.has(app.path)"
+              @toggle="toggleTrust(app.path)"
+            >
+              <template #header>
+                <div class="finding-info">
+                  <div class="finding-name-row">
+                    <span class="finding-name">{{ app.name }}</span>
+                    <span
+                      v-if="app.findings.length > 0"
+                      :class="['badge', severityClass[highestSeverityTrust(app)]]"
+                    >
+                      {{ severityLabel[highestSeverityTrust(app)] }}
+                    </span>
+                    <span v-if="!app.is_signed" class="badge badge-danger">Unsigned</span>
+                    <span v-else-if="!app.signature_valid" class="badge badge-warning">Invalid Signature</span>
+                    <span v-if="app.is_notarized" class="badge badge-success">Notarized</span>
+                  </div>
+                  <div class="finding-detail finding-detail--flush">
+                    <span class="mono text-muted">{{ app.bundle_id || "---" }}</span>
+                  </div>
                 </div>
-                <div class="finding-detail">
-                  <span class="mono text-muted">{{ app.bundle_id || "---" }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="expandedTrust.has(app.path)" class="finding-expanded">
+              </template>
+              <div class="finding-expanded">
               <div class="expanded-section">
                 <span class="expanded-label">Path</span>
                 <span class="mono expanded-path">{{ app.path }}</span>
@@ -402,24 +401,26 @@ async function handleRemove(item: LaunchItem) {
               <div v-if="app.findings.length === 0" class="expanded-section">
                 <span class="text-muted">No findings -- app appears trustworthy</span>
               </div>
-            </div>
+              </div>
+            </CollapsibleSection>
           </div>
-        </div>
+          </div>
+        </CollapsibleSection>
       </div>
 
       <!-- Shell Init Section -->
       <div class="section">
-        <div class="section-header" tabindex="0" role="button" :aria-expanded="expandedSections.has('shell')" @click="toggleSection('shell')" @keydown.enter="toggleSection('shell')" @keydown.space.prevent="toggleSection('shell')">
-          <span class="expand-chevron" :class="{ expanded: expandedSections.has('shell') }">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-          </span>
-          <h3 class="section-title">Shell Init</h3>
-          <span class="badge badge-accent">
-            {{ securityResult.shell_findings.length }}
-          </span>
-        </div>
-
-        <div v-if="expandedSections.has('shell')" class="section-body">
+        <CollapsibleSection
+          :expanded="expandedSections.has('shell')"
+          @toggle="toggleSection('shell')"
+        >
+          <template #header>
+            <h3 class="section-title">Shell Init</h3>
+            <span class="badge badge-accent">
+              {{ securityResult.shell_findings.length }}
+            </span>
+          </template>
+          <div class="section-body">
           <EmptyState
             v-if="securityResult.shell_findings.length === 0"
             title="No suspicious shell configuration found"
@@ -429,26 +430,26 @@ async function handleRemove(item: LaunchItem) {
           <div
             v-for="sf in securityResult.shell_findings"
             :key="shellKey(sf)"
-            class="card-flush finding-item"
+            class="card-flush finding-item finding-item--collapsible"
           >
-            <div class="finding-row" @click="toggleShell(shellKey(sf))">
-              <div class="finding-info">
-                <div class="finding-name-row">
-                  <span class="expand-chevron" :class="{ expanded: expandedShell.has(shellKey(sf)) }">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-                  </span>
-                  <span class="finding-name">{{ sf.finding.title }}</span>
-                  <span :class="['badge', severityClass[sf.finding.severity]]">
-                    {{ severityLabel[sf.finding.severity] }}
-                  </span>
+            <CollapsibleSection
+              :expanded="expandedShell.has(shellKey(sf))"
+              @toggle="toggleShell(shellKey(sf))"
+            >
+              <template #header>
+                <div class="finding-info">
+                  <div class="finding-name-row">
+                    <span class="finding-name">{{ sf.finding.title }}</span>
+                    <span :class="['badge', severityClass[sf.finding.severity]]">
+                      {{ severityLabel[sf.finding.severity] }}
+                    </span>
+                  </div>
+                  <div class="finding-detail finding-detail--flush">
+                    <span class="mono text-muted">{{ sf.file_path }}:{{ sf.line_number }}</span>
+                  </div>
                 </div>
-                <div class="finding-detail">
-                  <span class="mono text-muted">{{ sf.file_path }}:{{ sf.line_number }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="expandedShell.has(shellKey(sf))" class="finding-expanded">
+              </template>
+              <div class="finding-expanded">
               <div class="expanded-section">
                 <span class="expanded-label">Line Content</span>
                 <pre class="shell-line mono">{{ sf.line_content }}</pre>
@@ -469,9 +470,11 @@ async function handleRemove(item: LaunchItem) {
                 <span class="expanded-label">Suggested Action</span>
                 <span class="finding-description">{{ sf.finding.suggested_action }}</span>
               </div>
-            </div>
+              </div>
+            </CollapsibleSection>
           </div>
-        </div>
+          </div>
+        </CollapsibleSection>
       </div>
     </template>
   </section>
@@ -495,7 +498,7 @@ async function handleRemove(item: LaunchItem) {
   margin-bottom: var(--sp-6);
 }
 
-.section-header {
+.section :deep(.collapsible-header) {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -506,12 +509,35 @@ async function handleRemove(item: LaunchItem) {
   transition: background 0.15s ease;
 }
 
-.section-header:hover {
+.section :deep(.collapsible-header:hover) {
   background: var(--surface-alt);
 }
 
-.section-header .section-title {
+.section :deep(.collapsible-header .section-title) {
   margin-bottom: 0;
+}
+
+.finding-item--collapsible :deep(.collapsible-header) {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  justify-content: flex-start;
+  padding: var(--sp-4) var(--sp-5);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.finding-item--collapsible :deep(.collapsible-header:hover) {
+  background: var(--surface-alt);
+}
+
+.finding-item--collapsible :deep(.collapsible-header .finding-info) {
+  flex: 1;
+  min-width: 0;
+}
+
+.finding-detail--flush {
+  padding-left: 0;
 }
 
 .section-body {

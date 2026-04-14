@@ -160,9 +160,13 @@ enum RuleBasedClassifier {
         ("/webdeploy/production/", "safe",
          "Application web deployment cache. Regenerates automatically.", 0.90),
 
-        // Negativ_ Vault archives
-        ("/MyNegativeSpaceVault/", "vaulted",
-         "Negativ_ Vault archive. Contains compressed copies of files you archived — originals were deleted. Manage these from the Vault view.", 0.99),
+        // Negativ_ Archive
+        ("/NegativeSpace/archive/", "archived",
+         "Negativ_ Archive. Contains compressed copies of files you archived — originals were deleted. Manage from the Archive view.", 0.99),
+        ("/NegativeSpace/vault/", "archived",
+         "Negativ_ Vault. Contains securely stored files. Manage from the Sensitive Content view.", 0.99),
+        ("/MyNegativeSpaceVault/", "archived",
+         "Legacy Negativ_ Archive. Manage from the Archive view.", 0.99),
 
         // Affinity
         ("/Affinity", "risky",

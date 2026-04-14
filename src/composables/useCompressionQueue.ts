@@ -1,5 +1,5 @@
 /**
- * Composable that manages a compression queue for the Vault view.
+ * Composable that manages a compression queue for the Archive view.
  *
  * Handles staging folders/files, calculating sizes, and executing
  * compression in sequence. Store actions are injected as parameters
@@ -30,15 +30,10 @@ export interface CompressProgress {
 }
 
 export interface UseCompressionQueueOptions {
-  /** Compress a directory into the vault */
-  compressDirectoryToVault: (path: string) => Promise<CompressResult>;
-  /** Compress individual files into the vault */
-  compressToVault: (paths: string[]) => Promise<CompressResult>;
-  /** Callback when errors occur (e.g. set vaultError) */
+  compressDirectoryToArchive: (path: string) => Promise<CompressResult>;
+  compressToArchive: (paths: string[]) => Promise<CompressResult>;
   onError: (message: string) => void;
-  /** Callback when compression succeeds */
   onSuccess: (message: string) => void;
-  /** Whether compression is currently in progress (external flag) */
   compressing: { value: boolean };
 }
 
@@ -106,7 +101,7 @@ export function useCompressionQueue(opts: UseCompressionQueueOptions) {
 
       try {
         if (item.isDirectory) {
-          const result = await opts.compressDirectoryToVault(item.path);
+          const result = await opts.compressDirectoryToArchive(item.path);
           if (result.success || result.files_compressed > 0) {
             totalSavings += result.total_savings;
             compressed++;
@@ -114,7 +109,7 @@ export function useCompressionQueue(opts: UseCompressionQueueOptions) {
           }
           if (result.errors.length) errors.push(...result.errors);
         } else {
-          const result = await opts.compressToVault([item.path]);
+          const result = await opts.compressToArchive([item.path]);
           if (result.success || result.files_compressed > 0) {
             totalSavings += result.total_savings;
             compressed++;
@@ -123,7 +118,7 @@ export function useCompressionQueue(opts: UseCompressionQueueOptions) {
           if (result.errors.length) errors.push(...result.errors);
         }
       } catch (e) {
-        console.warn('[vault] compress failed for', item.path, e);
+        console.warn('[archive] compress failed for', item.path, e);
         errors.push(`${item.name}: ${String(e)}`);
       }
     }

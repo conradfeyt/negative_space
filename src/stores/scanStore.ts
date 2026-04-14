@@ -242,27 +242,73 @@ export {
   packagesScanned,
   packagesError,
   scanPackages,
+  customProbes,
+  customProbesLoaded,
+  loadCustomProbes,
+  saveCustomProbes,
+  deleteCustomProbe,
+  testProbeCommand,
 } from "./packagesStore";
 
 // ---------------------------------------------------------------------------
-// Re-export: vault
+// Re-export: sensitive content (NSFW)
+// ---------------------------------------------------------------------------
+export {
+  nsfwResult,
+  nsfwScanning,
+  nsfwScanned,
+  nsfwError,
+  nsfwProgress,
+  excludedLabels,
+  toggleExcludedLabel,
+  isLabelExcluded,
+  labelWeights,
+  setLabelWeight,
+  getLabelWeight,
+  ALL_LABELS,
+  EXPOSED_LABELS,
+  scanNsfw,
+  stopNsfwScan,
+  dismissNsfwPaths,
+  clearNsfwDismissed,
+} from "./nsfwStore";
+
+// ---------------------------------------------------------------------------
+// Re-export: archive (compress-to-save-space)
+// ---------------------------------------------------------------------------
+export {
+  archiveSummary,
+  archiveEntries,
+  archiveCandidates,
+  archiveScanning,
+  archiveCompressing,
+  archiveError,
+  loadArchiveSummary,
+  scanArchiveCandidates,
+  compressToArchive,
+  restoreFromArchive,
+  compressDirectoryToArchive,
+  collectArchiveDirectory,
+  deleteArchiveEntry,
+  setArchiveEntries,
+  removeArchiveCandidates,
+} from "./archiveStore";
+
+// ---------------------------------------------------------------------------
+// Re-export: vault (sensitive content secure storage)
 // ---------------------------------------------------------------------------
 export {
   vaultSummary,
   vaultEntries,
-  vaultCandidates,
-  vaultScanning,
-  vaultCompressing,
   vaultError,
   loadVaultSummary,
-  scanVaultCandidates,
   compressToVault,
   restoreFromVault,
-  compressDirectoryToVault,
-  collectVaultDirectory,
   deleteVaultEntry,
-  setVaultEntries,
-  removeCandidates,
+  moveFilesToDirectory,
+  storageConfig,
+  loadStorageConfig,
+  setStorageConfig,
 } from "./vaultStore";
 
 // ---------------------------------------------------------------------------
@@ -337,6 +383,7 @@ import { restoreSecurityCache } from "./securityStore";
 import { restoreBrowsersCache } from "./browserStore";
 import { restoreDuplicatesCache, restoreSimilarCache } from "./duplicatesStore";
 import { restorePackagesCache } from "./packagesStore";
+import { restoreNsfwCache } from "./nsfwStore";
 import { listDiskMapCaches, loadDiskMapCache } from "./diskMapStore";
 import { diskUsage } from "./diskUsageStore";
 
@@ -358,6 +405,7 @@ export async function restoreAllCaches() {
     restoreDuplicatesCache(),
     restoreSimilarCache(),
     restorePackagesCache(),
+    restoreNsfwCache(),
   ]);
 
   // Restore most recent disk map cache (for dashboard waffle chart)

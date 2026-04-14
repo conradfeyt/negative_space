@@ -1,0 +1,80 @@
+[
+  {
+    "shortDescription" : "NudeNet 320n - YOLOv8 nano body part detection (18 classes)",
+    "metadataOutputVersion" : "3.0",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float16",
+        "formattedType" : "MultiArray (Float16 1 × 22 × 2100)",
+        "shortDescription" : "",
+        "shape" : "[1, 22, 2100]",
+        "name" : "var_1711",
+        "type" : "MultiArray"
+      }
+    ],
+    "version" : "3.4.2",
+    "modelParameters" : [
+
+    ],
+    "author" : "NudeNet (notAI-tech)",
+    "specificationVersion" : 7,
+    "storagePrecision" : "Float16",
+    "mlProgramOperationTypeHistogram" : {
+      "Concat" : 19,
+      "Ios16.cast" : 1,
+      "Ios16.mul" : 3,
+      "SliceByIndex" : 2,
+      "Transpose" : 1,
+      "Ios16.sub" : 2,
+      "Ios16.sigmoid" : 1,
+      "Ios16.maxPool" : 3,
+      "UpsampleNearestNeighbor" : 2,
+      "Ios16.add" : 8,
+      "Ios16.conv" : 64,
+      "Ios16.softmax" : 1,
+      "Split" : 9,
+      "Ios16.reshape" : 5,
+      "Ios16.silu" : 57
+    },
+    "computePrecision" : "Mixed (Float16, Float32, Int32)",
+    "stateSchema" : [
+
+    ],
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "13.0",
+      "tvOS" : "16.0",
+      "visionOS" : "1.0",
+      "watchOS" : "9.0",
+      "iOS" : "16.0",
+      "macCatalyst" : "16.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "inputSchema" : [
+      {
+        "height" : "320",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "320",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 320 × 320)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "images"
+      }
+    ],
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.conversion_date" : "2026-04-12",
+      "com.github.apple.coremltools.source" : "torch==2.11.0",
+      "com.github.apple.coremltools.version" : "9.0",
+      "com.github.apple.coremltools.source_dialect" : "TorchScript"
+    },
+    "generatedClassName" : "NudeNet320n",
+    "method" : "predict"
+  }
+]

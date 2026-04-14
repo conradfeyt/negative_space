@@ -37,6 +37,7 @@ tauri-plugin-dialog = "2.6.0"
 # Image processing and perceptual hashing (similar image detection)
 image = { version = "0.23", default-features = false, features = ["jpeg", "png", "gif", "tiff", "webp", "bmp"] }
 img_hash = "3.2"
+kamadak-exif = "0.6.1"
 
 [dev-dependencies]
 tempfile = "3"

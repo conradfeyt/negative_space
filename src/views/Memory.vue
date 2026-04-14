@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from "vue";
 import type { ProcessGroup } from "../types";
 import {
   memoryResult,
@@ -11,6 +11,8 @@ import {
 import { formatSize, MEMORY_CATEGORY_COLORS, MEMORY_BAR_COLORS, memoryPressureLevel } from "../utils";
 import EmptyState from "../components/EmptyState.vue";
 import LiveIndicator from "../components/LiveIndicator.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
+import { showToast } from "../stores/toastStore";
 
 // ---------------------------------------------------------------------------
 // Live refresh
@@ -123,6 +125,8 @@ const sortedGroups = computed((): ProcessGroup[] => {
   if (!memoryResult.value) return [];
   return [...memoryResult.value.groups];
 });
+
+watch(memoryError, (err) => { if (err) showToast(err, "error"); });
 </script>
 
 <template>
@@ -141,9 +145,6 @@ const sortedGroups = computed((): ProcessGroup[] => {
         <LiveIndicator :paused="paused" />
       </div>
     </div>
-
-    <!-- Error state -->
-    <div v-if="memoryError" class="error-message">{{ memoryError }}</div>
 
     <!-- Initial scanning state (no prior results) -->
     <div v-if="memoryScanning && !memoryResult" class="scanning-state card">
@@ -205,29 +206,30 @@ const sortedGroups = computed((): ProcessGroup[] => {
           :key="group.name"
           class="group-card card-flush"
         >
-          <div class="group-header" tabindex="0" role="button" @click="toggleGroup(group.name)" @keydown.enter="toggleGroup(group.name)" @keydown.space.prevent="toggleGroup(group.name)">
-            <div class="group-left">
-              <span
-                class="group-color-dot"
-                :style="{ backgroundColor: getCategoryColor(group.category) }"
-              ></span>
-              <div class="group-info">
-                <span class="group-name">{{ group.name }}</span>
-                <span class="group-desc" v-if="group.description">{{ group.description }}</span>
+          <CollapsibleSection
+            :expanded="expandedGroups.has(group.name)"
+            @toggle="toggleGroup(group.name)"
+          >
+            <template #header>
+              <div class="group-header-main">
+                <div class="group-left">
+                  <span
+                    class="group-color-dot"
+                    :style="{ backgroundColor: getCategoryColor(group.category) }"
+                  ></span>
+                  <div class="group-info">
+                    <span class="group-name">{{ group.name }}</span>
+                    <span class="group-desc" v-if="group.description">{{ group.description }}</span>
+                  </div>
+                </div>
+                <div class="group-right">
+                  <span class="group-count">{{ group.process_count }} proc{{ group.process_count === 1 ? '' : 's' }}</span>
+                  <span class="group-mem">{{ formatSize(group.total_rss_bytes) }}</span>
+                  <span class="group-pct">{{ formatPercent(group.total_mem_percent) }}</span>
+                </div>
               </div>
-            </div>
-            <div class="group-right">
-              <span class="group-count">{{ group.process_count }} proc{{ group.process_count === 1 ? '' : 's' }}</span>
-              <span class="group-mem">{{ formatSize(group.total_rss_bytes) }}</span>
-              <span class="group-pct">{{ formatPercent(group.total_mem_percent) }}</span>
-              <span class="expand-chevron" :class="{ expanded: expandedGroups.has(group.name) }">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 2 L8 6 L4 10"/></svg>
-              </span>
-            </div>
-          </div>
-
-          <!-- Expanded: individual processes -->
-          <div v-if="expandedGroups.has(group.name)" class="group-processes">
+            </template>
+            <div class="group-processes">
             <table>
               <thead>
                 <tr>
@@ -248,7 +250,8 @@ const sortedGroups = computed((): ProcessGroup[] => {
                 </tr>
               </tbody>
             </table>
-          </div>
+            </div>
+          </CollapsibleSection>
         </div>
       </div>
     </template>
@@ -400,17 +403,25 @@ const sortedGroups = computed((): ProcessGroup[] => {
   gap: var(--sp-2);
 }
 
-.group-header {
+.group-card :deep(.collapsible-header) {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--sp-3);
   padding: 14px 18px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.group-header:hover {
+.group-card :deep(.collapsible-header:hover) {
   background: var(--surface-alt);
+}
+
+.group-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
 }
 
 .group-left {

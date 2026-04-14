@@ -3,11 +3,13 @@ import { ref, onMounted, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
 const router = useRouter();
-import type { PathAccess, ScanArea } from "../types";
+import { open } from "@tauri-apps/plugin-dialog";
+import type { PathAccess, ScanArea, StorageConfig } from "../types";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
+import InlineAlert from "../components/InlineAlert.vue";
+import { hasFullDiskAccess, checkFullDiskAccess, loadStorageConfig, setStorageConfig, storageConfig } from "../stores/scanStore";
 
 const checking = ref(false);
-const hasFullDiskAccess = ref<boolean | null>(null);
 const customJsDrag = ref(true);
 const DRAG_MODE_KEY = "negative_space_use_custom_js_drag";
 
@@ -59,8 +61,7 @@ watch(customJsDrag, saveSettings);
 async function checkAllAccess() {
   checking.value = true;
   try {
-    // Check full disk access first
-    hasFullDiskAccess.value = await invoke<boolean>("check_full_disk_access");
+    await checkFullDiskAccess();
 
     if (hasFullDiskAccess.value) {
       // FDA granted -- all areas are accessible and should be enabled.
@@ -138,9 +139,42 @@ async function toggleArea(area: ScanArea) {
 
 const enabledCount = computed(() => scanAreas.value.filter((a) => a.enabled).length);
 
+// ── Storage locations ─────────────────────────────────────────────────────
+
+const archiveDirDisplay = computed(() => storageConfig.value.archive_dir ?? "Default (~/Documents/NegativeSpace/archive)");
+const vaultDirDisplay = computed(() => storageConfig.value.vault_dir ?? "Default (~/Documents/NegativeSpace/vault)");
+
+async function pickStorageDir(kind: "archive" | "vault") {
+  const current = kind === "archive" ? storageConfig.value.archive_dir : storageConfig.value.vault_dir;
+  const picked = await open({
+    directory: true,
+    multiple: false,
+    defaultPath: current ?? undefined,
+    title: `Choose ${kind} directory`,
+  });
+  if (!picked) return;
+  const dir = typeof picked === "string" ? picked : picked[0];
+  if (!dir) return;
+
+  const updated: StorageConfig = {
+    ...storageConfig.value,
+    [kind === "archive" ? "archive_dir" : "vault_dir"]: dir,
+  };
+  await setStorageConfig(updated);
+}
+
+async function resetStorageDir(kind: "archive" | "vault") {
+  const updated: StorageConfig = {
+    ...storageConfig.value,
+    [kind === "archive" ? "archive_dir" : "vault_dir"]: null,
+  };
+  await setStorageConfig(updated);
+}
+
 onMounted(() => {
   loadSettings();
   checkAllAccess();
+  loadStorageConfig();
 });
 </script>
 
@@ -212,10 +246,12 @@ onMounted(() => {
         Choose which directories are included when scanning for large files. Disabled areas will be skipped.
       </p>
 
-      <div v-if="deniedMessage" class="denied-banner">
-        <span>{{ deniedMessage }}</span>
-        <button class="btn-primary btn-sm" @click="openSettings">Open System Settings</button>
-      </div>
+      <InlineAlert v-if="deniedMessage" variant="warning">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);width:100%">
+          <span>{{ deniedMessage }}</span>
+          <button class="btn-primary btn-sm" @click="openSettings">Open System Settings</button>
+        </div>
+      </InlineAlert>
 
       <div class="area-list">
         <div
@@ -244,6 +280,46 @@ onMounted(() => {
             </template>
             <span v-else-if="checking" class="spinner spinner-xs"></span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage Locations -->
+    <div class="card storage-section">
+      <div class="section-header">
+        <h3 class="section-title">Storage Locations</h3>
+      </div>
+      <p class="text-muted section-desc">
+        Choose where compressed archives and vaulted files are stored. Use an external drive or NAS for offloading.
+      </p>
+
+      <div class="storage-row">
+        <div class="storage-info">
+          <span class="storage-label">Archive</span>
+          <span class="storage-path mono text-muted">{{ archiveDirDisplay }}</span>
+        </div>
+        <div class="storage-actions">
+          <button class="btn-secondary btn-sm" @click="pickStorageDir('archive')">Change</button>
+          <button
+            v-if="storageConfig.archive_dir"
+            class="btn-ghost btn-sm"
+            @click="resetStorageDir('archive')"
+          >Reset</button>
+        </div>
+      </div>
+
+      <div class="storage-row">
+        <div class="storage-info">
+          <span class="storage-label">Vault</span>
+          <span class="storage-path mono text-muted">{{ vaultDirDisplay }}</span>
+        </div>
+        <div class="storage-actions">
+          <button class="btn-secondary btn-sm" @click="pickStorageDir('vault')">Change</button>
+          <button
+            v-if="storageConfig.vault_dir"
+            class="btn-ghost btn-sm"
+            @click="resetStorageDir('vault')"
+          >Reset</button>
         </div>
       </div>
     </div>
@@ -329,27 +405,6 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-/* Denied access banner */
-.denied-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--radius-sm);
-  background: var(--warning-tint);
-  border: 1px solid rgba(194, 122, 18, 0.1);
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: var(--sp-4);
-  animation: fadeIn 0.3s ease;
-}
-
-.denied-banner .btn-sm {
-  flex-shrink: 0;
-}
-
 /* Scan areas */
 .areas-section {
   margin-bottom: var(--sp-6);
@@ -382,6 +437,7 @@ onMounted(() => {
   font-size: 12px;
 }
 
+/* ── Detection Model ────────────────────────────────── */
 .area-summary {
   font-size: 12px;
 }
@@ -471,6 +527,50 @@ onMounted(() => {
 .access-badge.missing {
   background: transparent;
   color: var(--muted);
+}
+
+/* Storage locations */
+.storage-section {
+  margin-bottom: var(--sp-6);
+}
+
+.storage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.storage-row:last-child {
+  border-bottom: none;
+}
+
+.storage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.storage-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.storage-path {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-shrink: 0;
 }
 
 .mt-6 { margin-top: var(--sp-6); }

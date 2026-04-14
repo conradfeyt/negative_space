@@ -1,12 +1,14 @@
-// vault.rs — Compress-instead-of-delete file archival for Negative _.
+// vault.rs — Shared compression engine for Archive and Vault features.
 //
-// The Vault lets users reclaim disk space by compressing large, stale files
-// into a managed archive. Files can be restored to their original path at
-// any time. This addresses the core anxiety of disk cleanup: users need
-// space but are afraid to permanently delete files they might need.
+// Two features share this engine:
+//   Archive — compress large files to save disk space (sidebar "Archive" view)
+//   Vault   — securely store sensitive files (Sensitive Content "Vault" button)
+//
+// Both use the same zstd compression, BLAKE3 integrity checks, and manifest
+// format, but store data in separate directories under ~/Documents/NegativeSpace/.
 //
 // COMPRESSION: zstd level 3 (good balance of speed and ratio).
-// STORAGE: ~/Library/Application Support/NegativeSpace/vault/
+// STORAGE: ~/Documents/NegativeSpace/{archive,vault}/
 // INTEGRITY: BLAKE3 hash verified on both compress and restore.
 // DEDUP: Files with identical content share a single compressed copy.
 
@@ -84,6 +86,21 @@ pub struct RestoreResult {
     pub errors: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MoveResult {
+    pub success: bool,
+    pub files_moved: u64,
+    pub errors: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OperationProgress {
+    pub operation: String,
+    pub processed: u64,
+    pub total: u64,
+    pub current_file: String,
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -108,45 +125,91 @@ const SKIP_EXTENSIONS: &[&str] = &[
 ];
 
 // ---------------------------------------------------------------------------
-// Vault paths
+// Storage kind + paths
 // ---------------------------------------------------------------------------
 
-fn vault_dir() -> Option<String> {
+#[derive(Clone, Copy, Debug)]
+pub enum StorageKind {
+    Archive,
+    Vault,
+}
+
+fn base_dir() -> Option<String> {
     let home = commands::home_dir()?;
-    let new_path = format!("{}/Documents/MyNegativeSpaceVault", home);
-    let old_path = format!("{}/Library/Application Support/NegativeSpace/vault", home);
-    if std::path::Path::new(&new_path).exists() {
-        Some(new_path)
-    } else if std::path::Path::new(&old_path).exists() {
-        Some(old_path)
-    } else {
-        Some(new_path)
+    Some(format!("{}/Documents/NegativeSpace", home))
+}
+
+fn storage_dir(kind: StorageKind) -> Option<String> {
+    let config = load_storage_config();
+    let custom = match kind {
+        StorageKind::Archive => config.archive_dir,
+        StorageKind::Vault => config.vault_dir,
+    };
+
+    if let Some(dir) = custom {
+        if !dir.is_empty() {
+            return Some(dir);
+        }
     }
+
+    default_storage_dir(kind)
 }
 
-fn vault_data_dir() -> Option<String> {
-    Some(format!("{}/data", vault_dir()?))
+fn storage_data_dir(kind: StorageKind) -> Option<String> {
+    Some(format!("{}/data", storage_dir(kind)?))
 }
 
-fn manifest_path() -> Option<String> {
-    Some(format!("{}/manifest.json", vault_dir()?))
+fn storage_manifest_path(kind: StorageKind) -> Option<String> {
+    Some(format!("{}/manifest.json", storage_dir(kind)?))
 }
 
-fn ensure_vault_dirs() -> Result<(), String> {
-    let data_dir = vault_data_dir().ok_or("Cannot determine vault directory")?;
+fn ensure_storage_dirs(kind: StorageKind) -> Result<(), String> {
+    let data_dir = storage_data_dir(kind).ok_or("Cannot determine storage directory")?;
     fs::create_dir_all(&data_dir)
-        .map_err(|e| format!("Failed to create vault directory: {}", e))?;
+        .map_err(|e| format!("Failed to create storage directory: {}", e))?;
     Ok(())
+}
+
+/// Migrate legacy ~/Documents/MyNegativeSpaceVault into the new archive/ location.
+pub fn migrate_legacy_vault() {
+    let home = match commands::home_dir() {
+        Some(h) => h,
+        None => return,
+    };
+    let legacy = format!("{}/Documents/MyNegativeSpaceVault", home);
+    let legacy2 = format!("{}/Library/Application Support/NegativeSpace/vault", home);
+
+    let source = if Path::new(&legacy).exists() {
+        legacy
+    } else if Path::new(&legacy2).exists() {
+        legacy2
+    } else {
+        return;
+    };
+
+    let archive = match storage_dir(StorageKind::Archive) {
+        Some(d) => d,
+        None => return,
+    };
+
+    if Path::new(&archive).exists() {
+        return; // already migrated
+    }
+
+    if let Some(parent) = Path::new(&archive).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::rename(&source, &archive);
 }
 
 // ---------------------------------------------------------------------------
 // Manifest I/O
 // ---------------------------------------------------------------------------
 
-fn load_manifest() -> VaultManifest {
+fn load_manifest(kind: StorageKind) -> VaultManifest {
     let empty = || VaultManifest { version: 1, entries: vec![] };
 
-    let path = match manifest_path() {
+    let path = match storage_manifest_path(kind) {
         Some(p) => p,
         None => return empty(),
     };
@@ -157,18 +220,18 @@ fn load_manifest() -> VaultManifest {
     match serde_json::from_str(&data) {
         Ok(m) => m,
         Err(e) => {
-            eprintln!("[vault] manifest parse failed: {}. Backing up corrupt file.", e);
+            eprintln!("[storage] manifest parse failed: {}. Backing up corrupt file.", e);
             let backup = format!("{}.corrupt", path);
             if let Err(be) = fs::copy(&path, &backup) {
-                eprintln!("[vault] failed to back up corrupt manifest: {}", be);
+                eprintln!("[storage] failed to back up corrupt manifest: {}", be);
             }
             empty()
         }
     }
 }
 
-fn save_manifest(manifest: &VaultManifest) -> Result<(), String> {
-    let path = manifest_path().ok_or("Cannot determine manifest path")?;
+fn save_manifest(kind: StorageKind, manifest: &VaultManifest) -> Result<(), String> {
+    let path = storage_manifest_path(kind).ok_or("Cannot determine manifest path")?;
     let data = serde_json::to_string_pretty(manifest)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
     fs::write(&path, &data)
@@ -248,14 +311,12 @@ pub fn scan_candidates(opts: VaultScanOptions<'_>) -> Vec<CompressionCandidate> 
     let scan_roots = commands::build_scan_roots(&home, scan_path, true, &[]);
     let root = scan_roots.into_iter().next().unwrap_or_else(|| home.clone());
 
-    // Load existing vault to skip already-archived files
-    let manifest = load_manifest();
+    let manifest = load_manifest(StorageKind::Archive);
     let archived_paths: std::collections::HashSet<String> =
         manifest.entries.iter().map(|e| e.original_path.clone()).collect();
 
-    // Vault-specific extra skip prefixes: vault data dir + ~/Library when no FDA.
-    let vault = vault_dir().unwrap_or_default();
-    let mut extra = vec![vault];
+    let archive = storage_dir(StorageKind::Archive).unwrap_or_default();
+    let mut extra = vec![archive];
     if !fda {
         extra.push(format!("{}/Library", home));
     }
@@ -361,8 +422,11 @@ pub fn scan_candidates(opts: VaultScanOptions<'_>) -> Vec<CompressionCandidate> 
     candidates
 }
 
-/// Compress files into the vault.
-pub fn compress_files(paths: &[String]) -> CompressResult {
+/// Compress files into the specified storage (Archive or Vault).
+pub fn compress_files<F>(paths: &[String], kind: StorageKind, emit: F) -> CompressResult
+where
+    F: Fn(OperationProgress),
+{
     let mut result = CompressResult {
         success: true,
         files_compressed: 0,
@@ -372,22 +436,28 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
         errors: vec![],
     };
 
-    if let Err(e) = ensure_vault_dirs() {
+    let total = paths.len() as u64;
+    let op_name = match kind {
+        StorageKind::Archive => "compress",
+        StorageKind::Vault => "vault",
+    };
+
+    if let Err(e) = ensure_storage_dirs(kind) {
         result.success = false;
         result.errors.push(e);
         return result;
     }
 
-    let data_dir = match vault_data_dir() {
+    let data_dir = match storage_data_dir(kind) {
         Some(d) => d,
         None => {
             result.success = false;
-            result.errors.push("Cannot determine vault directory".to_string());
+            result.errors.push("Cannot determine storage directory".to_string());
             return result;
         }
     };
 
-    let mut manifest = load_manifest();
+    let mut manifest = load_manifest(kind);
 
     // Build a map of existing hashes for dedup
     let mut hash_refcount: HashMap<String, u32> = HashMap::new();
@@ -395,7 +465,18 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
         *hash_refcount.entry(entry.blake3_hash.clone()).or_insert(0) += 1;
     }
 
-    for path_str in paths {
+    for (idx, path_str) in paths.iter().enumerate() {
+        let name = Path::new(path_str)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        emit(OperationProgress {
+            operation: op_name.to_string(),
+            processed: idx as u64,
+            total,
+            current_file: name,
+        });
+
         match compress_single_file(path_str, &data_dir) {
             Ok((entry, original_size, compressed_size)) => {
                 crate::spotlight::index_vault_entry(&entry);
@@ -403,7 +484,6 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
                 manifest.entries.push(entry);
                 *hash_refcount.entry(hash).or_insert(0) += 1;
 
-                // Delete original — the critical step. Only after verified compression.
                 match fs::remove_file(Path::new(path_str)) {
                     Ok(_) => {
                         result.files_compressed += 1;
@@ -422,14 +502,21 @@ pub fn compress_files(paths: &[String]) -> CompressResult {
         }
     }
 
-    if let Err(e) = save_manifest(&manifest) {
+    emit(OperationProgress {
+        operation: op_name.to_string(),
+        processed: total,
+        total,
+        current_file: String::new(),
+    });
+
+    if let Err(e) = save_manifest(kind, &manifest) {
         result.errors.push(format!("Failed to save manifest: {}", e));
     }
 
     result
 }
 
-/// Compress a single file into the vault data directory.
+/// Compress a single file into the storage data directory.
 /// Returns (VaultEntry, original_size, compressed_size) on success,
 /// or an error message string on failure.
 fn compress_single_file(
@@ -491,26 +578,26 @@ fn compress_single_file(
     Ok((entry, original_size, compressed_size))
 }
 
-/// Restore a file from the vault to its original location.
-pub fn restore_file(entry_id: &str) -> RestoreResult {
-    let mut manifest = load_manifest();
+/// Restore a file from storage to its original location.
+pub fn restore_file(entry_id: &str, kind: StorageKind) -> RestoreResult {
+    let mut manifest = load_manifest(kind);
 
     let entry_idx = match manifest.entries.iter().position(|e| e.id == entry_id) {
         Some(i) => i,
         None => return RestoreResult {
             success: false,
             restored_path: String::new(),
-            errors: vec![format!("Entry {} not found in vault", entry_id)],
+            errors: vec![format!("Entry {} not found", entry_id)],
         },
     };
 
     let entry = &manifest.entries[entry_idx];
-    let data_dir = match vault_data_dir() {
+    let data_dir = match storage_data_dir(kind) {
         Some(d) => d,
         None => return RestoreResult {
             success: false,
             restored_path: String::new(),
-            errors: vec!["Cannot determine vault directory".to_string()],
+            errors: vec!["Cannot determine storage directory".to_string()],
         },
     };
 
@@ -616,7 +703,7 @@ pub fn restore_file(entry_id: &str) -> RestoreResult {
         }
     }
 
-    if let Err(e) = save_manifest(&manifest) {
+    if let Err(e) = save_manifest(kind, &manifest) {
         return RestoreResult {
             success: true, // File was restored, manifest save failed
             restored_path: original_path,
@@ -631,9 +718,9 @@ pub fn restore_file(entry_id: &str) -> RestoreResult {
     }
 }
 
-/// Get a summary of the vault contents.
-pub fn get_summary() -> VaultSummary {
-    let manifest = load_manifest();
+/// Get a summary of storage contents.
+pub fn get_summary(kind: StorageKind) -> VaultSummary {
+    let manifest = load_manifest(kind);
     let total_original: u64 = manifest.entries.iter().map(|e| e.original_size).sum();
     let total_compressed: u64 = manifest.entries.iter().map(|e| e.compressed_size).sum();
 
@@ -645,14 +732,14 @@ pub fn get_summary() -> VaultSummary {
     }
 }
 
-/// Get all vault entries.
-pub fn get_entries() -> Vec<VaultEntry> {
-    load_manifest().entries
+/// Get all entries from the specified storage.
+pub fn get_entries(kind: StorageKind) -> Vec<VaultEntry> {
+    load_manifest(kind).entries
 }
 
-/// Permanently delete a vault entry (no restore possible after this).
-pub fn delete_entry(entry_id: &str) -> Result<(), String> {
-    let mut manifest = load_manifest();
+/// Permanently delete an entry (no restore possible after this).
+pub fn delete_entry(entry_id: &str, kind: StorageKind) -> Result<(), String> {
+    let mut manifest = load_manifest(kind);
 
     let entry_idx = manifest.entries.iter().position(|e| e.id == entry_id)
         .ok_or_else(|| format!("Entry {} not found", entry_id))?;
@@ -671,7 +758,7 @@ pub fn delete_entry(entry_id: &str) -> Result<(), String> {
 
     // Only delete compressed file if no other entries reference it
     if hash_ref_count <= 1 {
-        if let Some(data_dir) = vault_data_dir() {
+        if let Some(data_dir) = storage_data_dir(kind) {
             let vault_path = format!("{}/{}", data_dir, vault_filename);
             if let Err(e) = fs::remove_file(&vault_path) {
                 eprintln!("[vault] failed to remove vault file {}: {}", vault_path, e);
@@ -679,7 +766,7 @@ pub fn delete_entry(entry_id: &str) -> Result<(), String> {
         }
     }
 
-    save_manifest(&manifest)?;
+    save_manifest(kind, &manifest)?;
     Ok(())
 }
 
@@ -782,9 +869,8 @@ fn build_vault_entry(
     }
 }
 
-/// Compress an entire directory into a single vault entry (tar.zst).
-/// The whole directory tree is archived as one blob and the original is removed.
-pub fn compress_directory(dir_path: &str) -> CompressResult {
+/// Compress an entire directory into a single archive entry (tar.zst).
+pub fn compress_directory(dir_path: &str, kind: StorageKind) -> CompressResult {
     let mut result = CompressResult {
         success: false,
         files_compressed: 0,
@@ -800,20 +886,19 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
         return result;
     }
 
-    if let Err(e) = ensure_vault_dirs() {
+    if let Err(e) = ensure_storage_dirs(kind) {
         result.errors.push(e);
         return result;
     }
 
-    let data_dir = match vault_data_dir() {
+    let data_dir = match storage_data_dir(kind) {
         Some(d) => d,
         None => {
-            result.errors.push("Cannot determine vault directory".to_string());
+            result.errors.push("Cannot determine storage directory".to_string());
             return result;
         }
     };
 
-    // Calculate total directory size
     let original_size = dir_size_bytes(dir_path);
 
     // Create tar.zst: tar the directory into a zstd-compressed stream
@@ -822,11 +907,10 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
     let vault_path = format!("{}/{}", data_dir, vault_filename);
 
     if Path::new(&vault_path).exists() {
-        result.errors.push("This directory is already archived in the vault".to_string());
+        result.errors.push("This directory is already archived".to_string());
         return result;
     }
 
-    // Create tar.zst
     match tar_zstd_directory(dir_path, &vault_path) {
         Ok(_) => {}
         Err(e) => {
@@ -843,11 +927,11 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
 
     let entry = build_vault_entry(dir_path, original_size, compressed_size, ratio, hash_hex, vault_filename, "directory");
 
-    let mut manifest = load_manifest();
+    let mut manifest = load_manifest(kind);
     crate::spotlight::index_vault_entry(&entry);
     manifest.entries.push(entry);
 
-    // Compression succeeded — set result regardless of deletion outcome
+    // Compression succeeded
     result.success = true;
     result.files_compressed = 1;
     result.total_original_size = original_size;
@@ -859,14 +943,14 @@ pub fn compress_directory(dir_path: &str) -> CompressResult {
         result.errors.push(format!("Compressed but failed to delete original: {}", e));
     }
 
-    if let Err(e) = save_manifest(&manifest) {
+    if let Err(e) = save_manifest(kind, &manifest) {
         result.errors.push(format!("Manifest save error: {}", e));
     }
 
     result
 }
 
-/// Restore a directory from a tar.zst vault entry.
+/// Restore a directory from a tar.zst archive entry.
 fn restore_directory(vault_path: &str, original_path: &str) -> Result<(), String> {
     // Ensure parent exists
     if let Some(parent) = Path::new(original_path).parent() {
@@ -950,11 +1034,11 @@ fn blake3_hash_directory(path: &str) -> String {
 /// Collect all compressible files in a user-chosen directory (no age filter).
 /// Used when the user explicitly picks a folder to archive via the folder picker.
 pub fn collect_directory_files(dir_path: &str) -> Vec<CompressionCandidate> {
-    let manifest = load_manifest();
+    let manifest = load_manifest(StorageKind::Archive);
     let archived_paths: std::collections::HashSet<String> =
         manifest.entries.iter().map(|e| e.original_path.clone()).collect();
 
-    let vault = vault_dir().unwrap_or_default();
+    let archive = storage_dir(StorageKind::Archive).unwrap_or_default();
     let now = std::time::SystemTime::now();
     let recent_threshold = 7 * 86400;
 
@@ -965,7 +1049,7 @@ pub fn collect_directory_files(dir_path: &str) -> Vec<CompressionCandidate> {
         .into_iter()
         .filter_entry(|e| {
             let p = e.path().to_string_lossy();
-            !p.starts_with(&vault)
+            !p.starts_with(&archive)
                 && !(e.file_type().is_dir() && e.path().file_name().map_or(false, |n| n == ".git"))
         })
         .filter_map(|e| e.ok())
@@ -1046,4 +1130,194 @@ fn chrono_now() -> String {
         }
         _ => "unknown".to_string(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Move files to directory (fire-and-forget relocation)
+// ---------------------------------------------------------------------------
+
+/// Move files to a target directory. Tries `fs::rename` first (same volume),
+/// falls back to copy+delete for cross-volume moves.
+pub fn move_files_to_directory<F>(paths: &[String], target_dir: &str, emit: F) -> MoveResult
+where
+    F: Fn(OperationProgress),
+{
+    let target = Path::new(target_dir);
+    let total = paths.len() as u64;
+
+    if let Err(e) = fs::create_dir_all(target) {
+        return MoveResult {
+            success: false,
+            files_moved: 0,
+            errors: vec![format!("Cannot create target directory: {}", e)],
+        };
+    }
+
+    let mut files_moved: u64 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for (idx, path_str) in paths.iter().enumerate() {
+        let name = Path::new(path_str)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        emit(OperationProgress {
+            operation: "move".to_string(),
+            processed: idx as u64,
+            total,
+            current_file: name.clone(),
+        });
+
+        let src = Path::new(path_str);
+        if !src.exists() {
+            errors.push(format!("File not found: {}", path_str));
+            continue;
+        }
+
+        if name.is_empty() {
+            errors.push(format!("Invalid file path: {}", path_str));
+            continue;
+        }
+
+        let dest = find_unique_dest(target, &name);
+
+        match fs::rename(src, &dest) {
+            Ok(()) => {
+                files_moved += 1;
+            }
+            Err(rename_err) => {
+                if rename_err.raw_os_error() == Some(18) /* EXDEV */ {
+                    match fs::copy(src, &dest) {
+                        Ok(_) => {
+                            if let Err(e) = fs::remove_file(src) {
+                                errors.push(format!(
+                                    "Copied but failed to remove original {}: {}",
+                                    path_str, e
+                                ));
+                            }
+                            files_moved += 1;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Failed to copy {}: {}", path_str, e));
+                        }
+                    }
+                } else {
+                    errors.push(format!("Failed to move {}: {}", path_str, rename_err));
+                }
+            }
+        }
+    }
+
+    emit(OperationProgress {
+        operation: "move".to_string(),
+        processed: total,
+        total,
+        current_file: String::new(),
+    });
+
+    MoveResult {
+        success: errors.is_empty(),
+        files_moved,
+        errors,
+    }
+}
+
+/// Find a unique destination path, appending _1, _2, etc. on collision.
+fn find_unique_dest(dir: &Path, file_name: &str) -> std::path::PathBuf {
+    let mut dest = dir.join(file_name);
+    if !dest.exists() {
+        return dest;
+    }
+
+    let stem = Path::new(file_name)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_name.to_string());
+    let ext = Path::new(file_name)
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+
+    let mut counter = 1u32;
+    loop {
+        dest = dir.join(format!("{}_{}{}", stem, counter, ext));
+        if !dest.exists() {
+            return dest;
+        }
+        counter += 1;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Storage configuration (custom vault/archive directories)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StorageConfig {
+    pub archive_dir: Option<String>,
+    pub vault_dir: Option<String>,
+}
+
+fn storage_config_path() -> Result<String, String> {
+    let home = commands::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    let dir = format!("{}/Library/Application Support/NegativeSpace", home);
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    Ok(format!("{}/storage-config.json", dir))
+}
+
+pub fn load_storage_config() -> StorageConfig {
+    let path = match storage_config_path() {
+        Ok(p) => p,
+        Err(_) => return StorageConfig { archive_dir: None, vault_dir: None },
+    };
+    if !Path::new(&path).exists() {
+        return StorageConfig { archive_dir: None, vault_dir: None };
+    }
+    match fs::read_to_string(&path) {
+        Ok(data) => serde_json::from_str(&data)
+            .unwrap_or(StorageConfig { archive_dir: None, vault_dir: None }),
+        Err(_) => StorageConfig { archive_dir: None, vault_dir: None },
+    }
+}
+
+pub fn save_storage_config(config: &StorageConfig) -> Result<(), String> {
+    let path = storage_config_path()?;
+
+    // Validate custom directories are writable
+    if let Some(ref dir) = config.archive_dir {
+        validate_storage_dir(dir)?;
+    }
+    if let Some(ref dir) = config.vault_dir {
+        validate_storage_dir(dir)?;
+    }
+
+    let data = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    fs::write(&path, data)
+        .map_err(|e| format!("Failed to write config: {}", e))
+}
+
+fn validate_storage_dir(dir: &str) -> Result<(), String> {
+    let path = Path::new(dir);
+    fs::create_dir_all(path)
+        .map_err(|e| format!("Cannot create directory {}: {}", dir, e))?;
+
+    // Verify writable by creating a temp file
+    let test_file = path.join(".negativ_write_test");
+    fs::write(&test_file, b"test")
+        .map_err(|e| format!("Directory {} is not writable: {}", dir, e))?;
+    let _ = fs::remove_file(&test_file);
+
+    Ok(())
+}
+
+/// Get the default storage directory for a kind (ignoring config).
+pub fn default_storage_dir(kind: StorageKind) -> Option<String> {
+    let base = base_dir()?;
+    Some(match kind {
+        StorageKind::Archive => format!("{}/archive", base),
+        StorageKind::Vault => format!("{}/vault", base),
+    })
 }

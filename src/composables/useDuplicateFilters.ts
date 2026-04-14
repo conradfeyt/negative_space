@@ -62,7 +62,7 @@ export function isImageFile(name: string): boolean {
 // ---------------------------------------------------------------------------
 
 export function useDuplicateFilters(duplicateResult: Ref<DuplicateScanResult | null>) {
-  const activeKindFilter = ref<FileKind>("all");
+  const activeKinds = ref<Set<FileKind>>(new Set());
 
   const kindCounts = computed(() => {
     if (!duplicateResult.value) return {};
@@ -76,17 +76,35 @@ export function useDuplicateFilters(duplicateResult: Ref<DuplicateScanResult | n
     return counts;
   });
 
+  function isKindActive(kind: FileKind): boolean {
+    if (kind === "all") return activeKinds.value.size === 0;
+    return activeKinds.value.has(kind);
+  }
+
+  function toggleKind(kind: FileKind) {
+    if (kind === "all") {
+      activeKinds.value = new Set();
+      return;
+    }
+    const next = new Set(activeKinds.value);
+    if (next.has(kind)) next.delete(kind);
+    else next.add(kind);
+    activeKinds.value = next;
+  }
+
   const filteredGroups = computed<DuplicateGroup[]>(() => {
     if (!duplicateResult.value) return [];
-    if (activeKindFilter.value === "all") return duplicateResult.value.groups;
+    if (activeKinds.value.size === 0) return duplicateResult.value.groups;
     return duplicateResult.value.groups.filter(
-      (g) => getFileKind(g.files[0].name) === activeKindFilter.value
+      (g) => activeKinds.value.has(getFileKind(g.files[0].name))
     );
   });
 
   return {
-    activeKindFilter,
+    activeKinds,
     kindCounts,
+    isKindActive,
+    toggleKind,
     filteredGroups,
   };
 }
