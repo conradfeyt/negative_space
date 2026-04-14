@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { formatSize, getFileExtension } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -22,6 +22,12 @@ import StatCard from "../components/StatCard.vue";
 import Checkbox from "../components/Checkbox.vue";
 import EmptyState from "../components/EmptyState.vue";
 import TabBar from "../components/TabBar.vue";
+import ScanHeader from "../components/ScanHeader.vue";
+import AppSelect from "../components/AppSelect.vue";
+import StickyBar from "../components/StickyBar.vue";
+import ProgressBar from "../components/ProgressBar.vue";
+import LoadingState from "../components/LoadingState.vue";
+import KindFilterBar from "../components/KindFilterBar.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import type { DuplicateGroup, SimilarGroup, FilePreview } from "../types";
 import {
@@ -31,26 +37,100 @@ import {
   KIND_LABELS,
   type FileKind,
 } from "../composables/useDuplicateFilters";
+import { useScanLocations } from "../composables/useScanFolder";
 
 const PREVIEW_FILES_PER_GROUP = 10;
 
-// Tab state
-const activeTab = ref<"exact" | "similar">("exact");
+// Scan type & result view
+const scanType = ref<string>("exact");
+const scanTypeOptions = ref([
+  { value: "exact", label: "Exact" },
+  { value: "similar", label: "Similar" },
+  { value: "both", label: "Both" },
+]);
 
-const tabOptions: TabOption[] = [
+// Load SF Symbol icons for scan types
+const SCAN_TYPE_ICONS: Record<string, string> = {
+  exact: "equal.circle",
+  similar: "photo.on.rectangle.angled",
+  both: "square.stack.3d.up",
+};
+
+for (const [type, sfName] of Object.entries(SCAN_TYPE_ICONS)) {
+  invoke<string>("render_sf_symbol", { name: sfName, size: 32, mode: "sf", style: "plain" })
+    .then((b64) => {
+      if (!b64) return;
+      const opt = scanTypeOptions.value.find((o) => o.value === type);
+      if (opt) (opt as any).icon = b64;
+    })
+    .catch(() => {});
+}
+const activeView = ref<"exact" | "similar">("exact");
+
+// Settings popover
+const showSettings = ref(false);
+
+function onSettingsClickOutside(e: MouseEvent) {
+  const el = (e.target as HTMLElement).closest('.settings-popover');
+  if (!el) showSettings.value = false;
+}
+
+function onSettingsEsc(e: KeyboardEvent) {
+  if (e.key === "Escape") showSettings.value = false;
+}
+
+watch(showSettings, (open) => {
+  if (open) {
+    setTimeout(() => {
+      document.addEventListener("click", onSettingsClickOutside);
+      document.addEventListener("keydown", onSettingsEsc);
+    }, 0);
+  } else {
+    document.removeEventListener("click", onSettingsClickOutside);
+    document.removeEventListener("keydown", onSettingsEsc);
+  }
+});
+
+const minSizeStops = [0, 1, 5, 10, 50, 100];
+const thresholdStops = [5, 10, 15, 20];
+
+const minSizeLabel = computed(() => {
+  if (minSizeMb.value === 0) return "1 KB";
+  if (minSizeMb.value >= 1000) return `${minSizeMb.value / 1000} GB`;
+  return `${minSizeMb.value} MB`;
+});
+
+const thresholdLabel = computed(() => {
+  if (similarThreshold.value <= 5) return "Strict";
+  if (similarThreshold.value <= 10) return "Normal";
+  if (similarThreshold.value <= 15) return "Loose";
+  return "Very Loose";
+});
+
+// ── Multi-directory picker ───────────────────────────────────────────────
+const { folders: scanFolders, addFolder, removeFolder } = useScanLocations("dup");
+
+const viewTabOptions: TabOption[] = [
   { value: "exact", label: "Exact Duplicates" },
   { value: "similar", label: "Similar Images" },
 ];
+
+const hasExactResults = computed(() => !!duplicateResult.value && duplicateResult.value.groups.length > 0);
+const hasSimilarResults = computed(() => !!similarResult.value && similarResult.value.groups.length > 0);
+const showViewTabs = computed(() => hasExactResults.value && hasSimilarResults.value);
+
+watch(scanType, (type) => {
+  if (type === "exact") activeView.value = "exact";
+  else if (type === "similar") activeView.value = "similar";
+});
+
+watch(duplicateError, (err) => { if (err) showToast(err, "error"); });
+watch(similarError, (err) => { if (err) showToast(err, "error"); });
 
 // Similar images state
 const similarThreshold = ref(10);
 const similarMinSizeMb = ref(0);
 const similarSelected = ref<Set<string>>(new Set());
-
-async function scanSimilar() {
-  similarSelected.value = new Set();
-  await scanSimilarImages(similarThreshold.value, similarMinSizeMb.value);
-}
 
 function toggleSimilarFile(path: string) {
   const next = new Set(similarSelected.value);
@@ -73,7 +153,7 @@ async function deleteSimilarSelected() {
     const result = await deleteFiles(Array.from(similarSelected.value));
     showToast(`Deleted ${result.deleted_count} file(s), freed ${formatSize(result.freed_bytes)}`, "success");
     similarSelected.value = new Set();
-    await scanSimilar();
+    await scanSimilarImages(similarThreshold.value, similarMinSizeMb.value);
   } catch (e) {
     showToast(String(e), "error");
   } finally {
@@ -84,20 +164,29 @@ async function deleteSimilarSelected() {
 // ── File kind filtering (composable) ──────────────────────────────────────
 
 const {
-  activeKindFilter,
+  activeKinds,
   kindCounts,
   filteredGroups,
 } = useDuplicateFilters(duplicateResult);
 
 const ALL_KINDS: FileKind[] = ["all", "images", "documents", "audio", "video", "archives", "code", "other"];
 
-const kindOptions = computed<TabOption[]>(() =>
-  ALL_KINDS.map((kind) => ({
-    value: kind,
-    label: KIND_LABELS[kind],
-    disabled: kind !== "all" && !kindCounts.value[kind],
-  }))
-);
+const kindOptions = ALL_KINDS.filter((k) => k !== "all").map((k) => ({ key: k, label: KIND_LABELS[k] }));
+
+const activeKindsList = computed({
+  get: () => Array.from(activeKinds.value),
+  set: (v: string[]) => {
+    activeKinds.value = new Set(v as FileKind[]);
+  },
+});
+
+const kindCountNumbers = computed(() => {
+  const result: Record<string, number> = {};
+  for (const [k, v] of Object.entries(kindCounts.value)) {
+    result[k] = (v as { groups: number }).groups;
+  }
+  return result;
+});
 
 // File icon cache (same pattern as LargeFiles)
 const fileIconCache = ref<Record<string, string>>({});
@@ -119,6 +208,12 @@ function getFileIcon(name: string): string {
 
 // Preload common icons
 for (const ext of ["png", "jpg", "pdf", "zip", "mp4", "mp3", "doc", "js", "py"]) loadFileIcon(ext);
+
+// Native filter icon
+const filterIcon = ref("");
+invoke<string>("render_sf_symbol", { name: "line.3.horizontal.decrease", size: 32, mode: "sf", style: "plain" })
+  .then((b64) => { if (b64) filterIcon.value = b64; })
+  .catch(() => {});
 
 // isImageFile and extCardColor are imported from useDuplicateFilters
 
@@ -146,9 +241,28 @@ const previewData = ref<FilePreview | null>(null);
 const previewLoading = ref(false);
 const previewPath = ref<string | null>(null);
 
+const scanLabel = "Scan";
+
+const isScanning = computed(() => duplicateScanning.value || similarScanning.value);
+
+const headerDescription = computed(() => {
+  if (scanType.value === "exact") return "Find identical files wasting disk space";
+  if (scanType.value === "similar") return "Find visually similar images";
+  return "Find duplicate and similar files";
+});
+
 async function scan() {
-  selected.value = new Set();
-  await scanDuplicates("~", minSizeMb.value);
+  const folders = scanFolders.value;
+  if (scanType.value === "exact" || scanType.value === "both") {
+    selected.value = new Set();
+    await scanDuplicates("~", minSizeMb.value, folders);
+    activeView.value = "exact";
+  }
+  if (scanType.value === "similar" || scanType.value === "both") {
+    similarSelected.value = new Set();
+    await scanSimilarImages(similarThreshold.value, similarMinSizeMb.value, folders);
+    if (scanType.value === "similar") activeView.value = "similar";
+  }
 }
 
 
@@ -272,69 +386,94 @@ function shortPath(p: string): string {
 
 <template>
   <section class="duplicates-view">
-    <div class="view-header">
-      <div class="view-header-top">
-        <div>
-          <h2>Duplicate Finder</h2>
-          <p class="text-muted">
-            {{ activeTab === 'exact' ? 'Find identical files wasting disk space' : 'Find visually similar images' }}
-          </p>
+    <ScanHeader
+      title="Duplicate Finder"
+      :subtitle="headerDescription"
+      :scanning="isScanning"
+      :scan-label="scanLabel"
+      :disabled="isScanning"
+      :folders="scanFolders"
+      @scan="scan"
+      @add-folder="addFolder"
+      @remove-folder="removeFolder"
+    >
+      <AppSelect v-model="scanType" :options="scanTypeOptions" compact />
+      <span class="scan-bar-divider"></span>
+      <button class="scan-bar-settings" @click.stop="showSettings = !showSettings" title="Scan settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+          <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+          <line x1="1" y1="14" x2="7" y2="14" />
+          <line x1="9" y1="8" x2="15" y2="8" />
+          <line x1="17" y1="16" x2="23" y2="16" />
+        </svg>
+      </button>
+    </ScanHeader>
+
+    <!-- Settings popover -->
+    <Teleport to="body">
+      <div v-if="showSettings" class="settings-popover" @click.stop>
+        <div class="settings-popover-header">
+          <div class="settings-popover-title">Scan settings</div>
+          <button class="settings-popover-close" @click="showSettings = false">&times;</button>
         </div>
-        <TabBar :options="tabOptions" v-model="activeTab" />
-        <div v-if="activeTab === 'exact'" class="scan-controls">
-          <div class="min-size-control">
-            <label for="dup-min-size" class="text-muted">Min size</label>
-            <select id="dup-min-size" v-model.number="minSizeMb" class="size-select">
-              <option :value="0">1 KB</option>
-              <option :value="1">1 MB</option>
-              <option :value="5">5 MB</option>
-              <option :value="10">10 MB</option>
-              <option :value="50">50 MB</option>
-              <option :value="100">100 MB</option>
-            </select>
+
+        <template v-if="scanType !== 'similar'">
+          <div class="settings-row">
+            <label class="settings-label">Minimum file size</label>
+            <span class="settings-value">{{ minSizeLabel }}</span>
           </div>
-          <button
-            class="btn-primary scan-btn"
-            :disabled="duplicateScanning"
-            @click="scan"
-          >
-            <span v-if="duplicateScanning" class="spinner-sm"></span>
-            {{ duplicateScanning ? "Scanning..." : "Find Duplicates" }}
-          </button>
-        </div>
-        <div v-if="activeTab === 'similar'" class="scan-controls">
-          <div class="min-size-control">
-            <label for="dup-threshold" class="text-muted">Threshold</label>
-            <select id="dup-threshold" v-model.number="similarThreshold" class="size-select">
-              <option :value="5">Strict (5)</option>
-              <option :value="10">Normal (10)</option>
-              <option :value="15">Loose (15)</option>
-              <option :value="20">Very loose (20)</option>
-            </select>
+          <input
+            type="range"
+            class="settings-slider"
+            :value="minSizeStops.indexOf(minSizeMb)"
+            min="0"
+            :max="minSizeStops.length - 1"
+            step="1"
+            @input="minSizeMb = minSizeStops[Number(($event.target as HTMLInputElement).value)]"
+          />
+          <div class="settings-slider-labels">
+            <span>1 KB</span>
+            <span>100 MB</span>
           </div>
-          <button
-            class="btn-primary scan-btn"
-            :disabled="similarScanning"
-            @click="scanSimilar"
-          >
-            <span v-if="similarScanning" class="spinner-sm"></span>
-            {{ similarScanning ? "Scanning..." : "Find Similar" }}
-          </button>
-        </div>
+        </template>
+
+        <template v-if="scanType !== 'exact'">
+          <div class="settings-row">
+            <label class="settings-label">Similarity</label>
+            <span class="settings-value">{{ thresholdLabel }}</span>
+          </div>
+          <input
+            type="range"
+            class="settings-slider"
+            :value="thresholdStops.indexOf(similarThreshold)"
+            min="0"
+            :max="thresholdStops.length - 1"
+            step="1"
+            @input="similarThreshold = thresholdStops[Number(($event.target as HTMLInputElement).value)]"
+          />
+          <div class="settings-slider-labels">
+            <span>Strict</span>
+            <span>Very Loose</span>
+          </div>
+        </template>
       </div>
+    </Teleport>
+
+    <!-- Result view filter (when both scan types have results) -->
+    <div v-if="showViewTabs" class="view-filter-tabs">
+      <TabBar :options="viewTabOptions" v-model="activeView" />
     </div>
 
-    <!-- ══════ EXACT DUPLICATES TAB ══════ -->
-    <template v-if="activeTab === 'exact'">
-
-    <!-- Scan error -->
-    <div v-if="duplicateError" class="error-message">{{ duplicateError }}</div>
+    <!-- ══════ EXACT DUPLICATES ══════ -->
+    <template v-if="activeView === 'exact'">
 
     <!-- Loading -->
-    <div v-if="duplicateScanning" class="loading-state">
-      <span class="spinner"></span>
-      <span>Scanning for duplicates... this may take a while</span>
-    </div>
+    <LoadingState
+      v-if="duplicateScanning"
+      message="Scanning for duplicates... this may take a while"
+    />
 
     <!-- Empty state -->
     <EmptyState
@@ -353,43 +492,17 @@ function shortPath(p: string): string {
         <StatCard :value="formatSize(duplicateResult.total_wasted_bytes)" label="wasted space" highlight />
       </div>
 
-      <!-- Skipped paths -->
-      <div
-        v-if="duplicateResult.skipped_paths.length > 0"
-        class="skipped-note text-muted"
-      >
-        Skipped (no FDA):
-        {{ duplicateResult.skipped_paths.join(", ") }}
-      </div>
-
-      <!-- Kind filter pills -->
-      <div class="kind-filter-bar">
-        <TabBar
+      <StickyBar>
+        <KindFilterBar
           :options="kindOptions"
-          v-model="activeKindFilter"
-        >
-          <template #default="{ option, active }">
-            {{ option.label }}
-            <span
-              v-if="option.value === 'all'"
-              class="kind-count"
-              :class="{ 'kind-count--active': active }"
-            >{{ duplicateResult!.groups.length }}</span>
-            <span
-              v-else-if="kindCounts[option.value as FileKind]"
-              class="kind-count"
-              :class="{ 'kind-count--active': active }"
-            >{{ kindCounts[option.value as FileKind].groups }}</span>
-          </template>
-        </TabBar>
-      </div>
-
-      <!-- Action bar -->
-      <div class="summary-bar">
-        <div class="results-actions">
-          <span v-if="selected.size > 0" class="selected-info">
-            {{ selected.size }} file(s) selected ({{ formatSize(totalSelected) }})
-          </span>
+          v-model="activeKindsList"
+          :counts="kindCountNumbers"
+          :icon="filterIcon"
+        />
+        <span v-if="selected.size > 0" class="results-count">
+          {{ selected.size }} file(s) selected &mdash; {{ formatSize(totalSelected) }}
+        </span>
+        <template #actions>
           <button
             class="btn-danger"
             :disabled="selected.size === 0 || cleaning"
@@ -398,8 +511,8 @@ function shortPath(p: string): string {
             <span v-if="cleaning" class="spinner-sm"></span>
             {{ cleaning ? "Deleting..." : "Delete Selected" }}
           </button>
-        </div>
-      </div>
+        </template>
+      </StickyBar>
 
       <!-- Duplicate groups — card gallery layout -->
       <div class="group-list">
@@ -508,13 +621,10 @@ function shortPath(p: string): string {
         </div>
       </div>
     </template>
-    </template><!-- /exact tab -->
+    </template><!-- /exact -->
 
-    <!-- ══════ SIMILAR IMAGES TAB ══════ -->
-    <template v-if="activeTab === 'similar'">
-
-      <!-- Scan error -->
-      <div v-if="similarError" class="error-message">{{ similarError }}</div>
+    <!-- ══════ SIMILAR IMAGES ══════ -->
+    <template v-if="activeView === 'similar'">
 
       <!-- Progress -->
       <div v-if="similarScanning" class="similar-progress">
@@ -534,9 +644,10 @@ function shortPath(p: string): string {
           </span>
         </div>
         <div v-if="similarProgress && similarProgress.phase === 'hashing' && similarProgress.total_images > 0" class="similar-progress-bar-wrap">
-          <div class="similar-progress-bar" role="progressbar" :aria-valuenow="Math.round(similarProgress.images_processed / similarProgress.total_images * 100)" aria-valuemin="0" aria-valuemax="100">
-            <div class="similar-progress-fill" :style="{ width: Math.round(similarProgress.images_processed / similarProgress.total_images * 100) + '%' }"></div>
-          </div>
+          <ProgressBar
+            :percent="Math.round((similarProgress.images_processed / similarProgress.total_images) * 100)"
+            size="thin"
+          />
           <span class="similar-progress-pct text-muted">{{ Math.round(similarProgress.images_processed / similarProgress.total_images * 100) }}%</span>
         </div>
         <div v-if="similarProgress && similarProgress.current_file" class="similar-progress-file text-muted">
@@ -560,20 +671,24 @@ function shortPath(p: string): string {
           <StatCard :value="formatSize(similarResult.total_wasted_bytes)" label="reclaimable" highlight />
         </div>
 
-        <!-- Batch actions -->
-        <div class="batch-bar" v-if="similarResult.groups.length > 0">
-          <button class="btn-secondary" @click="similarResult.groups.forEach(g => selectSimilarDuplicates(g))">
-            Select all duplicates
-          </button>
-          <button
-            class="btn-danger"
-            :disabled="similarSelected.size === 0 || cleaning"
-            @click="deleteSimilarSelected"
-          >
-            <span v-if="cleaning" class="spinner-sm"></span>
-            {{ cleaning ? "Deleting..." : `Delete ${similarSelected.size} selected` }}
-          </button>
-        </div>
+        <StickyBar v-if="similarResult.groups.length > 0">
+          <span v-if="similarSelected.size > 0" class="results-count">
+            {{ similarSelected.size }} selected
+          </span>
+          <template #actions>
+            <button class="btn-secondary" @click="similarResult.groups.forEach(g => selectSimilarDuplicates(g))">
+              Select all duplicates
+            </button>
+            <button
+              class="btn-danger"
+              :disabled="similarSelected.size === 0 || cleaning"
+              @click="deleteSimilarSelected"
+            >
+              <span v-if="cleaning" class="spinner-sm"></span>
+              {{ cleaning ? "Deleting..." : `Delete ${similarSelected.size} selected` }}
+            </button>
+          </template>
+        </StickyBar>
 
         <!-- Groups — card gallery (same layout as exact duplicates) -->
         <div class="group-list">
@@ -628,7 +743,7 @@ function shortPath(p: string): string {
         </div>
       </template>
 
-    </template><!-- /similar tab -->
+    </template><!-- /similar -->
   </section>
 </template>
 
@@ -637,6 +752,44 @@ function shortPath(p: string): string {
   max-width: 1440px;
 }
 
+.results-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.scan-bar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Settings button in ScanBar */
+.scan-bar-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  opacity: 0.7;
+}
+
+.scan-bar-settings:hover {
+  background: rgba(0, 0, 0, 0.06);
+  opacity: 1;
+}
+
+/* Result view filter tabs */
+.view-filter-tabs {
+  margin-bottom: var(--sp-3);
+}
 
 .similar-progress {
   padding: var(--sp-4);
@@ -661,19 +814,9 @@ function shortPath(p: string): string {
   margin-bottom: var(--sp-1);
 }
 
-.similar-progress-bar {
+.similar-progress-bar-wrap :deep(.progress-track) {
   flex: 1;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.similar-progress-fill {
-  height: 100%;
-  background: var(--accent, rgba(2, 117, 244, 0.8));
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  min-width: 0;
 }
 
 .similar-progress-pct {
@@ -691,53 +834,8 @@ function shortPath(p: string): string {
   max-width: 500px;
 }
 
-.kind-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: var(--sp-3);
-}
 
-.kind-count {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--muted);
-}
 
-.kind-count--active {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
-}
-
-.scan-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.min-size-control {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.min-size-control label {
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.size-select {
-  font-size: 12px;
-  padding: 6px var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--glass);
-  color: var(--text);
-  cursor: pointer;
-}
 
 /* Stats bar */
 .stats-bar {
@@ -747,11 +845,6 @@ function shortPath(p: string): string {
 }
 
 
-.skipped-note {
-  font-size: 12px;
-  margin-bottom: var(--sp-3);
-  padding: 0 var(--sp-1);
-}
 
 /* Group list */
 .group-list {
@@ -802,7 +895,7 @@ function shortPath(p: string): string {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding: 0 16px 14px;
+  margin: 0 16px 14px;
 }
 
 .card-strip-container::-webkit-scrollbar {
@@ -821,6 +914,7 @@ function shortPath(p: string): string {
   gap: 10px;
   flex-wrap: nowrap;
 }
+
 
 /* ── File card ─────────────────────────────────────────── */
 
@@ -1116,5 +1210,104 @@ function shortPath(p: string): string {
   text-align: center;
   padding: var(--sp-6);
   font-size: 13px;
+}
+</style>
+
+<style>
+/* Settings popover — Teleported to body, needs global styles */
+.settings-popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg, 12px);
+  padding: 0 20px 16px;
+  width: 260px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  -webkit-app-region: no-drag;
+}
+
+.settings-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 8px;
+}
+
+.settings-popover-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-popover-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.settings-popover-close:hover {
+  opacity: 1;
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  outline: none;
+  margin: 4px 0 2px;
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #0088FF);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.settings-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
 }
 </style>

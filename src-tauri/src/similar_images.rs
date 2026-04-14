@@ -82,6 +82,9 @@ pub struct SimilarScanOptions<'a> {
     pub min_size_bytes: u64,
     pub fda: bool,
     pub skip_paths: &'a [String],
+    /// Explicit scan roots (e.g. user-picked directories).
+    /// When non-empty, these are used directly instead of build_scan_roots.
+    pub scan_paths: &'a [String],
 }
 
 /// Internal struct holding a hashed image during scanning.
@@ -127,17 +130,19 @@ pub fn run_similar_scan(
     // Build skip prefixes via shared helper.
     let skip_prefixes = commands::build_skip_prefixes(&home, opts.skip_paths, &[]);
 
-    // Safe dirs for similar-image scanner — intentionally limited to
-    // user media directories (Pictures, Downloads, Documents, Desktop).
-    let safe_dirs = vec![
-        format!("{}/Pictures", home),
-        format!("{}/Downloads", home),
-        format!("{}/Documents", home),
-        format!("{}/Desktop", home),
-    ];
-    // Note: with FDA the scanner walks from home (not a user-specified path),
-    // so we pass "~" to get the home directory as the sole root.
-    let scan_roots = commands::build_scan_roots(&home, "~", fda, &safe_dirs);
+    // If explicit scan_paths were provided, use them directly.
+    // Otherwise fall back to the standard build_scan_roots logic.
+    let scan_roots = if !opts.scan_paths.is_empty() {
+        opts.scan_paths.to_vec()
+    } else {
+        let safe_dirs = vec![
+            format!("{}/Pictures", home),
+            format!("{}/Downloads", home),
+            format!("{}/Documents", home),
+            format!("{}/Desktop", home),
+        ];
+        commands::build_scan_roots(&home, "~", fda, &safe_dirs)
+    };
 
     // ── Phase 1: Discover image files ──────────────────────────────────────
     let _ = app.emit("similar-scan-progress", SimilarScanProgress {

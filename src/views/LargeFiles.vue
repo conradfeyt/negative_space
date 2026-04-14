@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { save, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import type { FileInfo } from "../types";
 import { formatSize, fileDiskSize, timeAgo, revealInFinder, getFileExtension } from "../utils";
 import { showToast } from "../stores/toastStore";
@@ -16,8 +16,8 @@ import {
   deleteFiles,
   fileClassifications,
   classifyFiles,
-  vaultEntries,
-  setVaultEntries,
+  archiveEntries,
+  setArchiveEntries,
   toggleProtected,
   isProtected,
 } from "../stores/scanStore";
@@ -27,89 +27,47 @@ import Checkbox from "../components/Checkbox.vue";
 import FileRow from "../components/FileRow.vue";
 import DirTreeNode from "../components/DirTreeNode.vue";
 import TabBar from "../components/TabBar.vue";
-import ScanBar from "../components/ScanBar.vue";
+import ScanHeader from "../components/ScanHeader.vue";
+import AppSelect from "../components/AppSelect.vue";
+import StickyBar from "../components/StickyBar.vue";
+import ChevronIcon from "../components/ChevronIcon.vue";
+import CollapsibleSection from "../components/CollapsibleSection.vue";
 import type { TabOption } from "../components/TabBar.vue";
 import {
   useFileGrouping,
   parentFolder,
 } from "../composables/useFileGrouping";
+import { useScanLocations, useScanFolder } from "../composables/useScanFolder";
+
+const { folders: scanFolders, addFolder, removeFolder } = useScanLocations("lf");
+const { nativeFolderIcon } = useScanFolder("_lf_icons");
 
 const selected = ref<Set<string>>(new Set());
 const deleting = ref(false);
-const minSizeMb = ref(100);
-const scanPath = ref("~");
-
-// Native icons for known directories
-const knownDirIcons = ref<Record<string, string>>({});
-async function loadKnownDirIcons() {
-  const iconDefs: Record<string, { name: string; mode: string; style: string }> = {
-    "~": { name: "house", mode: "sf", style: "plain" },
-    "/": { name: "externaldrive", mode: "sf", style: "plain" },
-    "~/Documents": { name: "doc", mode: "sf", style: "plain" },
-    "~/Desktop": { name: "menubar.dock.rectangle", mode: "sf", style: "plain" },
-    "~/Downloads": { name: "arrow.down.circle", mode: "sf", style: "plain" },
-    "~/Library/Mobile Documents/com~apple~CloudDocs": { name: "icloud", mode: "sf", style: "plain" },
-    "/Applications": { name: "square.grid.2x2", mode: "sf", style: "plain" },
-    "~/Movies": { name: "film", mode: "sf", style: "plain" },
-    "~/Pictures": { name: "photo", mode: "sf", style: "plain" },
-    "~/Music": { name: "music.note", mode: "sf", style: "plain" },
-  };
-  for (const [key, def] of Object.entries(iconDefs)) {
-    try {
-      const b64 = await invoke<string>("render_sf_symbol", { name: def.name, size: 32, mode: def.mode, style: def.style });
-      if (b64) knownDirIcons.value[key] = b64;
-    } catch { /* non-critical */ }
-  }
-}
-loadKnownDirIcons();
-
-const scanPathIcon = computed(() => {
-  const shortened = scanPath.value.replace(/^\/Users\/[^/]+/, "~");
-  return knownDirIcons.value[shortened] ?? "";
-});
-
-const knownDirs: Record<string, string> = {
-  "~": "Home",
-  "/": "Macintosh HD",
-  "~/Documents": "Documents",
-  "~/Desktop": "Desktop",
-  "~/Downloads": "Downloads",
-  "~/Library/Mobile Documents/com~apple~CloudDocs": "iCloud Drive",
-  "/Applications": "Applications",
-  "~/Movies": "Movies",
-  "~/Pictures": "Pictures",
-  "~/Music": "Music",
-};
-
-const scanPathDisplay = computed(() => {
-  const shortened = scanPath.value.replace(/^\/Users\/[^/]+/, "~");
-  return knownDirs[shortened] ?? shortened;
-});
-
-async function pickScanFolder() {
-  const folder = await openDialog({
-    directory: true,
-    multiple: false,
-    title: "Choose folder to scan",
-    defaultPath: scanPath.value === "~" ? undefined : scanPath.value,
-  });
-  if (folder) scanPath.value = folder as string;
-}
+const minSizeMb = ref<number>(100);
+const sizeOptions = [
+  { value: 1, label: "1 MB" },
+  { value: 5, label: "5 MB" },
+  { value: 10, label: "10 MB" },
+  { value: 50, label: "50 MB" },
+  { value: 100, label: "100 MB" },
+  { value: 500, label: "500 MB" },
+  { value: 1000, label: "1 GB" },
+];
 
 /** Track which groups are collapsed */
-const collapsedGroups = ref<Set<string>>(new Set(["vaulted"]));
+const collapsedGroups = ref<Set<string>>(new Set(["archived"]));
 
-// File grouping composable — sortMode, activeGroups, vaultedFiles, etc.
 const {
   sortMode,
   activeGroups,
-  vaultedFiles,
-  vaultedTotalSize,
+  archivedFiles,
+  archivedTotalSize,
   totalLargeFileSize,
 } = useFileGrouping({
   files: largeFiles,
   getClassification: (path: string) => fileClassifications.value.get(path),
-  isVaulted,
+  isArchived,
 });
 
 const sortOptions = computed<TabOption[]>(() => {
@@ -126,8 +84,8 @@ const sortOptions = computed<TabOption[]>(() => {
 
 async function scan() {
   selected.value = new Set();
-  collapsedGroups.value = new Set(["vaulted"]);
-  await scanLargeFiles(scanPath.value, minSizeMb.value);
+  collapsedGroups.value = new Set(["archived"]);
+  await scanLargeFiles("~", Number(minSizeMb.value), scanFolders.value);
 }
 
 // Classify files when scan completes
@@ -157,6 +115,8 @@ try {
   }
 } catch { /* non-critical */ }
 
+watch(largeFilesError, (err) => { if (err) showToast(err, "error"); });
+
 function getClassification(path: string) {
   return fileClassifications.value.get(path);
 }
@@ -168,7 +128,7 @@ function safetyBadgeClass(safety: string): string {
     case "safe_rebuild":
     case "probably_safe": return "badge-accent";
     case "risky": return "badge-danger";
-    case "vaulted": return "badge-info";
+    case "archived": return "badge-info";
     default: return "badge-neutral";
   }
 }
@@ -180,7 +140,7 @@ function safetyLabel(safety: string): string {
     case "safe_rebuild": return "Safe — recently modified";
     case "probably_safe": return "Likely safe";
     case "risky": return "Caution";
-    case "vaulted": return "Vaulted — do not delete";
+    case "archived": return "Archived — do not delete";
     default: return "";
   }
 }
@@ -280,18 +240,17 @@ async function deleteSelected() {
 }
 
 
-function isVaulted(path: string): boolean {
-  return getClassification(path)?.safety === "vaulted";
+function isArchived(path: string): boolean {
+  return getClassification(path)?.safety === "archived";
 }
 
 function isLocked(path: string): boolean {
-  return isVaulted(path);
+  return isArchived(path);
 }
 
-// Map vault archive hashes back to original names
-const vaultNameMap = computed(() => {
+const archiveNameMap = computed(() => {
   const map = new Map<string, string>();
-  for (const entry of vaultEntries.value) {
+  for (const entry of archiveEntries.value) {
     const originalName = entry.original_path.split("/").pop() ?? entry.vault_filename;
     // Key by multiple formats to handle .zst / .tar.zst variants
     const hash = entry.vault_filename.split(".")[0];
@@ -304,11 +263,10 @@ const vaultNameMap = computed(() => {
   return map;
 });
 
-function vaultDisplayName(filename: string): string {
-  // Try full filename, then hash prefix, then strip .tar.zst/.zst
-  return vaultNameMap.value.get(filename)
-    ?? vaultNameMap.value.get(filename.split(".")[0])
-    ?? vaultNameMap.value.get(filename.replace(/\.tar\.zst$/, ".zst"))
+function archiveDisplayName(filename: string): string {
+  return archiveNameMap.value.get(filename)
+    ?? archiveNameMap.value.get(filename.split(".")[0])
+    ?? archiveNameMap.value.get(filename.replace(/\.tar\.zst$/, ".zst"))
     ?? filename;
 }
 
@@ -336,20 +294,14 @@ function getFileIcon(name: string): string {
   return fileIconCache.value[ext] || "";
 }
 
-// Native macOS folder icon for reveal-in-finder buttons
-const nativeFolderIcon = ref("");
-invoke<string>("render_sf_symbol", { name: "public.folder", size: 32, mode: "uttype", style: "plain" })
-  .then(b64 => { if (b64) nativeFolderIcon.value = b64; })
-  .catch(e => console.warn('[large-files] folder icon load failed:', e));
 
 // Preload common extensions on mount
 const commonExts = ["png", "jpg", "log", "dmg", "qcow2", "jar", "a", "rlib", "so", "dylib", "img", "raw", "db", "f3d", "zip", "zst", "bin", "dill", "fst", "dat", "pack", "idx"];
 for (const ext of commonExts) loadFileIcon(ext);
 
-// Load vault manifest for name resolution
-invoke<any[]>("get_vault_entries").then((entries) => {
-  setVaultEntries(entries);
-}).catch(e => console.warn('[large-files] vault entries load failed:', e));
+invoke<any[]>("get_archive_entries").then((entries) => {
+  setArchiveEntries(entries);
+}).catch(e => console.warn('[large-files] archive entries load failed:', e));
 
 function toggleSelect(path: string) {
   if (isLocked(path)) return;
@@ -408,27 +360,6 @@ const diskSize = fileDiskSize;
 // and collectFiles are all in useFileGrouping composable.
 
 
-// Sticky bar detection — reconnects observer when sentinel element appears/changes
-const stickyBarRef = ref<HTMLElement | null>(null);
-const stickyBarSentinel = ref<HTMLElement | null>(null);
-const isStuck = ref(false);
-let stickyObserver: IntersectionObserver | null = null;
-
-function connectStickyObserver() {
-  stickyObserver?.disconnect();
-  isStuck.value = false;
-  if (stickyBarSentinel.value) {
-    stickyObserver = new IntersectionObserver(
-      ([entry]) => { isStuck.value = !entry.isIntersecting; },
-      { threshold: 0 }
-    );
-    stickyObserver.observe(stickyBarSentinel.value);
-  }
-}
-
-watch(stickyBarSentinel, connectStickyObserver);
-onMounted(connectStickyObserver);
-onUnmounted(() => { stickyObserver?.disconnect(); });
 
 function isGroupAllSelected(files: FileInfo[]): boolean {
   return files.length > 0 && files.every((f) => selected.value.has(f.path));
@@ -458,26 +389,17 @@ function fileTimeAgo(file: FileInfo): string {
 
 <template>
   <div class="large-files">
-    <div class="view-header lf-header">
-      <div>
-        <h2>Large Files</h2>
-        <p class="text-muted">Find and remove large files taking up space</p>
-      </div>
-      <ScanBar :scanning="largeFilesScanning" @scan="scan">
-        <label for="lf-min-size" class="sr-only">Minimum size (MB)</label>
-        <input id="lf-min-size" v-model.number="minSizeMb" type="number" min="1" max="10000" class="scan-bar-size" title="Minimum size (MB)" @blur="minSizeMb = Math.max(1, Math.min(10000, minSizeMb || 1))" />
-        <span class="scan-bar-unit">MB</span>
-        <span class="scan-bar-divider"></span>
-        <button class="scan-bar-folder" @click="pickScanFolder" title="Choose scan folder">
-          <img v-if="scanPathIcon" :src="scanPathIcon" alt="" class="scan-bar-folder-icon" />
-          <img v-else-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" />
-          <svg v-else width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
-          <span>{{ scanPathDisplay }}</span>
-        </button>
-      </ScanBar>
-    </div>
-
-    <div v-if="largeFilesError" class="error-message">{{ largeFilesError }}</div>
+    <ScanHeader
+      title="Large Files"
+      subtitle="Find and remove large files taking up space"
+      :scanning="largeFilesScanning"
+      :folders="scanFolders"
+      @scan="scan"
+      @add-folder="addFolder"
+      @remove-folder="removeFolder"
+    >
+      <AppSelect v-model="minSizeMb" :options="sizeOptions" compact title="Minimum file size" />
+    </ScanHeader>
 
     <!-- Protected files warning modal -->
     <Modal :visible="showProtectedWarning" title="Protected files selected" @close="showProtectedWarning = false">
@@ -519,17 +441,12 @@ function fileTimeAgo(file: FileInfo): string {
     <!-- Results -->
     <div v-if="largeFiles.length > 0" class="results-container">
 
-      <!-- Sentinel for sticky detection -->
-      <div ref="stickyBarSentinel" class="sticky-sentinel"></div>
-      <!-- Sticky action bar -->
-      <div ref="stickyBarRef" class="results-sticky-bar" :class="{ 'is-stuck': isStuck }">
-        <div class="summary-left">
-          <Checkbox :model-value="allSelected" :indeterminate="partialSelected" @change="toggleAll" />
-          <span v-if="selected.size === 0" class="results-count">{{ largeFiles.length }} file(s) &mdash; {{ formatSize(totalLargeFileSize) }}</span>
-          <span v-else-if="allSelected" class="results-count">{{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}</span>
-          <span v-else class="results-count">{{ selected.size }} of {{ largeFiles.length }} selected &mdash; {{ formatSize(totalSelected) }}</span>
-        </div>
-        <div class="results-actions">
+      <StickyBar>
+        <Checkbox :model-value="allSelected" :indeterminate="partialSelected" @change="toggleAll" />
+        <span v-if="selected.size === 0" class="results-count">{{ largeFiles.length }} file(s) &mdash; {{ formatSize(totalLargeFileSize) }}</span>
+        <span v-else-if="allSelected" class="results-count">{{ selected.size }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <span v-else class="results-count">{{ selected.size }} of {{ largeFiles.length }} selected &mdash; {{ formatSize(totalSelected) }}</span>
+        <template #actions>
           <button class="btn-secondary btn-sm protect-action-btn" :disabled="selected.size === 0" @click="protectSelected" title="Toggle protection on selected files">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Protect
@@ -539,37 +456,39 @@ function fileTimeAgo(file: FileInfo): string {
             <span v-if="deleting" class="spinner-sm"></span>
             {{ deleting ? "Deleting..." : "Delete Selected" }}
           </button>
-        </div>
-      </div>
+        </template>
+      </StickyBar>
 
-      <!-- Vaulted archives — locked section at top -->
-      <div v-if="vaultedFiles.length > 0" class="card-flush file-group vault-group">
-        <div class="group-header vault-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has('vaulted')" @click="toggleGroup('vaulted')" @keydown.enter="toggleGroup('vaulted')" @keydown.space.prevent="toggleGroup('vaulted')">
-          <div class="group-header-left">
-            <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has('vaulted') }">
-              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-            </span>
-            <div class="group-title-block">
-              <span class="group-title vault-title">Vaulted Archives</span>
-              <span class="group-meta text-muted">
-                {{ vaultedFiles.length }} file(s) &middot; {{ formatSize(vaultedTotalSize) }}
-              </span>
+      <div v-if="archivedFiles.length > 0" class="card-flush file-group archived-group">
+        <CollapsibleSection
+          :expanded="!collapsedGroups.has('archived')"
+          variant="filled"
+          @toggle="toggleGroup('archived')"
+        >
+          <template #header>
+            <div class="group-header-left archived-header">
+              <div class="group-title-block">
+                <span class="group-title archived-title">Archived</span>
+                <span class="group-meta text-muted">
+                  {{ archivedFiles.length }} file(s) &middot; {{ formatSize(archivedTotalSize) }}
+                </span>
+              </div>
+            </div>
+          </template>
+          <div class="group-description archived-description">
+            Compressed by Negativ_ Archive. Manage from the Archive view — do not delete directly.
+          </div>
+          <div class="archived-file-list">
+            <div v-for="file in archivedFiles" :key="file.path" class="archived-file-row">
+              <span class="archived-badge">Archived</span>
+              <span class="archived-file-name">{{ archiveDisplayName(file.name) }}</span>
+              <span class="archived-file-size mono">{{ formatSize(diskSize(file)) }}</span>
+              <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
+                <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
+              </button>
             </div>
           </div>
-        </div>
-        <div v-if="!collapsedGroups.has('vaulted')" class="group-description vault-description">
-          Archived by Negativ_ Vault. Manage from the Vault view — do not delete directly.
-        </div>
-        <div v-if="!collapsedGroups.has('vaulted')" class="vault-file-list">
-          <div v-for="file in vaultedFiles" :key="file.path" class="vault-file-row">
-            <span class="vault-badge">Vaulted</span>
-            <span class="vault-file-name">{{ vaultDisplayName(file.name) }}</span>
-            <span class="vault-file-size mono">{{ formatSize(diskSize(file)) }}</span>
-            <button class="btn-reveal" title="Reveal in Finder" @click.stop="revealInFinder(file.path)">
-              <img v-if="nativeFolderIcon" :src="nativeFolderIcon" alt="" width="16" height="16" /><svg v-else viewBox="0 0 20 20" fill="currentColor"><path d="M2 4.5A1.5 1.5 0 013.5 3h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 0010.621 5H16.5A1.5 1.5 0 0118 6.5v8a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 14.5v-10z"/></svg>
-            </button>
-          </div>
-        </div>
+        </CollapsibleSection>
       </div>
 
       <!-- Category groups -->
@@ -578,9 +497,7 @@ function fileTimeAgo(file: FileInfo): string {
         <!-- Category header -->
         <div class="group-header" tabindex="0" role="button" :aria-expanded="!collapsedGroups.has(group.id)" @click="toggleGroup(group.id)" @keydown.enter="toggleGroup(group.id)" @keydown.space.prevent="toggleGroup(group.id)">
           <div class="group-header-left">
-            <span class="expand-chevron" :class="{ expanded: !collapsedGroups.has(group.id) }">
-              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3l5 5-5 5V3z"/></svg>
-            </span>
+            <ChevronIcon :expanded="!collapsedGroups.has(group.id)" variant="filled" />
             <div class="group-title-block">
               <span class="group-title">{{ group.label }}</span>
               <span class="group-meta text-muted">
@@ -691,70 +608,6 @@ function fileTimeAgo(file: FileInfo): string {
 .controls-row { display: flex; align-items: flex-end; gap: var(--sp-4); }
 .control-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 .control-label { font-size: 12px; font-weight: 400; color: var(--muted); }
-/* ---- Scan bar slot content ---- */
-.scan-bar-size {
-  width: 80px;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  padding: 4px 0;
-  outline: none;
-  font-family: var(--font-mono);
-  text-align: right;
-  border-radius: 0;
-  -moz-appearance: textfield;
-}
-
-.scan-bar-size::-webkit-inner-spin-button,
-.scan-bar-size::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.scan-bar-unit {
-  font-size: 12px;
-  color: var(--muted);
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.scan-bar-divider {
-  width: 1px;
-  height: 18px;
-  background: rgba(0, 0, 0, 0.12);
-  margin: 0 8px;
-  flex-shrink: 0;
-}
-
-.scan-bar-folder {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 14px;
-  transition: background 0.15s;
-  flex: 1;
-  min-width: 0;
-}
-
-.scan-bar-folder:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.scan-bar-folder-icon {
-  height: 16px;
-  width: auto;
-  flex-shrink: 0;
-}
 
 /* ---- Scanning progress bar ---- */
 .scan-progress-bar {
@@ -795,58 +648,11 @@ function fileTimeAgo(file: FileInfo): string {
   margin-bottom: var(--sp-4);
 }
 
-/* ---- Sticky action bar ---- */
-.sticky-sentinel {
-  height: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.results-sticky-bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  margin-bottom: var(--sp-4);
-  transition: background 0.2s, border-color 0.2s;
-  border-bottom: 1px solid transparent;
-}
-
-.results-sticky-bar.is-stuck {
-  margin-left: -40px;
-  margin-right: -40px;
-  width: calc(100% + 80px);
-  padding: 10px 40px;
-  background: rgba(235, 232, 238, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom-color: rgba(0, 0, 0, 0.06);
-}
-
-.summary-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
+/* ---- Sticky bar content ---- */
 .results-count {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-}
-
-.results-total-size {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.results-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 
@@ -868,6 +674,20 @@ function fileTimeAgo(file: FileInfo): string {
 }
 
 .group-header:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.archived-group :deep(.collapsible-header) {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px 14px 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.archived-group :deep(.collapsible-header:hover) {
   background: rgba(255, 255, 255, 0.2);
 }
 
@@ -919,54 +739,46 @@ function fileTimeAgo(file: FileInfo): string {
 }
 
 
-/* Header with inline controls */
-.lf-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
 
 
-/* Vault section */
-.vault-group {
+.archived-group {
   padding: 4px 0;
   margin-bottom: var(--sp-4);
 }
 
-.vault-title {
-  color: var(--vault-text);
+.archived-title {
+  color: var(--archive-text);
 }
 
-.vault-description {
-  color: var(--vault-muted);
+.archived-description {
+  color: var(--archive-muted);
   font-style: italic;
   font-size: 11px;
 }
 
-.vault-file-list {
+.archived-file-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 4px 0;
 }
 
-.vault-file-row {
+.archived-file-row {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  border-bottom: 1px solid var(--vault-tint);
+  border-bottom: 1px solid var(--archive-tint);
 }
 
-.vault-file-row:hover {
-  background: var(--vault-tint);
+.archived-file-row:hover {
+  background: var(--archive-tint);
   opacity: 0.8;
 }
 
-.vault-badge {
-  color: var(--vault);
-  border-color: var(--vault-border);
+.archived-badge {
+  color: var(--archive);
+  border-color: var(--archive-border);
   font-size: 9px;
   font-weight: 600;
   padding: 1px 6px;
@@ -976,9 +788,9 @@ function fileTimeAgo(file: FileInfo): string {
   white-space: nowrap;
 }
 
-.vault-file-name {
+.archived-file-name {
   font-size: 12px;
-  color: var(--vault-muted);
+  color: var(--archive-muted);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -986,9 +798,9 @@ function fileTimeAgo(file: FileInfo): string {
   white-space: nowrap;
 }
 
-.vault-file-size {
+.archived-file-size {
   font-size: 12px;
-  color: var(--vault-muted);
+  color: var(--archive-muted);
   flex-shrink: 0;
 }
 

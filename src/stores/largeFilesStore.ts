@@ -39,7 +39,7 @@ export const totalLargeFileSize = computed(() =>
 // Actions
 // ---------------------------------------------------------------------------
 
-export async function scanLargeFiles(path = "~", minSizeMb = 100) {
+export async function scanLargeFiles(path = "~", minSizeMb = 100, scanPaths: string[] = []) {
   if (largeFilesScanning.value) return;
   largeFilesScanning.value = true;
   largeFilesError.value = "";
@@ -85,6 +85,7 @@ export async function scanLargeFiles(path = "~", minSizeMb = 100) {
       minSizeMb,
       skipPaths: getDisabledPaths(),
       hasFda: hasFullDiskAccess.value === true,
+      scanPaths: scanPaths.length > 0 ? scanPaths : undefined,
     });
   } catch (e) {
     largeFilesError.value = String(e);

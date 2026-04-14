@@ -62,6 +62,7 @@ pub async fn scan_large_files_stream(
     min_size_mb: u64,
     skip_paths: Option<Vec<String>>,
     has_fda: Option<bool>,
+    scan_paths: Option<Vec<String>>,
 ) -> Result<(), String> {
     use tauri::Emitter;
 
@@ -73,9 +74,15 @@ pub async fn scan_large_files_stream(
     let user_skips = skip_paths.unwrap_or_default();
     let skip_prefixes = commands::build_skip_prefixes(&home, &user_skips, &[]);
 
-    // Safe dirs for large-file scanner — shared with other scanners.
-    let safe_dirs = commands::base_scan_safe_dirs(&home);
-    let scan_roots = commands::build_scan_roots(&home, &path, fda, &safe_dirs);
+    // If explicit scan_paths were provided, use them directly.
+    // Otherwise fall back to the standard build_scan_roots logic.
+    let explicit_roots = scan_paths.unwrap_or_default();
+    let scan_roots = if !explicit_roots.is_empty() {
+        explicit_roots
+    } else {
+        let safe_dirs = commands::base_scan_safe_dirs(&home);
+        commands::build_scan_roots(&home, &path, fda, &safe_dirs)
+    };
 
     let skipped_paths: Vec<String> = if fda {
         vec![]

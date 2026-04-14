@@ -31,7 +31,7 @@ export const similarProgress = ref<SimilarScanProgress | null>(null);
 // Duplicates actions
 // ---------------------------------------------------------------------------
 
-export async function scanDuplicates(path = "~", minSizeMb = 1) {
+export async function scanDuplicates(path = "~", minSizeMb = 1, scanPaths: string[] = []) {
   if (duplicateScanning.value) return;
   duplicateScanning.value = true;
   duplicateError.value = "";
@@ -45,6 +45,7 @@ export async function scanDuplicates(path = "~", minSizeMb = 1) {
         minSizeMb,
         hasFda: hasFullDiskAccess.value === true,
         skipPaths: getDisabledPaths(),
+        scanPaths: scanPaths.length > 0 ? scanPaths : undefined,
       }
     );
     duplicateScanned.value = true;
@@ -60,7 +61,7 @@ export async function scanDuplicates(path = "~", minSizeMb = 1) {
 // Similar Images actions
 // ---------------------------------------------------------------------------
 
-export async function scanSimilarImages(threshold = 10, minSizeMb = 0) {
+export async function scanSimilarImages(threshold = 10, minSizeMb = 0, scanPaths: string[] = []) {
   if (similarScanning.value) return;
   similarScanning.value = true;
   similarError.value = "";
@@ -81,6 +82,7 @@ export async function scanSimilarImages(threshold = 10, minSizeMb = 0) {
         minSizeMb,
         hasFda: hasFullDiskAccess.value === true,
         skipPaths: getDisabledPaths(),
+        scanPaths: scanPaths.length > 0 ? scanPaths : undefined,
       }
     );
     similarScanned.value = true;

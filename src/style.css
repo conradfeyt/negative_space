@@ -205,12 +205,12 @@
   --kind-video: #27AE60;
   --kind-default: #95A5A6;
 
-  /* --- Vault feature --- */
-  --vault: var(--purple);
-  --vault-tint: hsla(280, 30%, 70%, 0.08);
-  --vault-text: hsla(280, 40%, 45%, 0.9);
-  --vault-muted: hsla(280, 30%, 30%, 0.7);
-  --vault-border: hsla(280, 40%, 60%, 0.15);
+  /* --- Archive feature --- */
+  --archive: var(--purple);
+  --archive-tint: hsla(280, 30%, 70%, 0.08);
+  --archive-text: hsla(280, 40%, 45%, 0.9);
+  --archive-muted: hsla(280, 30%, 30%, 0.7);
+  --archive-border: hsla(280, 40%, 60%, 0.15);
 
   /* --- File protection --- */
   --protect-green: hsla(145, 55%, 45%, 1);
@@ -505,7 +505,7 @@ select {
 
 select:focus {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.7);
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 

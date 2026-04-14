@@ -108,6 +108,9 @@ pub struct DuplicateScanOptions<'a> {
     pub min_size_mb: u64,
     pub fda: bool,
     pub skip_paths: &'a [String],
+    /// Explicit scan roots (e.g. user-picked directories).
+    /// When non-empty, these are used directly instead of build_scan_roots.
+    pub scan_paths: &'a [String],
 }
 
 /// Run a full duplicate file scan.
@@ -145,9 +148,14 @@ pub fn run_duplicate_scan(opts: DuplicateScanOptions<'_>) -> DuplicateScanResult
     // Build skip prefixes via shared helper.
     let skip_prefixes = commands::build_skip_prefixes(&home, skip_paths, &[]);
 
-    // Safe dirs for duplicate scanner — shared base set from commands.rs.
-    let safe_dirs = commands::base_scan_safe_dirs(&home);
-    let scan_roots = commands::build_scan_roots(&home, scan_path, fda, &safe_dirs);
+    // If explicit scan_paths were provided, use them directly.
+    // Otherwise fall back to the standard build_scan_roots logic.
+    let scan_roots = if !opts.scan_paths.is_empty() {
+        opts.scan_paths.to_vec()
+    } else {
+        let safe_dirs = commands::base_scan_safe_dirs(&home);
+        commands::build_scan_roots(&home, scan_path, fda, &safe_dirs)
+    };
 
     let skipped_paths: Vec<String> = if fda {
         vec![]
